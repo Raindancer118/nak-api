@@ -1,14 +1,19 @@
 # cis-api
 
-Go CLI client for the [NORDAKADEMIE](https://www.nordakademie.de) Campus Information System (CIS).
+Go CLI + MCP server for the [NORDAKADEMIE](https://www.nordakademie.de) Campus Information System (CIS).
 
-Reverse-engineered from the TYPO3-based CIS portal at `cis.nordakademie.de`.
+Reverse-engineered from the TYPO3-based portal at `cis.nordakademie.de`. Works as a standalone CLI and as an MCP server so Claude Code can interact directly with the CIS.
 
 ## Features
 
-- **Login / Logout** — TYPO3 felogin with session persistence (`~/.config/cis-api/session.json`)
-- **Grades** — fetch Leistungsübersicht / Notenspiegel as a table or JSON
-- **Certificates** — list and download Online-Bescheinigungen
+| | CLI | MCP |
+|---|---|---|
+| Login / Logout | ✓ | ✓ |
+| Grades (Leistungsübersicht) | ✓ | ✓ |
+| Seminar list + details | — | ✓ |
+| Wahlpflichtmodul list + details | — | ✓ |
+| Wahlpflichtmodul selection | — | ✓ |
+| Certificate list + download | ✓ | ✓ |
 
 ## Install
 
@@ -20,49 +25,73 @@ go build -o cis .
 
 Requires Go 1.21+.
 
-## Usage
+## CLI Usage
 
 ```sh
-# Login (interactive prompt or env vars)
+# Login (interactive prompt, or via env vars)
 ./cis login
-CIS_USER=20066 CIS_PASS=geheim ./cis login
+CIS_USER=20066 CIS_PASS='yourpassword' ./cis login
 
-# Show grades
+# Grades
 ./cis grades
 ./cis grades --lang en
 ./cis grades --json
 
-# List certificates
+# Certificates
 ./cis certs
-
-# Download certificate #1
 ./cis certs --download 1 --out ~/Downloads
 
 # Logout
 ./cis logout
 ```
 
+## MCP Server
+
+Add to your Claude Code `~/.claude/settings.json`:
+
+```json
+{
+  "mcpServers": {
+    "cis": {
+      "command": "/path/to/cis",
+      "args": ["mcp"],
+      "env": {
+        "CIS_USER": "your_student_id",
+        "CIS_PASS": "your_password"
+      }
+    }
+  }
+}
+```
+
+Or run `cis login` once first — the session is saved to `~/.config/cis-api/session.json` and reused automatically.
+
+### Available MCP Tools
+
+| Tool | Description |
+|---|---|
+| `cis_login` | Log in with username + password |
+| `cis_logout` | Log out and clear session |
+| `cis_grades` | Fetch grades (Leistungsübersicht) |
+| `cis_list_seminars` | List all available seminars with IDs |
+| `cis_seminar_detail` | Seminar details (dozent, dates, credits) |
+| `cis_list_wahlpflicht` | List Wahlpflichtmodule for your curriculum |
+| `cis_wahlpflicht_detail` | Module details + whether selection is open |
+| `cis_select_wahlpflicht` | Select a Wahlpflichtmodul (when period is open) |
+| `cis_list_certs` | List downloadable certificates |
+| `cis_download_cert` | Download a certificate to a local file |
+
 ## How it works
 
-The CIS runs on **TYPO3 (Extbase)** — there is no REST API. All responses are HTML.
+The CIS runs on **TYPO3 (Extbase)** — no REST API, all responses are server-rendered HTML.
 
-1. **Auth:** GET `/` → extract hidden form fields → POST credentials. Session stored as `fe_typo_user_cae070b` cookie.
-2. **cHash:** TYPO3 signs almost every URL with a `cHash` parameter that cannot be computed client-side. The client always extracts pre-signed links from the page HTML and follows those.
-3. **Scraping:** HTML tables are parsed with `golang.org/x/net/html` and matched by column header keywords.
+**Auth:** `GET /` → extract hidden TYPO3 form fields → `POST` credentials. Session stored as `fe_typo_user_cae070b` cookie, persisted in `~/.config/cis-api/session.json` (mode 0600).
 
-## Architecture
+**cHash:** TYPO3 signs every URL with a `cHash` parameter that cannot be computed client-side. The client always extracts pre-signed links from page HTML and follows those — making it robust against parameter changes.
 
-```
-cmd/          Cobra CLI commands (login, grades, certs)
-internal/
-  client/     HTTP client with cookie jar + session persistence
-  auth/       TYPO3 felogin flow
-  scraper/    Generic HTML utilities (forms, links, tables)
-  grades/     Grade fetching and parsing
-  certs/      Certificate listing and download
-```
+**Wahlpflichtmodule selection:** The selection form only appears during the selection period. `cis_wahlpflicht_detail` reports `select_available: true` when the button is live.
 
 ## Security
 
-- Credentials are never stored on disk — only the session cookie is persisted (mode 0600).
-- Credentials can be passed via `CIS_USER` / `CIS_PASS` env vars for scripting.
+- Credentials are **never stored on disk** — only the session cookie is persisted (mode 0600).
+- Pass credentials via `CIS_USER` / `CIS_PASS` env vars for scripting/MCP.

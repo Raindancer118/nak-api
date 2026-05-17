@@ -30,7 +30,11 @@ func Login(c *client.Client, username, password string) error {
 		return fmt.Errorf("parse login form: %w", err)
 	}
 	if form == nil {
-		return fmt.Errorf("login form not found — already logged in or page changed")
+		// Already logged in (no form visible) — treat as success
+		if c.IsLoggedIn() {
+			return nil
+		}
+		return fmt.Errorf("login form not found — page layout may have changed")
 	}
 
 	// Resolve action URL (may be relative)
