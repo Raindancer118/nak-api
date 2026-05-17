@@ -47,7 +47,7 @@ CIS_USER=20066 CIS_PASS='yourpassword' ./cis login
 
 ## MCP Server
 
-Add to your Claude Code `~/.claude/settings.json`:
+Add to your Claude Code `~/.claude/.mcp.json` (create the file if it doesn't exist):
 
 ```json
 {
