@@ -61,9 +61,9 @@ var gradesCmd = &cobra.Command{
 		t.SetStyle(table.StyleLight)
 		t.Style().Title.Align = text.AlignCenter
 		t.SetTitle("Leistungsübersicht")
-		t.AppendHeader(table.Row{"Modul", "Note", "Credits", "Semester", "Status"})
+		t.AppendHeader(table.Row{"Nr.", "Bezeichnung", "Note", "Credits", "Prüfungsdatum", "Semester", "Status"})
 		for _, g := range gs {
-			t.AppendRow(table.Row{g.Module, g.Grade, g.Credits, g.Semester, g.Status})
+			t.AppendRow(table.Row{g.ModuleNumber, g.Module, g.Grade, g.Credits, g.ExamDate, g.Semester, g.Status})
 		}
 		t.Render()
 		return nil
