@@ -210,6 +210,50 @@ func FetchAll(c *client.Client, lang string) ([]Grade, []string, error) {
 	return gs, links, nil
 }
 
+// DebugInfo holds diagnostic information about what was found on the grades page.
+type DebugInfo struct {
+	PageStatus     int      `json:"page_status"`
+	TablesFound    int      `json:"tables_found"`
+	TableHeaders   [][]string `json:"table_headers"`
+	TranscriptLinks []string `json:"transcript_links"`
+	GradesFound    int      `json:"grades_found"`
+}
+
+// FetchDebugInfo fetches the Leistungsübersicht page and returns diagnostic
+// information without filtering — shows all tables and their headers.
+func FetchDebugInfo(c *client.Client) (*DebugInfo, error) {
+	resp, err := c.Get("/mein-profil/mein-postfach/leistungsuebersicht")
+	if err != nil {
+		return nil, fmt.Errorf("fetch page: %w", err)
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	info := &DebugInfo{PageStatus: resp.StatusCode}
+
+	tables, _ := scraper.ExtractTables(strings.NewReader(string(body)))
+	info.TablesFound = len(tables)
+	for _, t := range tables {
+		info.TableHeaders = append(info.TableHeaders, t.Headers)
+	}
+
+	links, _ := scraper.ExtractLinks(strings.NewReader(string(body)), "tx_nagrades_nagradesmodules")
+	for _, l := range links {
+		if !strings.HasPrefix(l, "http") {
+			l = client.BaseURL + l
+		}
+		info.TranscriptLinks = append(info.TranscriptLinks, l)
+	}
+
+	gs, _ := FetchDirect(c)
+	info.GradesFound = len(gs)
+
+	return info, nil
+}
+
 type colIdx struct {
 	moduleNumber, module, examDate, grade, credits, semester, status int
 }

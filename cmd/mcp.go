@@ -120,6 +120,22 @@ func registerTools(s *server.MCPServer, c *client.Client) {
 	// ── Seminars ──────────────────────────────────────────────────────────────
 
 	s.AddTool(
+		mcp.NewTool("cis_grades_debug",
+			mcp.WithDescription("Debug tool: shows all tables found on the Leistungsübersicht page, their headers, and transcript links. Use when cis_grades returns null."),
+		),
+		func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			if !c.IsLoggedIn() {
+				return mcp.NewToolResultError("not logged in — call cis_login first"), nil
+			}
+			info, err := grades.FetchDebugInfo(c)
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			return mcp.NewToolResultText(toJSON(info)), nil
+		},
+	)
+
+	s.AddTool(
 		mcp.NewTool("cis_list_seminars",
 			mcp.WithDescription("List all available seminars. Shows title, ID, and whether a waitlist is open."),
 		),
