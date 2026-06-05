@@ -5,13 +5,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/Raindancer118/cis-api/internal/auth"
 	"github.com/Raindancer118/cis-api/internal/certs"
 	"github.com/Raindancer118/cis-api/internal/client"
+	"github.com/Raindancer118/cis-api/internal/exams"
 	"github.com/Raindancer118/cis-api/internal/grades"
 	"github.com/Raindancer118/cis-api/internal/seminars"
+	"github.com/Raindancer118/cis-api/internal/stundenplan"
+	"github.com/Raindancer118/cis-api/internal/transfer"
 	"github.com/Raindancer118/cis-api/internal/wahlpflicht"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
@@ -117,6 +119,106 @@ func registerTools(s *server.MCPServer, c *client.Client) {
 		},
 	)
 
+	// ── Stundenplan ───────────────────────────────────────────────────────────
+
+	s.AddTool(
+		mcp.NewTool("cis_list_stundenplan",
+			mcp.WithDescription("List downloadable timetable files (Stundenpläne) per Zenturie. Each Zenturie has an .ics calendar and an .html overview."),
+			mcp.WithString("zenturie", mcp.Description("Optional Zenturie prefix filter, e.g. 'I24a'")),
+			mcp.WithString("format", mcp.Description("Optional format filter: 'ics' or 'html'")),
+		),
+		func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			if !c.IsLoggedIn() {
+				return mcp.NewToolResultError("not logged in — call cis_login first"), nil
+			}
+			all, err := stundenplan.FetchList(c)
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			plans := stundenplan.Filter(all, req.GetString("zenturie", ""), req.GetString("format", ""))
+			return mcp.NewToolResultText(toJSON(plans)), nil
+		},
+	)
+
+	s.AddTool(
+		mcp.NewTool("cis_download_stundenplan",
+			mcp.WithDescription("Download a timetable file (e.g. an .ics calendar) to a local path. Get the URL from cis_list_stundenplan."),
+			mcp.WithString("download_url", mcp.Required(), mcp.Description("Download URL (from cis_list_stundenplan)")),
+			mcp.WithString("output_path", mcp.Required(), mcp.Description("Local file path, e.g. ~/Downloads/I24a.ics")),
+		),
+		func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			if !c.IsLoggedIn() {
+				return mcp.NewToolResultError("not logged in — call cis_login first"), nil
+			}
+			dlURL, _ := req.RequireString("download_url")
+			outPath, _ := req.RequireString("output_path")
+			outPath = expandHome(outPath)
+			data, _, err := stundenplan.Download(c, dlURL)
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			if err := os.WriteFile(outPath, data, 0600); err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("write file: %v", err)), nil
+			}
+			return mcp.NewToolResultText(fmt.Sprintf("Saved %d bytes to %s", len(data), outPath)), nil
+		},
+	)
+
+	// ── Klausuren / Prüfungen ─────────────────────────────────────────────────
+
+	s.AddTool(
+		mcp.NewTool("cis_list_klausuren",
+			mcp.WithDescription("List the exam overview (Prüfungsübersicht) with each exam's examId, dates and whether registration/deregistration is currently offered."),
+		),
+		func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			if !c.IsLoggedIn() {
+				return mcp.NewToolResultError("not logged in — call cis_login first"), nil
+			}
+			list, err := exams.FetchList(c)
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			return mcp.NewToolResultText(toJSON(list)), nil
+		},
+	)
+
+	s.AddTool(
+		mcp.NewTool("cis_klausur_action",
+			mcp.WithDescription("Register for or deregister from an exam. THIS IS A BINDING WRITE ACTION. Without confirm=true it only returns a dry-run preview and submits nothing. Always show the preview to the user and get explicit approval before calling again with confirm=true."),
+			mcp.WithString("exam_id", mcp.Required(), mcp.Description("ExamID (from cis_list_klausuren)")),
+			mcp.WithString("action", mcp.Required(), mcp.Description("'register' or 'deregister' — must match what the page currently offers for this exam")),
+			mcp.WithBoolean("confirm", mcp.Description("Set true to actually submit the binding request. Default false = dry run.")),
+		),
+		func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			if !c.IsLoggedIn() {
+				return mcp.NewToolResultError("not logged in — call cis_login first"), nil
+			}
+			examID, _ := req.RequireString("exam_id")
+			action, _ := req.RequireString("action")
+			if action != "register" && action != "deregister" {
+				return mcp.NewToolResultError("action must be 'register' or 'deregister'"), nil
+			}
+			e, err := exams.Resolve(c, examID)
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			if e.Action != action {
+				return mcp.NewToolResultError(fmt.Sprintf("exam %s currently offers %q, not %q", examID, e.Action, action)), nil
+			}
+			preview := fmt.Sprintf("Prüfung: %s %s | ExamID %s | %s–%s | action=%s",
+				e.ModuleNr, e.Title, e.ExamID, e.Start, e.Ende, e.Action)
+			if !req.GetBool("confirm", false) {
+				return mcp.NewToolResultText("DRY RUN — nothing submitted.\n" + preview +
+					"\nCall again with confirm=true to perform this BINDING action."), nil
+			}
+			msg, err := exams.Submit(c, e.ActionURL)
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			return mcp.NewToolResultText("SUBMITTED: " + preview + "\nResult: " + msg), nil
+		},
+	)
+
 	// ── Seminars ──────────────────────────────────────────────────────────────
 
 	s.AddTool(
@@ -166,6 +268,66 @@ func registerTools(s *server.MCPServer, c *client.Client) {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			return mcp.NewToolResultText(toJSON(detail)), nil
+		},
+	)
+
+	// ── Transferleistungen ────────────────────────────────────────────────────
+
+	s.AddTool(
+		mcp.NewTool("cis_list_transfer",
+			mcp.WithDescription("List Transferleistungen / Praxisberichte (overview) with their id, Thema, Modul, Wertung and Status."),
+		),
+		func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			if !c.IsLoggedIn() {
+				return mcp.NewToolResultError("not logged in — call cis_login first"), nil
+			}
+			list, err := transfer.FetchList(c)
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			return mcp.NewToolResultText(toJSON(list)), nil
+		},
+	)
+
+	s.AddTool(
+		mcp.NewTool("cis_transfer_bewertung",
+			mcp.WithDescription("Grading detail of one Transferleistung: per-criterion notes, weights, feedback, plus a client-side weighted Gesamtnote (the CIS itself publishes no overall grade)."),
+			mcp.WithString("transfer_id", mcp.Required(), mcp.Description("transferTermPaperId (from cis_list_transfer)")),
+		),
+		func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			if !c.IsLoggedIn() {
+				return mcp.NewToolResultError("not logged in — call cis_login first"), nil
+			}
+			id, _ := req.RequireString("transfer_id")
+			b, err := transfer.FetchBewertung(c, id)
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			return mcp.NewToolResultText(toJSON(b)), nil
+		},
+	)
+
+	s.AddTool(
+		mcp.NewTool("cis_download_transfer_document",
+			mcp.WithDescription("Download a Transferleistung attachment (e.g. the report PDF) to a local path. URLs come from cis_transfer_bewertung."),
+			mcp.WithString("download_url", mcp.Required(), mcp.Description("Document URL (from cis_transfer_bewertung)")),
+			mcp.WithString("output_path", mcp.Required(), mcp.Description("Local file path, e.g. ~/Downloads/transfer.pdf")),
+		),
+		func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			if !c.IsLoggedIn() {
+				return mcp.NewToolResultError("not logged in — call cis_login first"), nil
+			}
+			dlURL, _ := req.RequireString("download_url")
+			outPath, _ := req.RequireString("output_path")
+			outPath = expandHome(outPath)
+			data, _, err := transfer.Download(c, dlURL)
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			if err := os.WriteFile(outPath, data, 0600); err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("write file: %v", err)), nil
+			}
+			return mcp.NewToolResultText(fmt.Sprintf("Saved %d bytes to %s", len(data), outPath)), nil
 		},
 	)
 
@@ -253,10 +415,7 @@ func registerTools(s *server.MCPServer, c *client.Client) {
 			}
 			dlURL, _ := req.RequireString("download_url")
 			outPath, _ := req.RequireString("output_path")
-			if strings.HasPrefix(outPath, "~/") {
-				home, _ := os.UserHomeDir()
-				outPath = home + outPath[1:]
-			}
+			outPath = expandHome(outPath)
 			data, _, err := certs.Download(c, dlURL)
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil

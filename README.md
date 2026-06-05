@@ -10,10 +10,15 @@ Reverse-engineered from the TYPO3-based portal at `cis.nordakademie.de`. Works a
 |---|---|---|
 | Login / Logout | ✓ | ✓ |
 | Grades (Leistungsübersicht) | ✓ | ✓ |
+| Stundenplan list + download (.ics/.html per Zenturie) | ✓ | ✓ |
+| Klausuren list + register/deregister (binding) | ✓ | ✓ |
+| Transferleistungen list + grading (computed Gesamtnote) | ✓ | ✓ |
 | Seminar list + details | — | ✓ |
-| Wahlpflichtmodul list + details | — | ✓ |
-| Wahlpflichtmodul selection | — | ✓ |
+| Wahlpflichtmodul list + details + selection (binding) | ✓ | ✓ |
 | Certificate list + download | ✓ | ✓ |
+
+> **Binding write actions** (Klausur an-/abmelden, Wahlpflicht wählen) default to a
+> dry run. They only execute with `--confirm` plus an interactive typed confirmation.
 
 ## Install
 
@@ -36,6 +41,24 @@ CIS_USER=20066 CIS_PASS='yourpassword' ./cis login
 ./cis grades
 ./cis grades --lang en
 ./cis grades --json
+
+# Stundenplan (timetable calendars per Zenturie)
+./cis stundenplan                          # list all
+./cis stundenplan -z I24a -f ics           # filter
+./cis stundenplan -z I24a -f ics -d -o ~/Downloads   # download the .ics
+
+# Klausuren (exam registration — binding writes need --confirm)
+./cis klausuren                            # list exams + examIds
+./cis klausuren --register 12022           # dry run
+./cis klausuren --register 12022 --confirm # actually register (asks again)
+
+# Transferleistungen
+./cis transfer                             # overview
+./cis transfer --bewertung 14534           # grading detail + weighted Gesamtnote
+
+# Wahlpflichtmodule
+./cis wpf                                  # list
+./cis wpf --select 1234 --confirm          # binding selection (asks again)
 
 # Certificates
 ./cis certs
@@ -73,6 +96,13 @@ Or run `cis login` once first — the session is saved to `~/.config/cis-api/ses
 | `cis_login` | Log in with username + password |
 | `cis_logout` | Log out and clear session |
 | `cis_grades` | Fetch grades (Leistungsübersicht) |
+| `cis_list_stundenplan` | List timetable files per Zenturie (.ics/.html) |
+| `cis_download_stundenplan` | Download a timetable file to a local path |
+| `cis_list_klausuren` | List the exam overview (Prüfungsübersicht) |
+| `cis_klausur_action` | Register/deregister for an exam (binding; needs `confirm=true`) |
+| `cis_list_transfer` | List Transferleistungen / Praxisberichte |
+| `cis_transfer_bewertung` | Grading detail + client-side weighted Gesamtnote |
+| `cis_download_transfer_document` | Download a Transferleistung attachment |
 | `cis_list_seminars` | List all available seminars with IDs |
 | `cis_seminar_detail` | Seminar details (dozent, dates, credits) |
 | `cis_list_wahlpflicht` | List Wahlpflichtmodule for your curriculum |
