@@ -134,11 +134,13 @@ jobs:
         run: |
           mkdir -p dist
           cp app/build/outputs/apk/release/app-release.apk "dist/naknak-$NAKNAK_VERSION_NAME.apk"
+          # stable name for releases/latest/download/naknak.apk (README link)
+          cp app/build/outputs/apk/release/app-release.apk dist/naknak.apk
           (cd dist && sha256sum *.apk > naknak-apk-SHA256SUMS)
       - name: Check signature
         if: github.event_name == 'push'
         run: |
-          "$ANDROID_HOME"/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)/apksigner verify --print-certs dist/*.apk \
+          "$ANDROID_HOME"/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)/apksigner verify --print-certs dist/naknak.apk \
             | grep -q '4b886ba0e1a5e3859f857712bd40ec9bfe7fafd2660e4cb09f5db06cde50656e'
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:

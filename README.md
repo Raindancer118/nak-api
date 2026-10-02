@@ -20,6 +20,7 @@
   <a href="#studies">CIS</a> &nbsp;·&nbsp;
   <a href="#moodle">Moodle</a> &nbsp;·&nbsp;
   <a href="#portal">Web portal</a> &nbsp;·&nbsp;
+  <a href="#android">Android app</a> &nbsp;·&nbsp;
   <a href="#safety">Safety</a> &nbsp;·&nbsp;
   <a href="#get-it">Install</a> &nbsp;·&nbsp;
   <a href="#under-the-hood">How it works</a>
@@ -244,21 +245,25 @@ With `NAK_OPERATOR` (and `NAK_OPERATOR_CONTACT`) set, a friend's login page and 
 
 </details>
 
-<details>
-<summary><b>Android app</b></summary>
+<br>
 
-`android/` holds a small Java app around your instance: the portal in a WebView plus what a browser tab cannot do.
+<a id="android"></a>
+<img alt="naknak, on your phone" src="docs/readme/h-android-light.svg#gh-light-mode-only" width="100%">
+<img alt="naknak, on your phone" src="docs/readme/h-android-dark.svg#gh-dark-mode-only" width="100%">
 
-- notifications for new grades, messages, Moodle news and deadlines (every 15 min from naknak's watcher, never a CIS call of its own; the lock screen only ever shows "Neues in naknak")
-- home screen widget with the next appointment and the three nearest deadlines
-- optional app lock (fingerprint or device PIN) that also blocks screenshots
-- downloads with your session, app shortcuts for week, courses, messages and grades
+The naknak app for Android is your portal in your pocket, plus what a browser tab cannot do. It talks to your own naknak and nothing else.
 
-Get the APK from the [latest release](https://github.com/Raindancer118/nak-api/releases/latest) (or the `naknak-apk` artifact of any CI run on `main`), install it and enter your server's address. It must be `https://`; the app talks only to that host. Behind Authentik or another SSO proxy, the login happens inside the app just like in the browser.
+<img alt="naknak on Android: overview in light and dark, the inbox a notification opens, the home screen widgets (made-up data)" src="docs/readme/android/screens.webp" width="100%">
 
-Build it yourself with JDK 21 and the Android SDK: `cd android && ./gradlew assembleDebug`.
+- **Notifications** for new grades, messages, Moodle news and deadlines, straight from naknak's watcher (no CIS call of its own). The lock screen only ever says "Neues in naknak".
+- **Two widgets:** what's next today with the nearest deadlines, and your grade average (an eye hides it; with the app lock on it never shows).
+- **App lock** with fingerprint or device PIN, which also blocks screenshots and the recents preview.
+- **Feels native:** downloads with your session, shortcuts for week, courses, inbox and grades, pull to refresh, light and dark.
+- **Sign-in stays put:** behind Authentik or another SSO the login runs inside the app, and the app renews an expired proxy session in the background.
 
-</details>
+**Install:** [download the APK](https://github.com/Raindancer118/nak-api/releases/latest/download/naknak.apk), or point [Obtainium](https://github.com/ImranR98/Obtainium) or Komi Store at this repository to get updates. Open it and enter your server's address (`https://` only). Every release is signed with the same key, SHA-256 `4B:88:6B:A0:E1:A5:E3:85:9F:85:77:12:BD:40:EC:9B:FE:7F:AF:D2:66:0E:4C:B0:9F:5D:B0:6C:DE:50:65:6E`.
+
+Building it yourself needs JDK 21 and the Android SDK: `cd android && ./gradlew assembleDebug`.
 
 <br>
 

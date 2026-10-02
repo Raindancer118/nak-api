@@ -109,20 +109,31 @@ update)
   render
   mapfile -t svc < <(services)
   [ ${#svc[@]} -gt 0 ] || exit 0
-  before=$(docker image inspect -f '{{.Id}}' "$IMG" 2>/dev/null || true)
   docker pull -q "$IMG" >/dev/null
-  after=$(docker image inspect -f '{{.Id}}' "$IMG")
-  # also start instances that were added since the last update
-  missing=0
-  for s in "${svc[@]}"; do [ -n "$(container "$s")" ] || missing=1; done
-  [ "$before" = "$after" ] && [ $missing = 0 ] && exit 0
-  [ -n "$before" ] && [ "$before" != "$after" ] && docker tag "$before" naknak-friends:previous
-  compose up -d "${svc[@]}"
+  img=$(docker image inspect -f '{{.Id}}' "$IMG")
+  # an image that failed its health check is not retried every 2 minutes
+  if [ "$(cat "$DIR/.friends-failed" 2>/dev/null)" = "$img" ]; then exit 0; fi
+  # compare what each container runs with the current image — another script
+  # (e.g. your own instance's update) may have pulled it already
+  stale=() prev=""
+  for s in "${svc[@]}"; do
+    c=$(container "$s")
+    if [ -z "$c" ]; then stale+=("$s"); continue; fi
+    running=$(docker inspect -f '{{.Image}}' "$c")
+    [ "$running" = "$img" ] && continue
+    stale+=("$s")
+    prev=$running
+  done
+  [ ${#stale[@]} -gt 0 ] || exit 0
+  log "updating ${stale[*]}"
+  [ -n "$prev" ] && docker tag "$prev" naknak-friends:previous
+  compose up -d "${stale[@]}"
   failed=()
-  for s in "${svc[@]}"; do wait_healthy "$(container "$s")" || failed+=("$s"); done
-  [ ${#failed[@]} = 0 ] && { log "all ${#svc[@]} healthy"; exit 0; }
+  for s in "${stale[@]}"; do wait_healthy "$(container "$s")" || failed+=("$s"); done
+  [ ${#failed[@]} = 0 ] && { log "healthy: ${stale[*]}"; exit 0; }
   log "NOT healthy: ${failed[*]} — rolling back"
-  if docker image inspect naknak-friends:previous >/dev/null 2>&1; then
+  echo "$img" >"$DIR/.friends-failed"
+  if [ -n "$prev" ]; then
     docker tag naknak-friends:previous "$IMG"
     compose up -d "${failed[@]}"
   fi
