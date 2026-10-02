@@ -1271,12 +1271,25 @@ a.wg-ev:hover { translate: 0 -1px; box-shadow: 0 6px 18px -8px #0007; z-index: 2
 
 /* ── privacy mode (blur) ────────────────────────────────── */
 
-html.private .sens:not(.peek) {
-  filter: blur(7px);
+/* blur alone leaves big digits guessable: the glyphs are made transparent
+   and only a wide, soft shadow in the text colour remains — nothing of the
+   letter shapes is left to read. Bars and charts are blurred beyond lengths. */
+html.private .sens:not(.peek),
+html.private .sens:not(.peek) * {
+  color: transparent !important;
+  text-shadow: 0 0 .55em color-mix(in oklab, var(--ink) 75%, transparent), 0 0 1.1em color-mix(in oklab, var(--ink) 45%, transparent) !important;
   cursor: pointer;
   user-select: none;
-  transition: filter .35s var(--ease);
 }
+html.private .sens:not(.peek) { filter: blur(3px); transition: filter .35s var(--ease); }
+html.private .meter.sens:not(.peek),
+html.private .dist.sens:not(.peek),
+html.private .sens:not(.peek) .progress { filter: blur(14px) saturate(.4); opacity: .55; }
+/* same width for every chip: a long "5,0 (2.Versuch)" must not stand out */
+html.private .chip.sens:not(.peek) { background: color-mix(in oklab, var(--ink) 12%, transparent) !important; display: inline-block; width: 3.6rem; overflow: hidden; white-space: nowrap; vertical-align: middle; }
+html.private .sem-bars.sens:not(.peek) { filter: blur(14px) saturate(0); opacity: .5; }
+/* pass/fail colours would give the result away */
+html.private .tl-item.ok .tl-dot, html.private .tl-item.bad .tl-dot { border-color: var(--dim); background: var(--tile); }
 html.private .sens.peek { filter: none; transition: filter .35s var(--ease); }
 html.private .eye-btn { border-color: color-mix(in oklab, var(--cis) 55%, transparent); background: color-mix(in oklab, var(--cis) 12%, var(--tile)); }
 .eye-btn .label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }

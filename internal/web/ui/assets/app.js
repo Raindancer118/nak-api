@@ -539,7 +539,7 @@ function thesisView(tr) {
 function semesterBars(sems) {
   if (!sems.length) return emptyRow("Kein Studienplan.");
   const max = Math.max(...sems.map((x) => (x.passed || 0) + (x.open || 0) + (x.failed || 0)), 1);
-  return [h("div", { class: "sem-bars", role: "img", "aria-label": sems.map((x) => `Semester ${x.semester}: ${x.passed} bestanden, ${x.open} offen, ${x.failed} nicht bestanden`).join("; ") },
+  return [h("div", { class: "sem-bars sens", role: "img", "aria-label": sems.map((x) => `Semester ${x.semester}: ${x.passed} bestanden, ${x.open} offen, ${x.failed} nicht bestanden`).join("; ") },
     sems.map((x, j) => h("div", { class: "sem", vars: { "--j": j } },
       h("div", { class: "sem-stack", vars: { "--h": ((x.passed || 0) + (x.open || 0) + (x.failed || 0)) / max } },
         [["failed", x.failed, "var(--bad)"], ["open", x.open, "var(--tile-2)"], ["passed", x.passed, "var(--ok)"]].filter(([, n]) => n > 0).map(([k, n, c]) => h("i", { class: k, vars: { "--n": n, "--c": c }, title: `${n} ${k === "passed" ? "bestanden" : k === "open" ? "offen" : "nicht bestanden"}` }))),
