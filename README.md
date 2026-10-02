@@ -241,6 +241,20 @@ Signing out also clears the data the browser kept for offline use.
 
 Each friend gets their own instance (own container, own data volume, pinned to their NAK account with `NAK_OWNER`), so nothing can mix between people. [`deploy/friends/naknak-friends`](deploy/friends/naknak-friends) turns a `friends.conf` (`<slug> <NAK username>` per line) into compose services next to your `compose.yml`, starts them and updates them all with a health check and rollback. [`authentik-friend.py`](deploy/friends/authentik-friend.py) gives each one an Authentik proxy provider, application and group, copied from your own.
 
+No Authentik? Any TLS reverse proxy does: naknak has its own login with the NAK account, `NAK_OWNER` pins each instance to its person, and failed logins are rate-limited. Put the proxy in the same compose project and add one site per friend, for example with [Caddy](https://caddyserver.com) (fetches certificates by itself):
+
+```caddyfile
+naknak.example.org {
+	reverse_proxy naknak:8080
+}
+
+max.naknak.example.org {
+	reverse_proxy naknak-max:8080
+}
+```
+
+An SSO in front (Authelia, oauth2-proxy, Cloudflare Access) or a VPN such as Tailscale adds a second lock; the Android app copes with any of them, because the sign-in runs inside the app. Set `NAK_TRUST_PROXY=1` only when such a proxy is in front.
+
 With `NAK_OPERATOR` (and `NAK_OPERATOR_CONTACT`) set, a friend's login page and settings say who runs the instance, what is stored and how to delete it. Hosting other people's NAK logins and grades makes you responsible for them: tell your friends what you store, keep it to people you know, and delete an instance when asked (Einstellungen → Instanz zurücksetzen, or remove the volume).
 
 </details>
