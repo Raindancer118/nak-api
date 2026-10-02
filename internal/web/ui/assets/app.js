@@ -2594,12 +2594,25 @@ function mensaToday(menu, acc) {
     day ? [h("p", { class: "empty", text: mensaDayLabel(day) }), dishRows(day.dishes)] : emptyRow("Noch kein Speiseplan veröffentlicht.")].flat().filter(Boolean);
 }
 
-function bookingRows(bs, limit = 12) {
+// the last few, more on demand
+function bookingRows(bs, step = 3) {
   if (!bs.length) return emptyRow("Keine Buchungen.");
-  return h("ul", { class: "rows" }, bs.slice(0, limit).map((b, j) => h("li", {}, h("div", { class: "row", vars: { "--j": j } },
+  const row = (b, j) => h("li", {}, h("div", { class: "row", vars: { "--j": j } },
     h("span", { class: "ext", text: new Intl.DateTimeFormat("de-DE", { day: "2-digit", month: "2-digit" }).format(new Date(b.at)) }),
     h("span", { class: "t" }, b.dish || b.item, h("span", { class: "s", text: [b.dish && b.item, b.qty > 1 && `${b.qty}×`].filter(Boolean).join(" · ") })),
-    h("span", { class: `chip sens ${b.amount > 0 ? "ok" : ""}`, text: `${b.amount > 0 ? "+" : ""}${fmtEuro(b.amount)}` })))));
+    h("span", { class: `chip sens ${b.amount > 0 ? "ok" : ""}`, text: `${b.amount > 0 ? "+" : ""}${fmtEuro(b.amount)}` })));
+  let shown = Math.min(step, bs.length);
+  const list = h("ul", { class: "rows" }, bs.slice(0, shown).map(row));
+  const more = h("button", { class: "ghost", type: "button", text: "Mehr anzeigen" });
+  const actions = h("div", { class: "row-actions" }, more);
+  actions.hidden = shown >= bs.length;
+  more.addEventListener("click", () => {
+    const next = Math.min(shown + 10, bs.length);
+    list.append(...bs.slice(shown, next).map((b, j) => row(b, j)));
+    shown = next;
+    actions.hidden = shown >= bs.length;
+  });
+  return [list, actions];
 }
 
 function spendingView(r) {
@@ -2648,9 +2661,9 @@ async function mensaPage(root) {
     draw();
     return [seg, h("div", { class: "filters mensa-veg" }, veg), list];
   });
-  fill(tCard, () => api("mensa_account", { days: 60 }), (acc) => [
+  fill(tCard, () => api("mensa_account", { days: 365 }), (acc) => [
     h("div", { class: "band-num" }, h("div", { class: "avg" }, h("span", { class: "big sens", text: fmtEuro(acc.balance) }), h("span", { class: "empty", text: acc.balance < 5 ? "reicht für kein Menü mehr" : "Guthaben" }))),
-    bookingRows(acc.bookings || [], 8)]);
+    ...[bookingRows(acc.bookings || [])].flat()]);
 }
 
 // which top-bar buttons show; saved on the server like the bar below
