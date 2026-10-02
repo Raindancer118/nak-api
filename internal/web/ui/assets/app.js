@@ -1458,8 +1458,14 @@ async function settingsPage(root) {
       h("dt", { text: "NAK-Konto" }), h("dd", { text: acc.user || "–" }),
       h("dt", { text: "Herkunft" }), h("dd", { text: acc.source === "env" ? "Umgebungsvariablen" : acc.source === "file" ? "Web-Anmeldung" : "–" }),
       h("dt", { text: "Modus" }), h("dd", {}, st.read_only ? h("span", { class: "chip due", text: "nur lesen" }) : h("span", { class: "chip ok", text: "voll" })),
-      h("dt", { text: "Version" }), h("dd", { text: st.version || "–" }),
+      h("dt", { text: "Version" }), h("dd", { class: "version-dd", text: st.version || "–" }),
       h("dt", { text: "Daten" }), h("dd", { class: "mono-ish", text: st.data_dir || "–" })));
+
+  fetch("/api/version", { credentials: "same-origin" }).then((r) => r.json()).then((v) => {
+    const dd = tAcc.querySelector(".version-dd");
+    if (dd && v.update) dd.append(" ", h("a", { class: "chip due", href: v.url || "https://github.com/Raindancer118/nak-api/releases", target: "_blank", rel: "noopener", text: `${v.latest} verfügbar` }));
+    else if (dd && v.latest && !String(v.current).includes("-")) dd.append(" ", h("span", { class: "chip ok", text: "aktuell" }));
+  }).catch(() => {});
 
   // appearance
   const tLook = tile("Darstellung", { i: 2 });

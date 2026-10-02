@@ -73,6 +73,9 @@ type Server struct {
 	history *history
 	stats   *stats
 
+	versions   versionCache
+	releaseURL string // tests point this at a fake GitHub
+
 	loginMu sync.Mutex
 	logins  map[string]*attempts
 	login   *template.Template
@@ -134,6 +137,7 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("GET /api/history", s.authed(http.HandlerFunc(s.historyAPI)))
 	mux.Handle("GET /api/stats", s.authed(http.HandlerFunc(s.statsAPI)))
 	mux.Handle("GET /api/export", s.authed(http.HandlerFunc(s.export)))
+	mux.Handle("GET /api/version", s.authed(http.HandlerFunc(s.version)))
 	mux.Handle("POST /api/reset", s.authed(s.jsonOnly(s.reset)))
 	mux.Handle("GET /metrics", s.authed(http.HandlerFunc(s.metrics)))
 	mux.Handle("POST /api/upload", s.authed(s.sameOriginOnly(s.upload)))
