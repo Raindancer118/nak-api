@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/Raindancer118/nak-api/internal/client"
+	"github.com/Raindancer118/nak-api/internal/drift"
 	"github.com/Raindancer118/nak-api/internal/htmlx"
 	"golang.org/x/net/html"
 )
@@ -87,7 +88,7 @@ func Fetch(c *client.Client) (*Overview, error) {
 	}
 	o := ParseOverview(p.Body, c.Base)
 	if len(o.Modules) == 0 && len(o.Seminars) == 0 {
-		return nil, fmt.Errorf("leistungsübersicht: no grade tables found (layout changed?)")
+		return nil, drift.New(PagePath, "grade tables in tabs #curricular/#seminar with data-label cells", p.Body)
 	}
 	return o, nil
 }
@@ -337,7 +338,7 @@ func ParseDistribution(body string) (*Distribution, error) {
 	d := &Distribution{}
 	box := htmlx.First(doc, htmlx.Class("tx_na_grades"))
 	if box == nil {
-		return nil, fmt.Errorf("statistic: content box not found")
+		return nil, drift.New(PagePath+" (statistic)", "content box .tx_na_grades with chart data", body)
 	}
 	if h := htmlx.First(box, htmlx.Tag("h3")); h != nil {
 		if m := distHead.FindStringSubmatch(htmlx.Text(h)); m != nil {

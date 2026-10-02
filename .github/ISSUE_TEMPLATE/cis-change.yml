@@ -1,0 +1,40 @@
+name: Something stopped working (CIS or Moodle changed?)
+description: A tool fails or returns wrong data
+labels: [cis-drift]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks! The quickest way to help: run `nak selfcheck` and paste its output, or let it file the issue itself with `nak selfcheck --report`.
+        **Please do not paste grades, names, addresses or other personal data** — this repository is public. Structure (table headers, field names, error messages) is what helps.
+  - type: input
+    id: version
+    attributes:
+      label: nak version
+      placeholder: "nak --version"
+    validations:
+      required: true
+  - type: input
+    id: tool
+    attributes:
+      label: Tool or command
+      placeholder: "cis_grades / nak tool cis_list_seminars quarter=…"
+    validations:
+      required: true
+  - type: textarea
+    id: error
+    attributes:
+      label: Error message or what looks wrong
+      description: The text after "Fehler:" is usually enough. Remove personal data.
+    validations:
+      required: true
+  - type: textarea
+    id: selfcheck
+    attributes:
+      label: Output of `nak selfcheck`
+      render: text
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else
+      description: e.g. "the CIS shows a new button", "since the semester change", a screenshot with personal data blacked out

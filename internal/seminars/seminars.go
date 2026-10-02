@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/Raindancer118/nak-api/internal/client"
+	"github.com/Raindancer118/nak-api/internal/drift"
 	"github.com/Raindancer118/nak-api/internal/forms"
 	"github.com/Raindancer118/nak-api/internal/htmlx"
 	"golang.org/x/net/html"
@@ -60,7 +61,7 @@ type Listing struct {
 	Quarters   map[string]string `json:"available_quarters,omitempty"` // label -> id
 	Notice     string            `json:"notice,omitempty"`
 	Seminars   []Seminar         `json:"seminars"`
-	PersonalOK bool              `json:"-"`
+	TableFound bool              `json:"-"`
 }
 
 // Fetch lists seminars. quarter is a label like "2026 - 4" ("" = current);
@@ -71,6 +72,9 @@ func Fetch(c *client.Client, quarter string, mine bool) (*Listing, error) {
 		return nil, fmt.Errorf("seminare: %w", err)
 	}
 	l := Parse(p.Body, c.Base)
+	if !l.TableFound {
+		return nil, drift.New(PagePath, "table#seminar-table-* with 7 columns", p.Body)
+	}
 	if mine {
 		doc := htmlx.MustParse(p.Body)
 		a := htmlx.First(doc, htmlx.HrefContains("[action]=personalList"))
@@ -131,6 +135,7 @@ func Parse(body, base string) *Listing {
 	if tbl == nil {
 		return l
 	}
+	l.TableFound = true
 	for _, tr := range htmlx.Rows(tbl) {
 		if s, ok := parseRow(tr, base); ok {
 			l.Seminars = append(l.Seminars, s)

@@ -3,6 +3,7 @@ package tools
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -16,6 +17,7 @@ import (
 
 	"github.com/Raindancer118/nak-api/internal/app"
 	"github.com/Raindancer118/nak-api/internal/client"
+	"github.com/Raindancer118/nak-api/internal/drift"
 	"github.com/Raindancer118/nak-api/internal/moodle"
 	mcpclient "github.com/mark3labs/mcp-go/client"
 	"github.com/mark3labs/mcp-go/mcp"
@@ -281,7 +283,7 @@ func TestStartupListsAllToolsWithSafeSchemas(t *testing.T) {
 			t.Errorf("%s: description must warn", tool.Name)
 		}
 	}
-	if prefixes["cis"] < 40 || prefixes["moodle"] != 30 || prefixes["nak"] != 4 {
+	if prefixes["cis"] < 40 || prefixes["moodle"] != 30 || prefixes["nak"] != 6 {
 		t.Errorf("prefixes = %v", prefixes)
 	}
 }
@@ -378,6 +380,7 @@ func TestNoWriteWithoutConfirm(t *testing.T) {
 		"moodle_forum_post":              {"forumid": 1, "subject": "s", "message": "m"},
 		"moodle_choice_submit":           {"choiceid": 1, "optionids": []any{1}},
 		"moodle_assignment_submit":       {"assignid": 1, "files": []any{upload}},
+		"nak_report_drift":               {},
 	}
 	for _, tool := range All().All() {
 		if tool.Kind != Write {
@@ -466,5 +469,22 @@ func TestArgCoercionAndValidation(t *testing.T) {
 	}
 	if out, isErr := call(t, c, "cis_page", map[string]any{"path": "/x?tx_naexams_naexams%5Baction%5D=register"}); !isErr {
 		t.Errorf("action link readable: %s", out)
+	}
+}
+
+func TestSelfcheckAgainstFixturesAndDriftHint(t *testing.T) {
+	e := newEnv(t)
+	c := startMCP(t, e.app)
+	out, isErr := call(t, c, "nak_selfcheck", nil)
+	if isErr || !strings.Contains(out, `"checks"`) {
+		t.Fatalf("selfcheck: %s", out)
+	}
+	if strings.Contains(out, `"drift"`) {
+		t.Errorf("fixtures must not drift:\n%s", out)
+	}
+	// A changed page yields a drift error with the reporting hint.
+	err := DriftHint(fmt.Errorf("x: %w", drift.New("/p", "table", "<main><table><tr><th>A</th></tr></table></main>")))
+	if !strings.Contains(err, "nak_report_drift") || !strings.Contains(err, "github.com/Raindancer118/nak-api/issues/new") {
+		t.Errorf("hint = %s", err)
 	}
 }

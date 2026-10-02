@@ -4,6 +4,7 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/Raindancer118/nak-api/internal/tools"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -29,6 +30,7 @@ override). NAK_READONLY=1 blocks every write in both systems.`,
 
 func Execute() {
 	rootCmd.Version = Version
+	tools.Version = Version
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)

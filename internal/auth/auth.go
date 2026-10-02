@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/Raindancer118/nak-api/internal/client"
+	"github.com/Raindancer118/nak-api/internal/drift"
 	"github.com/Raindancer118/nak-api/internal/forms"
 	"github.com/Raindancer118/nak-api/internal/htmlx"
 )
@@ -20,7 +21,7 @@ func Login(c *client.Client, username, password string) error {
 	}
 	f := forms.FindByField(forms.Parse(htmlx.MustParse(p.Body), c.Base), "pass")
 	if f == nil {
-		return fmt.Errorf("login form not found — page layout may have changed")
+		return drift.New("/", "felogin form with a pass field", p.Body)
 	}
 	set := map[string]string{"user": username, "pass": password}
 	if f.Field("logintype") != nil {

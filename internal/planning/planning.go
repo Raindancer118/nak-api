@@ -4,13 +4,13 @@
 package planning
 
 import (
-	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/Raindancer118/nak-api/internal/client"
+	"github.com/Raindancer118/nak-api/internal/drift"
 	"github.com/Raindancer118/nak-api/internal/htmlx"
 	"golang.org/x/net/html"
 )
@@ -80,7 +80,7 @@ func FetchStudienplan(c *client.Client) (*Studienplan, error) {
 	}
 	sp := ParseStudienplan(p.Body)
 	if len(sp.Modules) == 0 {
-		return nil, fmt.Errorf("studienplan: no modules found")
+		return nil, drift.New(StudienplanPath, "table.studienplan with td.modulnr rows", p.Body)
 	}
 	return sp, nil
 }

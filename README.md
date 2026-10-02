@@ -230,6 +230,7 @@ nak mcp                          MCP server on stdio
 nak tools [filter] [--params]    list tools (WRITE = binding)
 nak tool <name> key=value …      run a tool, JSON out; values may be JSON
 nak login | logout               CIS session
+nak selfcheck [--report] [--json]   is the CIS still as expected? file issues for changes
 ```
 
 ```sh
@@ -249,7 +250,7 @@ nak tool cis_klausur_action exam_id=12345 action=register     # preview only
 <img alt="Under the hood" src="docs/readme/h-inside-dark.svg#gh-dark-mode-only" width="100%">
 
 ```mermaid
-flowchart LR
+flowchart TB
     client(["MCP client / CLI"]) -- "stdio" --> reg["tool registry<br/><sub>write gate · confirm</sub>"]
     reg --> cisp["CIS packages<br/><sub>grades · exams · seminars …</sub>"]
     reg --> mdl["Moodle service"]
@@ -292,6 +293,32 @@ go vet ./...
 </details>
 
 <br>
+
+### When the CIS changes
+
+The CIS is a website, not an API — sooner or later a page will look different. nak notices instead of returning wrong data:
+
+<table>
+<tr>
+<td width="50%" valign="top">
+
+**In every answer.** When a parser misses the structure it expects, the tool says so and offers a pre-filled issue link — plus `nak_report_drift`, which files it after you confirm.
+
+**`nak selfcheck`** checks, read-only, every page and form nak depends on (including the ones write actions need) and tells *drift* (the CIS changed) apart from *unavailable* (network, login, maintenance).
+
+</td>
+<td width="50%" valign="top">
+
+**`nak selfcheck --report`** opens one GitHub issue per broken check, comments if it's still broken, and closes it once the check passes again. Run it daily, e.g. from a systemd timer.
+
+**No personal data, ever.** Reports contain the page *outline* only: table headers, data-label and field names, CSS classes. Never cell values, headings or names — the repository is public.
+
+</td>
+</tr>
+</table>
+
+> [!NOTE]
+> Something broken and no token at hand? [Open an issue](https://github.com/Raindancer118/nak-api/issues/new?template=cis-change.yml) and paste `nak selfcheck` — no grades or names, please.
 
 ### Good to know
 

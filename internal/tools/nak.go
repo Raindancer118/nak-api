@@ -11,6 +11,7 @@ import (
 	"github.com/Raindancer118/nak-api/internal/app"
 	"github.com/Raindancer118/nak-api/internal/exams"
 	"github.com/Raindancer118/nak-api/internal/grades"
+	"github.com/Raindancer118/nak-api/internal/health"
 	"github.com/Raindancer118/nak-api/internal/planning"
 	"github.com/Raindancer118/nak-api/internal/profile"
 	"github.com/Raindancer118/nak-api/internal/transfer"
@@ -203,6 +204,41 @@ func nakTools() []*Tool {
 			Run:    func(a *app.App, args Args) (any, error) { return agenda(a, args) }},
 		{Name: "nak_dashboard", Kind: Read, Desc: "Der Überblick in einem Aufruf: heutige & morgige Vorlesungen, dringende Fristen (CIS + Moodle, 14 Tage), angemeldete Prüfungen, ungelesene Moodle-Nachrichten, aktuelles Quartal, Kopierguthaben. Guter Einstieg.",
 			Run: func(a *app.App, args Args) (any, error) { return dashboard(a) }},
+		{Name: "nak_selfcheck", Kind: Read, Desc: "Prüft (nur lesend) alle CIS-Seiten und -Formulare, auf die nak angewiesen ist, ob sie noch die erwartete Struktur haben. 'drift' = das CIS hat sich geändert (dann nak_report_drift vorschlagen); 'unavailable' = Netz/Login/Wartung.",
+			Run: func(a *app.App, args Args) (any, error) {
+				c, err := a.CIS()
+				if err != nil {
+					return nil, err
+				}
+				rep := health.Run(c, Version, a.Now())
+				return selfcheckSummary(rep), nil
+			}},
+		{Name: "nak_report_drift", Kind: Write, Desc: "Meldet vom Self-Check gefundene CIS-Änderungen als GitHub-Issue (ein Issue pro Prüfung, nur Seitenstruktur, keine persönlichen Daten; schließt wieder grüne Prüfungen). Braucht NAK_GITHUB_TOKEN oder gh-Login; ohne Token gibt es vorbefüllte Links.",
+			Preview: func(a *app.App, args Args) (any, error) {
+				c, err := a.CIS()
+				if err != nil {
+					return nil, err
+				}
+				rep := health.Run(c, Version, a.Now())
+				var issues []map[string]string
+				for _, r := range rep.Drifted() {
+					issues = append(issues, map[string]string{"title": health.Title(r), "body": health.Body(r, Version, rep.At), "manual_link": health.IssueURL(health.DefaultRepo, r, Version, rep.At)})
+				}
+				return map[string]any{"action": "GitHub-Issues in " + health.DefaultRepo + " anlegen/aktualisieren", "drifted": len(issues), "issues": issues,
+					"token_available": health.Token() != ""}, nil
+			},
+			Do: func(a *app.App, args Args) (any, error) {
+				c, err := a.CIS()
+				if err != nil {
+					return nil, err
+				}
+				rep := health.Run(c, Version, a.Now())
+				tok := health.Token()
+				if tok == "" {
+					return nil, fmt.Errorf("no GitHub token (NAK_GITHUB_TOKEN or 'gh auth login') — use the manual links from the preview")
+				}
+				return (&health.GitHub{API: "https://api.github.com", Repo: health.DefaultRepo, Token: tok}).Sync(rep)
+			}},
 		{Name: "nak_module", Kind: Read, Desc: "Alles zu einem Modul über beide Systeme: CIS-Note/Status/Versuch, Prüfungstermin & Anmeldestatus, Studienplan (Semester, Prüfungsform, Credits), nächste Termine, Notenverteilung und der zugehörige Moodle-Kurs mit offenen Aufgaben.",
 			Params: []Param{{Name: "module_nr", Required: true, Desc: "Modulnummer, z.B. I151"}},
 			Run: func(a *app.App, args Args) (any, error) {
@@ -443,6 +479,21 @@ func moduleOverview(a *app.App, nr string) (any, error) {
 		return nil, fmt.Errorf("module %s not found in CIS or Moodle", nr)
 	}
 	return res, nil
+}
+
+// Version is set by cmd at start-up.
+var Version = "dev"
+
+func selfcheckSummary(rep *health.Report) map[string]any {
+	counts := map[string]int{}
+	var problems []health.Result
+	for _, r := range rep.Results {
+		counts[r.Status]++
+		if r.Status != health.StatusOK {
+			problems = append(problems, r)
+		}
+	}
+	return map[string]any{"version": rep.Version, "checks": len(rep.Results), "counts": counts, "problems": problems}
 }
 
 // All returns the complete tool set.

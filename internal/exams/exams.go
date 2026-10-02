@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/Raindancer118/nak-api/internal/client"
+	"github.com/Raindancer118/nak-api/internal/drift"
 	"github.com/Raindancer118/nak-api/internal/htmlx"
 	"golang.org/x/net/html"
 )
@@ -68,6 +69,7 @@ func FetchList(c *client.Client) ([]Exam, error) {
 
 func fetch(c *client.Client, now time.Time) ([]Exam, error) {
 	var lastErr error
+	lastBody := ""
 	for _, path := range []string{PagePath, LegacyPath} {
 		p, err := c.Page(path)
 		if err != nil {
@@ -77,11 +79,12 @@ func fetch(c *client.Client, now time.Time) ([]Exam, error) {
 		if list, found := parseExams(p.Body, c.Base, now); found {
 			return list, nil
 		}
+		lastBody = p.Body
 	}
 	if lastErr != nil {
 		return nil, fmt.Errorf("fetch exams: %w", lastErr)
 	}
-	return nil, nil
+	return nil, drift.New(PagePath, "table with Modulnummer and An-/Abmelden columns", lastBody)
 }
 
 // Resolve fetches the live overview and returns the exam with that ID.

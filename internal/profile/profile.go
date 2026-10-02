@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/Raindancer118/nak-api/internal/client"
+	"github.com/Raindancer118/nak-api/internal/drift"
 	"github.com/Raindancer118/nak-api/internal/forms"
 	"github.com/Raindancer118/nak-api/internal/htmlx"
 	"golang.org/x/net/html"
@@ -68,7 +69,7 @@ func FetchPersonal(c *client.Client) (*Personal, error) {
 	}
 	p := ParsePersonal(pg.Body)
 	if p.Login == "" && p.Nachname == "" {
-		return nil, fmt.Errorf("meine daten: no personal data found")
+		return nil, drift.New(MeineDatenPath, "div.form-group with span label + .form-readonly value", pg.Body)
 	}
 	return p, nil
 }
@@ -106,7 +107,7 @@ func LoadForm(c *client.Client, path, actionContains string) (*forms.Form, *html
 	doc := htmlx.MustParse(pg.Body)
 	f := forms.FindByAction(forms.Parse(htmlx.Main(doc), c.Base), actionContains)
 	if f == nil {
-		return nil, doc, fmt.Errorf("%s: form %q not found (period closed or layout changed?)", path, actionContains)
+		return nil, doc, drift.New(path, fmt.Sprintf("form with action containing %q", actionContains), pg.Body)
 	}
 	return f, doc, nil
 }
@@ -136,11 +137,11 @@ const notenAction = "action]=betriebsfreigabe"
 func ParseFreigabe(body, base string) (*Freigabe, error) {
 	f := formFrom(body, base, notenAction)
 	if f == nil {
-		return nil, fmt.Errorf("notenfreigabe form not found")
+		return nil, drift.New(NotenfreigabePath, "form action=betriebsfreigabe", body)
 	}
 	n, a := f.Field("notenfreigabe"), f.Field("anmeldungfreigabe")
 	if n == nil || a == nil {
-		return nil, fmt.Errorf("notenfreigabe fields not found")
+		return nil, drift.New(NotenfreigabePath, "selects notenfreigabe/anmeldungfreigabe", body)
 	}
 	return &Freigabe{Noten: n.Value == "1", Anmeldungen: a.Value == "1"}, nil
 }
@@ -191,7 +192,7 @@ const datenAction = "datenfreigabe-verwalten?"
 func ParseDatenfreigabe(body, base string) (Datenfreigabe, error) {
 	f := formFrom(body, base, datenAction)
 	if f == nil {
-		return nil, fmt.Errorf("datenfreigabe form not found")
+		return nil, drift.New(DatenfreigabePath, "Datenfreigabe settings form", body)
 	}
 	out := Datenfreigabe{}
 	for _, k := range DatenfreigabeFields {
@@ -253,11 +254,11 @@ const (
 func ParseEmail(body, base string) (string, bool, error) {
 	f := formFrom(body, base, emailAction)
 	if f == nil {
-		return "", false, fmt.Errorf("e-mail form not found")
+		return "", false, drift.New(EmailsPath, "form action=email", body)
 	}
 	e, ip := f.Field("email.privat"), f.Field("email.infopost")
 	if e == nil {
-		return "", false, fmt.Errorf("e-mail field not found")
+		return "", false, drift.New(EmailsPath, "field email[privat]", body)
 	}
 	return e.Value, ip != nil && ip.Checked, nil
 }
@@ -265,7 +266,7 @@ func ParseEmail(body, base string) (string, bool, error) {
 func ParsePhone(body, base string) (fest, mobil, fax string, err error) {
 	f := formFrom(body, base, phoneAction)
 	if f == nil {
-		return "", "", "", fmt.Errorf("telefon form not found")
+		return "", "", "", drift.New(TelefonPath, "form action=telefon", body)
 	}
 	get := func(k string) string {
 		if fl := f.Field(k); fl != nil {
@@ -378,7 +379,7 @@ func ParseAddress(body, base string) (*Address, error) {
 	}
 	cf := forms.FindByAction(fs, addrChangeAction)
 	if cf == nil {
-		return nil, fmt.Errorf("address change form not found")
+		return nil, drift.New(AdressenPath, "form action=address", body)
 	}
 	get := func(k string) string {
 		if fl := cf.Field(k); fl != nil {
@@ -491,7 +492,7 @@ func ParsePayment(body, base string) (*Payment, error) {
 		f = formFrom(body, base, "sepamandat")
 	}
 	if f == nil {
-		return nil, fmt.Errorf("SEPA form not found")
+		return nil, drift.New(ZahlungPath, "SEPA mandate form", body)
 	}
 	p := &Payment{}
 	if fl := f.Field("iban"); fl != nil && fl.Value != "" {
@@ -634,7 +635,7 @@ const vertiefungAction = "action]=handleForm"
 func ParseVertiefung(body, base string) (*Vertiefung, error) {
 	f := formFrom(body, base, vertiefungAction)
 	if f == nil {
-		return nil, fmt.Errorf("Vertiefungsrichtung form not found")
+		return nil, drift.New(VertiefungPath, "form action=handleForm", body)
 	}
 	fl := f.Field("vertiefungsrichtung")
 	if fl == nil {

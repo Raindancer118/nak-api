@@ -11,8 +11,11 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/Raindancer118/nak-api/internal/app"
+	"github.com/Raindancer118/nak-api/internal/drift"
+	"github.com/Raindancer118/nak-api/internal/health"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
@@ -112,6 +115,19 @@ func (r *Registry) Call(a *app.App, name string, raw map[string]any) (any, error
 	return map[string]any{"mode": "executed", "tool": t.Name, "result": res}, nil
 }
 
+// DriftHint explains a parser failure caused by a changed CIS page and asks
+// for an issue (the outline it would contain has no personal data).
+func DriftHint(err error) string {
+	var d *drift.Error
+	if !errors.As(err, &d) {
+		return ""
+	}
+	res := health.Result{Check: "tool call", Status: health.StatusDrift, Page: d.Page, Expected: d.Expected, Print: d.Fingerprint}
+	return "\n\nDas CIS hat diese Seite offenbar geändert, nak muss angepasst werden. Bitte dem Nutzer vorschlagen, das zu melden: " +
+		"nak_report_drift (legt nach Bestätigung ein GitHub-Issue nur mit der Seitenstruktur an, ohne persönliche Daten) oder dieser vorbefüllte Link: " +
+		health.IssueURL(health.DefaultRepo, res, "nak", time.Now())
+}
+
 func previewEnvelope(t *Tool, res any) any {
 	// Moodle previews already carry mode/next.
 	if b, err := json.Marshal(res); err == nil && strings.Contains(string(b), `"mode":"preview"`) {
@@ -141,7 +157,7 @@ func (r *Registry) Register(s *server.MCPServer, a *app.App) {
 		s.AddTool(t.mcpTool(), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			res, err := r.Call(a, t.Name, req.GetArguments())
 			if err != nil {
-				return mcp.NewToolResultError("Fehler: " + err.Error()), nil
+				return mcp.NewToolResultError("Fehler: " + err.Error() + DriftHint(err)), nil
 			}
 			if s, ok := res.(string); ok {
 				return mcp.NewToolResultText(s), nil
