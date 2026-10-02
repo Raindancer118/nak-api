@@ -4,7 +4,7 @@ go 1.26.3
 
 require (
 	github.com/ledongthuc/pdf v0.0.0-20260907135840-6c8c28e0e8a0
-	github.com/mark3labs/mcp-go v0.54.0
+	github.com/mark3labs/mcp-go v1.1.1
 	github.com/spf13/cobra v1.10.2
 	golang.org/x/net v0.54.0
 	golang.org/x/term v0.43.0
