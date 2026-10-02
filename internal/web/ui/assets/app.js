@@ -2683,6 +2683,71 @@ function thesisReviewers() {
   return box;
 }
 
+// Betreuungs-Assistent: a topic → fitting reviewers, or a topic + reviewer →
+// how well they fit. Matched on the server (nak_thesis_match), no external AI.
+function matchCard(m, j, { compact = false } = {}) {
+  const r = m.reviewer;
+  return h("li", {}, h("div", { class: "row match", vars: { "--j": j } },
+    h("span", { class: "match-pct", vars: { "--p": m.percent }, text: `${m.percent} %` }),
+    h("span", { class: "t" }, r.email ? h("a", { href: `mailto:${r.email}`, text: r.name }) : r.name,
+      h("span", { class: "s", text: (m.matched || []).map((x) => `${x.area} ← ${x.terms.join(", ")}`).join(" · ") || (r.areas || []).join(", ") }),
+      !compact && (m.uncovered || []).length > 0 && h("span", { class: "s", text: `nicht abgedeckt: ${m.uncovered.join(", ")}` })),
+    h("span", { class: `chip ${r.load === 0 ? "ok" : r.load === 2 ? "bad" : r.load === 1 ? "due" : ""}`, text: r.load_label || "–" })));
+}
+
+function thesisAssistant() {
+  let mode = "suggest";
+  const seg = h("div", { class: "filters", role: "group", "aria-label": "Assistent" });
+  const topic = h("textarea", { rows: 2, placeholder: "Arbeitstitel oder Thema, z. B. „Datenqualität im Data Warehouse eines Versandhändlers“", "aria-label": "Thema" });
+  const who = h("select", { "aria-label": "Gutachtende Person" }, h("option", { value: "", text: "Gutachtende Person wählen …" }));
+  const whoRow = h("label", { hidden: true }, "Gutachtende Person", who);
+  const go = h("button", { class: "primary", type: "button", text: "Vorschläge" });
+  const out = h("div", { "aria-live": "polite" });
+  const setMode = (m) => {
+    mode = m;
+    whoRow.hidden = m !== "check";
+    go.textContent = m === "check" ? "Match prüfen" : "Vorschläge";
+    seg.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.m === m)));
+    out.replaceChildren();
+  };
+  for (const [m, label] of [["suggest", "Vorschlag finden"], ["check", "Passt das?"]]) {
+    const b = h("button", { type: "button", text: label, onclick: () => setMode(m) });
+    b.dataset.m = m;
+    seg.append(b);
+  }
+  api("nak_thesis_reviewers").then((rs) => {
+    for (const r of [...(rs || [])].sort((a, b) => a.name.localeCompare(b.name, "de"))) who.append(h("option", { value: r.name, text: `${r.name}${r.department ? " · " + r.department : ""}` }));
+  }).catch(() => {});
+  const run = async () => {
+    const t = topic.value.trim();
+    if (!t) { out.replaceChildren(h("p", { class: "empty", text: "Erst ein Thema eingeben." })); return; }
+    if (mode === "check" && !who.value) { out.replaceChildren(h("p", { class: "empty", text: "Und eine gutachtende Person wählen." })); return; }
+    out.replaceChildren(...skeleton());
+    try {
+      const r = await api("nak_thesis_match", mode === "check" ? { topic: t, reviewer: who.value } : { topic: t }, { wait: true });
+      if (mode === "suggest") {
+        const list = r.suggestions || [];
+        out.replaceChildren(list.length ? h("ul", { class: "rows" }, list.map((m, j) => matchCard(m, j))) : emptyRow("Niemand passt erkennbar. Anders formulieren oder Fachbegriffe ergänzen."),
+          h("p", { class: "empty meter", text: "Sortiert nach Passung; wer voll ausgelastet ist, rutscht etwas nach unten. Bestellt werden Gutachtende vom Prüfungsausschuss; vorher mit der Person abstimmen." }));
+      } else {
+        const m = r.match;
+        out.replaceChildren(h("ul", { class: "rows" }, matchCard(m, 0)),
+          m.percent >= 60 ? h("p", { class: "tl-alert ok" }, h("b", { text: "Passt gut." }), " Die Fachgebiete decken das Thema weitgehend ab.")
+            : m.percent >= 35 ? h("p", { class: "tl-alert" }, h("b", { text: "Passt teilweise." }), " Einzelne Aspekte liegen außerhalb der Fachgebiete.")
+            : h("p", { class: "tl-alert bad" }, h("b", { text: "Passt kaum." }), " Die Fachgebiete treffen das Thema nur am Rand."),
+          ...((r.better || []).length ? [h("h2", { class: "sub", text: "Würde besser passen" }), h("ul", { class: "rows" }, r.better.map((x, j) => matchCard(x, j, { compact: true })))] : []));
+      }
+    } catch (err) {
+      out.replaceChildren(errorBox(err));
+    }
+  };
+  go.addEventListener("click", run);
+  topic.addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) run(); });
+  setMode("suggest");
+  return h("div", {}, seg, h("div", { class: "settings-form wide" }, h("label", {}, "Thema", topic), whoRow, h("div", { class: "row-actions" }, go)), out,
+    h("p", { class: "empty meter", text: "Das Thema bleibt auf deinem naknak-Server: abgeglichen wird mit den Fachgebieten aus der Übersicht der Gutachtenden, nicht mit einer externen KI." }));
+}
+
 async function thesisPage(root) {
   root.append(h("div", { class: "page-head" }, h("h1", {}, "Bachelorthesis", h("small", { text: "Anmeldung, Termine, Rechner und Gutachtende" }))));
   const grid = h("div", { class: "grid" });
@@ -2691,9 +2756,10 @@ async function thesisPage(root) {
   const tPlan = tile("Dein Fahrplan", { cls: "w6", i: 1 });
   const tCalc = tile("Rechner", { cls: "w6", i: 2 });
   const tDates = tile("Abschlusstermine", { cls: "w6", i: 3 });
+  const tAssist = tile("Betreuungs-Assistent", { cls: "w12", i: 4 });
   const tRev = tile("Gutachtende finden", { cls: "w12", i: 4 });
   const tRules = tile("Was gilt", { cls: "w12", i: 5 });
-  grid.append(tStatus, tPlan, tCalc, tDates, tRev, tRules);
+  grid.append(tStatus, tPlan, tCalc, tDates, tAssist, tRev, tRules);
   const data = api("nak_thesis");
   fill(tStatus, () => Promise.all([data, api("cis_progress").catch(() => null)]), ([t, p]) => {
     const e = t.eligibility || {};
@@ -2723,6 +2789,7 @@ async function thesisPage(root) {
         : "nicht erreichbar: die Anmeldung läge vor der frühesten Anmeldung deines Jahrgangs" })),
       h("span", { class: `chip ${reachable ? "" : "bad"}`, text: l.graduation.ceremony ? l.graduation.ceremony.replace("Bachelor-Graduierung: ", "Feier ") : `Ende ${l.graduation.board}` })))));
   });
+  tAssist.append(thesisAssistant());
   tRev.append(thesisReviewers());
   tRules.append(h("ul", { class: "rules" },
     h("li", { text: "Anmeldung erst nach dem Ende der Vorlesungszeit des 6. Semesters und mit allen Modulprüfungen bis einschließlich 4. Semester sowie den 25 ECTS aus Transferleistung 1–5 (PO § 7 Abs. 1)." }),

@@ -563,6 +563,10 @@ func Registry() *tools.Registry {
 				}
 				return thesis.Calc(thesis.StartFor(t), qs, ds), nil
 			}},
+		&tools.Tool{Name: "nak_thesis_match", Kind: tools.Read, Desc: "Demo-Betreuungs-Assistent", Params: []tools.Param{{Name: "topic"}, {Name: "reviewer"}},
+			Run: func(a *app.App, args tools.Args) (any, error) {
+				return tools.MatchResult(args.Str("topic"), args.Str("reviewer"), demoReviewers())
+			}},
 		&tools.Tool{Name: "nak_thesis_reviewers", Kind: tools.Read, Desc: "Demo-Gutachtende", Params: []tools.Param{{Name: "query"}},
 			Run: func(a *app.App, args tools.Args) (any, error) {
 				return thesis.FilterReviewers(demoReviewers(), args.Str("query")), nil

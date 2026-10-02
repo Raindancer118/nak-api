@@ -149,6 +149,23 @@ func thesisTools() []*Tool {
 				qs, ds := thesisDates(a, c)
 				return thesis.Calc(start, qs, ds), nil
 			}},
+		{Name: "nak_thesis_match", Kind: Read, Desc: "Betreuungs-Assistent für die Bachelorthesis: zu einem Thema passende Gutachtende mit Match in Prozent, den passenden Fachgebieten und der Auslastung; mit reviewer zusätzlich, wie gut genau diese Person passt und wer besser passen würde. Läuft lokal, das Thema verlässt den Server nicht.",
+			Params: []Param{{Name: "topic", Required: true, Desc: "Thema oder Arbeitstitel"}, {Name: "reviewer", Desc: "Name wie in der Übersicht, z.B. 'Bleek, Wolf-Gideon'"}},
+			Run: func(a *app.App, args Args) (any, error) {
+				topic := strings.TrimSpace(args.Str("topic"))
+				if topic == "" {
+					return nil, fmt.Errorf("topic fehlt")
+				}
+				c, err := cis(a)
+				if err != nil {
+					return nil, err
+				}
+				p, err := c.Page(thesisReviews)
+				if err != nil {
+					return nil, err
+				}
+				return matchResult(topic, args.Str("reviewer"), thesis.ParseReviewers(p.Body))
+			}},
 		{Name: "nak_thesis_reviewers", Kind: Read, Desc: "Gutachtende für die Bachelorthesis: Name, Fachbereich, Fachgebiete und aktuelle Auslastung (frei/mittel/voll), optional gefiltert (z.B. 'datenbank').",
 			Params: []Param{{Name: "query", Desc: "Suchwörter (alle müssen in Name, Fachbereich oder Fachgebiet vorkommen)"}},
 			Run: func(a *app.App, args Args) (any, error) {
@@ -188,4 +205,29 @@ func applyThesisDeadline(a *app.App, c *client.Client, plan *transfer.Plan) {
 			return
 		}
 	}
+}
+
+// matchResult: suggestions, or one reviewer's fit plus better alternatives
+func matchResult(topic, reviewer string, rs []thesis.Reviewer) (any, error) {
+	if strings.TrimSpace(reviewer) == "" {
+		return map[string]any{"topic": topic, "suggestions": thesis.Suggest(topic, rs, 8)}, nil
+	}
+	for _, r := range rs {
+		if strings.EqualFold(strings.TrimSpace(r.Name), strings.TrimSpace(reviewer)) {
+			m := thesis.MatchAmong(topic, r, rs)
+			var better []thesis.Match
+			for _, s := range thesis.Suggest(topic, rs, 4) {
+				if s.Reviewer.Name != r.Name && s.Percent > m.Percent {
+					better = append(better, s)
+				}
+			}
+			return map[string]any{"topic": topic, "match": m, "better": better}, nil
+		}
+	}
+	return nil, fmt.Errorf("keine gutachtende Person %q in der Übersicht", reviewer)
+}
+
+// MatchResult is matchResult for other registries (demo).
+func MatchResult(topic, reviewer string, rs []thesis.Reviewer) (any, error) {
+	return matchResult(topic, reviewer, rs)
 }

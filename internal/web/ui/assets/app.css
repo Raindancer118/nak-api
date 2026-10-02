@@ -1374,3 +1374,8 @@ ul.rules { margin: .25rem 0 0; padding-left: 1.1rem; display: grid; gap: .5rem; 
 .thesis-result { margin-top: .75rem; }
 .bad-text { color: var(--bad); }
 .row-actions { flex-wrap: wrap; }
+/* match percentage as a small ring */
+.match-pct { flex: none; display: grid; place-items: center; width: 52px; height: 52px; border-radius: 50%; font-size: .8rem; font-weight: 700; color: var(--ink);
+  background: radial-gradient(closest-side, var(--tile) 76%, transparent 78%), conic-gradient(var(--cis) calc(var(--p) * 1%), color-mix(in oklab, var(--line) 70%, transparent) 0); }
+.row.match { gap: .8rem; }
+.settings-form textarea { font: inherit; padding: .6rem .85rem; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); resize: vertical; }

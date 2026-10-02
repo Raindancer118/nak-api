@@ -323,12 +323,12 @@ func ParseReviewers(body string) []Reviewer {
 				cur = l
 			}
 			if !joinEnd.MatchString(cur) {
-				r.Areas = append(r.Areas, strings.TrimSuffix(cur, ","))
+				r.Areas = append(r.Areas, cleanArea(cur))
 				cur = ""
 			}
 		}
 		if cur != "" {
-			r.Areas = append(r.Areas, cur)
+			r.Areas = append(r.Areas, cleanArea(cur))
 		}
 		if len(cells) > 3 {
 			if m := checkedRe.FindStringSubmatch(cells[3][1]); m != nil {
@@ -339,6 +339,12 @@ func ParseReviewers(body string) []Reviewer {
 		out = append(out, r)
 	}
 	return out
+}
+
+// cleanArea drops list bullets and a trailing comma
+func cleanArea(a string) string {
+	a = strings.TrimSpace(strings.TrimLeft(a, "•·-–* "))
+	return strings.TrimSpace(strings.TrimSuffix(a, ","))
 }
 
 // FilterReviewers: every word must appear in name, department or an area.
