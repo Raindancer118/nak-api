@@ -50,15 +50,17 @@ func (s *Server) getSettings(w http.ResponseWriter, r *http.Request) {
 		ev["configured"], ev["url"], ev["token_hint"] = true, c.Base, hint(c.Token)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"eduvault":  ev,
-		"notify":    s.app.Settings().Notify,
-		"nav":       s.app.Settings().NavOrDefault(),
-		"nav_items": app.NavItems,
-		"account":   s.accountInfo(),
-		"read_only": s.app.ReadOnly,
-		"demo":      s.cfg.Demo,
-		"version":   s.cfg.Version,
-		"data_dir":  s.app.ConfigDir,
+		"eduvault":   ev,
+		"notify":     s.app.Settings().Notify,
+		"nav":        s.app.Settings().NavOrDefault(),
+		"nav_items":  app.NavItems,
+		"home":       s.app.Settings().HomeOrDefault(),
+		"home_items": app.HomeItems,
+		"account":    s.accountInfo(),
+		"read_only":  s.app.ReadOnly,
+		"demo":       s.cfg.Demo,
+		"version":    s.cfg.Version,
+		"data_dir":   s.app.ConfigDir,
 	})
 }
 
@@ -127,39 +129,54 @@ func (s *Server) putNotify(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"saved": true})
 }
 
-// putNav stores the navigation bar: 2 to 7 known, distinct entries (a phone
-// fits seven); an empty list goes back to the default.
+// putNav stores the navigation bar: 2 to 7 entries (a phone fits seven).
 func (s *Server) putNav(w http.ResponseWriter, r *http.Request) {
-	var in struct {
-		Nav []string `json:"nav"`
-	}
+	s.putList(w, r, "nav", app.NavItems, 2, 7, "Die Leiste braucht 2 bis 7 Einträge.", func(st *app.Settings, v []string) []string {
+		st.Nav = v
+		return st.NavOrDefault()
+	})
+}
+
+// putHome stores the dashboard tiles: at least one.
+func (s *Server) putHome(w http.ResponseWriter, r *http.Request) {
+	s.putList(w, r, "home", app.HomeItems, 1, len(app.HomeItems), "Die Startseite braucht mindestens eine Kachel.", func(st *app.Settings, v []string) []string {
+		st.Home = v
+		return st.HomeOrDefault()
+	})
+}
+
+// putList takes {"<key>": [ids]}: known, distinct, between min and max; an
+// empty list goes back to the default.
+func (s *Server) putList(w http.ResponseWriter, r *http.Request, key string, items []string, min, max int, sizeErr string, set func(*app.Settings, []string) []string) {
+	var in map[string][]string
 	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<12)).Decode(&in); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "body must be JSON"})
 		return
 	}
-	if len(in.Nav) > 0 {
+	list := in[key]
+	if len(list) > 0 {
 		known := map[string]bool{}
-		for _, id := range app.NavItems {
+		for _, id := range items {
 			known[id] = true
 		}
 		seen := map[string]bool{}
-		for _, id := range in.Nav {
+		for _, id := range list {
 			if !known[id] || seen[id] {
 				writeJSON(w, http.StatusBadRequest, map[string]any{"error": "unbekannter oder doppelter Eintrag: " + id})
 				return
 			}
 			seen[id] = true
 		}
-		if len(in.Nav) < 2 || len(in.Nav) > 7 {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "Die Leiste braucht 2 bis 7 Einträge."})
+		if len(list) < min || len(list) > max {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": sizeErr})
 			return
 		}
 	}
 	st := s.app.Settings()
-	st.Nav = in.Nav
+	shown := set(&st, list)
 	if err := s.app.SaveSettings(st); err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"saved": true, "nav": st.NavOrDefault()})
+	writeJSON(w, http.StatusOK, map[string]any{"saved": true, key: shown})
 }

@@ -209,6 +209,16 @@ function bar(p, color) {
   return h("div", { class: "progress" }, h("i", { vars: { "--p": Math.max(0, Math.min(1, p)), ...(color ? { "--c": color } : {}) } }));
 }
 
+// latest conversations for the dashboard tile
+function messageRows(r) {
+  const list = (Array.isArray(r) ? r : r?.conversations || []).slice(0, 4);
+  if (!list.length) return emptyRow("Keine Unterhaltungen.");
+  return h("ul", { class: "rows" }, list.map((c, j) => h("li", {}, h("a", { class: `row ${c.unread ? "unread" : ""}`, href: `#/nachrichten/${c.conversationid}`, vars: { "--j": j } },
+    h("span", { class: "dot", "data-src": "moodle" }),
+    h("span", { class: "t" }, c.name || "Unterhaltung", h("span", { class: "s preview sens", text: c.last_message })),
+    c.unread ? h("span", { class: "chip moodle", text: String(c.unread) }) : h("span", { class: "s", text: (c.last_time || "").slice(5, 10).split("-").reverse().join(".") })))));
+}
+
 function emptyRow(text) {
   return h("p", { class: "empty", text });
 }
@@ -397,20 +407,23 @@ async function overview(root) {
   const grid = h("div", { class: "grid", id: "overview-grid" });
   root.append(grid);
 
-  const tNext = tile("Als Nächstes", { cls: "w8", i: 0 });
-  const tDead = tile("Fristen", { i: 1, link: ["Woche", "#/woche"] });
-  const tWeek = tile("Diese Woche", { cls: "half", i: 2, link: ["Alle Termine", "#/woche"] });
-  const tGrades = tile("Noten", { cls: "half", i: 3, link: ["Alle Noten", "#/noten"] });
-  const tExams = tile("Prüfungen", { cls: "half", i: 4, link: ["Alle Prüfungen", "#/pruefungen"] });
-  const tMoodle = tile("Moodle · aktuelle Kurse", { cls: "w12", i: 5, link: ["Alle Kurse", "#/kurse"] });
-  grid.append(tNext, tDead, tWeek, tGrades, tExams, tMoodle);
-
-  fill(tNext, () => Promise.all([agenda, dash]), ([a, d]) => renderNext(nextUp(a, d)));
-  fill(tDead, () => api("nak_deadlines", { days: 30 }), (r) => deadlineRows(r.deadlines || []));
-  fill(tWeek, () => agenda, weekStrip);
-  fill(tGrades, () => Promise.all([api("cis_grades"), api("cis_progress").catch(() => null)]), gradeSummary);
-  fill(tExams, () => Promise.all([dash, loadPending()]), ([d, p]) => [examRows(d), ...(pendingRows(p) || [])]);
-  fill(tMoodle, () => Promise.all([dash, api("moodle_courses", { classification: "current" })]), moodleSummary);
+  const make = {
+    next: (i) => { const t = tile("Als Nächstes", { cls: "w8", i }); fill(t, () => Promise.all([agenda, dash]), ([a, d]) => renderNext(nextUp(a, d))); return t; },
+    deadlines: (i) => { const t = tile("Fristen", { i, link: ["Woche", "#/woche"] }); fill(t, () => api("nak_deadlines", { days: 30 }), (r) => deadlineRows(r.deadlines || [])); return t; },
+    week: (i) => { const t = tile("Diese Woche", { cls: "half", i, link: ["Alle Termine", "#/woche"] }); fill(t, () => agenda, weekStrip); return t; },
+    grades: (i) => { const t = tile("Noten", { cls: "half", i, link: ["Alle Noten", "#/noten"] }); fill(t, () => Promise.all([api("cis_grades"), api("cis_progress").catch(() => null)]), gradeSummary); return t; },
+    exams: (i) => {
+      const t = tile("Prüfungen", { cls: "half", i, link: ["Alle Prüfungen", "#/pruefungen"] });
+      // with its own tile on the page, pending grades are not repeated here
+      fill(t, () => Promise.all([dash, loadPending()]), ([d, p]) => [examRows(d), ...(order.includes("pending") ? [] : pendingRows(p) || [])]);
+      return t;
+    },
+    moodle: (i) => { const t = tile("Moodle · aktuelle Kurse", { cls: "w12", i, link: ["Alle Kurse", "#/kurse"] }); fill(t, () => Promise.all([dash, api("moodle_courses", { classification: "current" })]), moodleSummary); return t; },
+    messages: (i) => { const t = tile("Nachrichten", { cls: "half", i, link: ["Inbox", "#/nachrichten"] }); fill(t, () => api("moodle_conversations", { limit: 4 }), messageRows); return t; },
+    pending: (i) => { const t = tile("Noten ausstehend", { cls: "half", i, link: ["Prüfungen", "#/pruefungen"] }); fill(t, loadPending, (p) => pendingRows(p) || emptyRow("Keine Note offen.")); return t; },
+  };
+  const order = savedHome();
+  grid.append(...order.map((id, i) => make[id](i)));
 
   const foot = h("div", { class: "foot" });
   root.append(foot);
@@ -1573,9 +1586,11 @@ async function courseTab(body, cid, tab) {
 
 // ── settings ────────────────────────────────────────────────────────────────
 
-function navSettings(st) {
-  let order = [...(st.nav || defaultNav)];
-  const all = (st.nav_items || Object.keys(navDefs)).filter((id) => navDefs[id]);
+// listEditor: choose entries and their order (drag the grip, or arrow keys
+// on it); used for the navigation bar and the dashboard
+function listEditor({ title, intro, defs, current, items, min, max, endpoint, key, applied, i = 0 }) {
+  let order = [...current];
+  const all = items.filter((id) => defs[id]);
   const list = h("ol", { class: "nav-edit" });
   const msg = h("div", { class: "form-msg", "aria-live": "polite" });
   const draw = () => {
@@ -1584,15 +1599,15 @@ function navSettings(st) {
       const on = order.includes(id);
       const i = order.indexOf(id);
       const move = (d) => { [order[i], order[i + d]] = [order[i + d], order[i]]; draw(); };
-      const box = h("input", { type: "checkbox", "aria-label": `${navDefs[id][0]} in der Leiste`, ...(on ? { checked: true } : {}) });
+      const box = h("input", { type: "checkbox", "aria-label": `${defs[id][0]} in der Leiste`, ...(on ? { checked: true } : {}) });
       box.addEventListener("change", () => {
-        if (box.checked && order.length >= 7) { box.checked = false; msg.replaceChildren(h("p", { class: "empty", text: "Mehr als 7 passen nicht in die Leiste." })); return; }
-        if (!box.checked && order.length <= 2) { box.checked = true; msg.replaceChildren(h("p", { class: "empty", text: "Mindestens 2 Einträge." })); return; }
+        if (box.checked && order.length >= max) { box.checked = false; msg.replaceChildren(h("p", { class: "empty", text: `Höchstens ${max} Einträge.` })); return; }
+        if (!box.checked && order.length <= min) { box.checked = true; msg.replaceChildren(h("p", { class: "empty", text: `Mindestens ${min} ${min === 1 ? "Eintrag" : "Einträge"}.` })); return; }
         order = box.checked ? [...order, id] : order.filter((x) => x !== id);
         msg.replaceChildren();
         draw();
       });
-      const grip = on && h("button", { class: "grip", type: "button", "aria-label": `${navDefs[id][0]} verschieben (Pfeiltasten)` }, svg(["M9 6h.01", "M15 6h.01", "M9 12h.01", "M15 12h.01", "M9 18h.01", "M15 18h.01"]));
+      const grip = on && h("button", { class: "grip", type: "button", "aria-label": `${defs[id][0]} verschieben (Pfeiltasten)` }, svg(["M9 6h.01", "M15 6h.01", "M9 12h.01", "M15 12h.01", "M9 18h.01", "M15 18h.01"]));
       if (grip) {
         grip.addEventListener("pointerdown", (e) => dragRow(e, grip, i));
         grip.addEventListener("keydown", (e) => {
@@ -1603,7 +1618,7 @@ function navSettings(st) {
           list.querySelectorAll(".grip")[i + d]?.focus();
         });
       }
-      return h("li", { class: on ? "on" : "off" }, h("label", {}, box, svg(navDefs[id][3]), h("span", { text: navDefs[id][0] })), grip);
+      return h("li", { class: on ? "on" : "off" }, h("label", {}, box, svg(defs[id][3]), h("span", { text: defs[id][0] })), grip);
     }));
   };
   const reorder = (from, to) => {
@@ -1649,11 +1664,11 @@ function navSettings(st) {
   };
   const save = async (nav) => {
     try {
-      const res = await fetch("/api/settings/nav", { method: "PUT", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ nav }) });
+      const res = await fetch(endpoint, { method: "PUT", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ [key]: nav }) });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
-      order = [...body.nav];
-      applyNav(body.nav);
+      order = [...body[key]];
+      applied(body[key]);
       draw();
       msg.replaceChildren(h("p", { class: "ok-note", text: "Gespeichert. Gilt in der App und im Browser." }));
     } catch (err) {
@@ -1661,13 +1676,25 @@ function navSettings(st) {
     }
   };
   draw();
-  return tile("Navigationsleiste", { cls: "w6", i: 0 },
-    h("p", { class: "empty", text: "Was unten in der Leiste steht (2 bis 7 Einträge); zum Umsortieren am Griff ziehen." }),
+  return tile(title, { cls: "w6", i },
+    h("p", { class: "empty", text: intro }),
     list,
     h("div", { class: "row-actions" },
       h("button", { class: "primary", type: "button", text: "Speichern", onclick: () => save(order) }),
       h("button", { class: "ghost", type: "button", text: "Standard", onclick: () => save([]) })),
     msg);
+}
+
+function navSettings(st) {
+  return listEditor({ title: "Navigationsleiste", intro: "Was in der Leiste steht (2 bis 7 Einträge); zum Umsortieren am Griff ziehen.",
+    defs: navDefs, current: st.nav || defaultNav, items: st.nav_items || Object.keys(navDefs), min: 2, max: 7,
+    endpoint: "/api/settings/nav", key: "nav", applied: applyNav });
+}
+
+function homeSettings(st) {
+  return listEditor({ title: "Startseite", intro: "Welche Kacheln die Startseite zeigt und in welcher Reihenfolge; zum Umsortieren am Griff ziehen.",
+    defs: homeDefs, current: st.home || defaultHome, items: st.home_items || Object.keys(homeDefs), min: 1, max: Object.keys(homeDefs).length,
+    endpoint: "/api/settings/home", key: "home", applied: applyHome, i: 1 });
 }
 
 async function settingsPage(root) {
@@ -1689,7 +1716,7 @@ async function settingsPage(root) {
       h("div", { class: "row-actions" }, h("button", { class: "primary", type: "button", text: "App-Einstellungen", onclick: () => window.NaknakApp.openSettings() }))));
   }
 
-  grid.append(navSettings(st));
+  grid.append(navSettings(st), homeSettings(st));
 
   // EduVault
   const ev = st.eduvault || {};
@@ -2630,6 +2657,34 @@ const navDefs = {
 };
 const defaultNav = ["start", "woche", "kurse", "inbox", "noten", "studium"];
 
+// dashboard tiles for the settings editor: [label, -, -, icon]
+const homeDefs = {
+  next: ["Als Nächstes", "", "", ["M12 7v5l3 2", "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z"]],
+  deadlines: ["Fristen", "", "", ["M5 4h14v16H5z", "M9 9h6", "M9 13h6"]],
+  week: ["Diese Woche", "", "", navDefs.woche[3]],
+  grades: ["Noten", "", "", navDefs.noten[3]],
+  exams: ["Prüfungen", "", "", navDefs.pruefungen[3]],
+  moodle: ["Moodle · aktuelle Kurse", "", "", navDefs.kurse[3]],
+  messages: ["Nachrichten", "", "", navDefs.inbox[3]],
+  pending: ["Noten ausstehend", "", "", ["M12 7v5l3 2", "M5 20h14"]],
+};
+const defaultHome = ["next", "deadlines", "week", "grades", "exams", "moodle"];
+
+function savedHome() {
+  try {
+    const n = JSON.parse(localStorage.getItem("nak-home") || "null");
+    if (Array.isArray(n) && n.length >= 1 && n.every((id) => homeDefs[id])) return n;
+  } catch {}
+  return defaultHome;
+}
+
+function applyHome(ids) {
+  if (!Array.isArray(ids) || !ids.every((id) => homeDefs[id])) return;
+  const changed = JSON.stringify(ids) !== localStorage.getItem("nak-home");
+  localStorage.setItem("nak-home", JSON.stringify(ids));
+  if (changed && (location.hash || "#/") === "#/") render();
+}
+
 function savedNav() {
   try {
     const n = JSON.parse(localStorage.getItem("nak-nav") || "null");
@@ -2746,7 +2801,7 @@ function boot() {
   addEventListener("hashchange", render);
   render();
   if (!document.documentElement.classList.contains("still")) {
-    fetch("/api/settings", { credentials: "same-origin" }).then((r) => r.ok ? r.json() : null).then((st) => st && applyNav(st.nav)).catch(() => {});
+    fetch("/api/settings", { credentials: "same-origin" }).then((r) => r.ok ? r.json() : null).then((st) => { if (st) { applyNav(st.nav); applyHome(st.home); } }).catch(() => {});
   }
 }
 

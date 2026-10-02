@@ -18,6 +18,8 @@ type Settings struct {
 	// Nav is the owner's choice and order of navigation entries (ids from
 	// NavItems); empty = DefaultNav.
 	Nav []string `json:"nav,omitempty"`
+	// Home is the choice and order of dashboard tiles (ids from HomeItems).
+	Home []string `json:"home,omitempty"`
 }
 
 // NavItems are the pages the navigation bar can hold; the web UI knows
@@ -25,6 +27,18 @@ type Settings struct {
 var NavItems = []string{"start", "woche", "kurse", "inbox", "noten", "studium", "pruefungen", "abgaben"}
 
 var DefaultNav = []string{"start", "woche", "kurse", "inbox", "noten", "studium"}
+
+// HomeItems are the dashboard tiles; the web UI renders them.
+var HomeItems = []string{"next", "deadlines", "week", "grades", "exams", "moodle", "messages", "pending"}
+
+var DefaultHome = []string{"next", "deadlines", "week", "grades", "exams", "moodle"}
+
+func (s Settings) HomeOrDefault() []string {
+	if len(s.Home) == 0 {
+		return DefaultHome
+	}
+	return s.Home
+}
 
 // NavOrDefault is the bar as it should be shown.
 func (s Settings) NavOrDefault() []string {

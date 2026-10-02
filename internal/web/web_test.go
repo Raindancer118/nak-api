@@ -797,3 +797,30 @@ func TestNavSettings(t *testing.T) {
 		t.Errorf("empty list must reset to the default")
 	}
 }
+
+func TestHomeSettings(t *testing.T) {
+	h := newHarness(t)
+	h.app.ConfigDir = t.TempDir()
+	get := func() []any {
+		m := decode(t, h.do(t, "GET", "/api/settings", "", bearer))
+		v, _ := m["home"].([]any)
+		return v
+	}
+	if n := get(); len(n) != 6 || n[0] != "next" {
+		t.Fatalf("default home = %v", n)
+	}
+	if res := h.do(t, "PUT", "/api/settings/home", `{"home":["grades","messages"]}`, bearer); res.StatusCode != 200 {
+		t.Fatalf("save: %d", res.StatusCode)
+	}
+	if n := get(); fmt.Sprint(n) != "[grades messages]" {
+		t.Fatalf("saved home = %v", n)
+	}
+	for _, bad := range []string{`{"home":["grades","grades"]}`, `{"home":["evil"]}`} {
+		if res := h.do(t, "PUT", "/api/settings/home", bad, bearer); res.StatusCode != 400 {
+			t.Errorf("%s: %d, want 400", bad, res.StatusCode)
+		}
+	}
+	if res := h.do(t, "PUT", "/api/settings/home", `{"home":[]}`, bearer); res.StatusCode != 200 || len(get()) != 6 {
+		t.Errorf("empty list must reset to the default")
+	}
+}

@@ -1356,3 +1356,6 @@ html.private .toast { filter: blur(6px); }
 .nav-edit .grip:active { cursor: grabbing; }
 .nav-edit .grip svg { width: 20px; height: 20px; stroke-width: 2.6; }
 @media (prefers-reduced-motion: reduce) { .nav-edit li.on { transition: none; } }
+
+/* the dashboard order is the owner's: dense flow closes gaps between tiles of different width */
+#overview-grid { grid-auto-flow: row dense; }
