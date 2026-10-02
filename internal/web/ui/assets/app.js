@@ -455,6 +455,8 @@ async function overview(root) {
     transfer: (i) => { const t = tile("Transferleistungen", { cls: "half", i, link: ["Alle", "#/transferleistungen"] }); fill(t, () => Promise.all([api("cis_list_transfer"), api("nak_transfer_plan").catch(() => null)]), ([list, plan]) => transferOverview(list, plan)); return t; },
     thesis: (i) => { const t = tile("Bachelorthesis", { cls: "half", i, link: ["Alles", "#/bachelorthesis"] }); fill(t, () => api("nak_thesis"), thesisSummary); return t; },
     transfer_grades: (i) => { const t = tile("TL-Noten · rechnerisch", { cls: "half", i, link: ["Details", "#/transferleistungen"] }); fill(t, () => api("nak_transfer_grades"), (g) => transferGradeSummary(g, 4)); return t; },
+    mensa: (i) => { const t = tile("Mensa", { cls: "half", i, link: ["Speiseplan", "#/mensa"] }); fill(t, () => Promise.all([api("mensa_menu", { weeks: 2 }), api("mensa_account", { days: 7 }).catch(() => null)]), ([m, a]) => mensaToday(m, a)); return t; },
+    mensa_spending: (i) => { const t = tile("Mensa-Ausgaben", { cls: "half", i, link: ["Mensa", "#/mensa"] }); fill(t, () => api("mensa_spending"), spendingView); return t; },
     pending: (i) => { const t = tile("Noten ausstehend", { cls: "half", i, link: ["Prüfungen", "#/pruefungen"] }); fill(t, loadPending, (p) => pendingRows(p) || emptyRow("Keine Note offen.")); return t; },
   };
   const order = savedHome();
@@ -1758,7 +1760,7 @@ async function settingsPage(root) {
       h("div", { class: "row-actions" }, h("button", { class: "primary", type: "button", text: "App-Einstellungen", onclick: () => window.NaknakApp.openSettings() }))));
   }
 
-  grid.append(navSettings(st), homeSettings(st));
+  grid.append(navSettings(st), homeSettings(st), mensaSettings());
 
   // EduVault
   const ev = st.eduvault || {};
@@ -2557,6 +2559,108 @@ function transferGradeSummary(g, limit = Infinity) {
       h("span", { class: `chip sens ${x.must_pass_ok ? "" : "bad"}`, text: x.final || x.grade })))))];
 }
 
+// ── Mensa ───────────────────────────────────────────────────────────────────
+// Menu public (mensa.nordakademie.de), card balance and bookings with the NAK
+// login. The total spent stays hidden unless switched on in the settings.
+const fmtEuro = (x) => (x ?? 0).toLocaleString("de-DE", { style: "currency", currency: "EUR" });
+const mensaSpendingOn = () => localStorage.getItem("nak-mensa-spending") === "1";
+const isoToday = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+const dishVeg = (d) => (d.tags || []).some((t) => t === "Vegetarisch" || t === "Vegan") || /veg/i.test(d.line);
+
+function dishRows(dishes) {
+  if (!dishes.length) return emptyRow("Nichts auf dem Plan.");
+  return h("ul", { class: "rows" }, dishes.map((d, j) => h("li", {}, h("div", { class: "row", vars: { "--j": j } },
+    h("span", { class: `ext ${dishVeg(d) ? "veg" : ""}`, text: d.line.replace(/^Menü\s*/i, "").replace(/\s*veg\.?$/i, "") || "·" }),
+    h("span", { class: "t" }, d.name, h("span", { class: "s", text: [...(d.tags || []), (d.allergens || []).length && `Allergene: ${d.allergens.join(", ")}`].filter(Boolean).join(" · ") })),
+    h("span", { class: "chip", text: fmtEuro(d.price) })))));
+}
+
+// today, or the next day with a menu (weekend, evening)
+function mensaNextDay(menu) {
+  const today = isoToday();
+  return (menu.days || []).find((d) => d.date >= today && d.dishes.length);
+}
+
+function mensaDayLabel(day) {
+  const today = isoToday();
+  if (day.date === today) return "Heute";
+  const t = new Date(today); t.setDate(t.getDate() + 1);
+  return day.date === t.toISOString().slice(0, 10) ? "Morgen" : `${day.weekday.slice(0, 2)} ${day.date.slice(8, 10)}.${day.date.slice(5, 7)}.`;
+}
+
+function mensaToday(menu, acc) {
+  const day = mensaNextDay(menu);
+  return [acc && h("div", { class: "band-num" }, h("div", { class: "avg" }, h("span", { class: "big sens", text: fmtEuro(acc.balance) }), h("span", { class: "empty", text: "Guthaben" }))),
+    day ? [h("p", { class: "empty", text: mensaDayLabel(day) }), dishRows(day.dishes)] : emptyRow("Noch kein Speiseplan veröffentlicht.")].flat().filter(Boolean);
+}
+
+function bookingRows(bs, limit = 12) {
+  if (!bs.length) return emptyRow("Keine Buchungen.");
+  return h("ul", { class: "rows" }, bs.slice(0, limit).map((b, j) => h("li", {}, h("div", { class: "row", vars: { "--j": j } },
+    h("span", { class: "ext", text: new Intl.DateTimeFormat("de-DE", { day: "2-digit", month: "2-digit" }).format(new Date(b.at)) }),
+    h("span", { class: "t" }, b.dish || b.item, h("span", { class: "s", text: [b.dish && b.item, b.qty > 1 && `${b.qty}×`].filter(Boolean).join(" · ") })),
+    h("span", { class: `chip sens ${b.amount > 0 ? "ok" : ""}`, text: `${b.amount > 0 ? "+" : ""}${fmtEuro(b.amount)}` })))));
+}
+
+function spendingView(r) {
+  const s = r.spending || {};
+  const months = (s.months || []).slice(-12);
+  const top = Math.max(1, ...months.map((m) => m.food));
+  const since = s.since ? new Intl.DateTimeFormat("de-DE", { month: "long", year: "numeric" }).format(new Date(s.since)) : "";
+  return [h("div", { class: "band-num" }, h("div", { class: "avg" }, h("span", { class: "big sens", text: fmtEuro(s.food) }),
+    h("span", { class: "empty", text: [since && `seit ${since}`, `${s.meals} Menüs`, (s.months || []).length && `⌀ ${fmtEuro(s.food / s.months.length)} im Monat`].filter(Boolean).join(" · ") }))),
+    months.length ? h("ul", { class: "spend-bars" }, months.map((m) => h("li", { title: `${m.month}: ${fmtEuro(m.food)} · ${m.meals} Menüs` },
+      h("span", { class: "bar sens", vars: { "--v": (m.food / top).toFixed(3) } }),
+      h("span", { class: "lbl", text: new Intl.DateTimeFormat("de-DE", { month: "short" }).format(new Date(m.month + "-01")) })))) : null].filter(Boolean);
+}
+
+async function mensaPage(root) {
+  root.append(h("div", { class: "page-head" }, h("h1", {}, "Mensa", h("small", { text: "Speiseplan und Mensakarte" }))));
+  const grid = h("div", { class: "grid" });
+  root.append(grid);
+  const tMenu = tile("Speiseplan", { cls: "w8", i: 0 });
+  const tCard = tile("Mensakarte", { i: 1 });
+  grid.append(tMenu, tCard);
+  if (mensaSpendingOn()) {
+    const tSpend = tile("Ausgaben fürs Essen", { cls: "w12", i: 2 });
+    grid.append(tSpend);
+    fill(tSpend, () => api("mensa_spending"), spendingView);
+  }
+  fill(tMenu, () => api("mensa_menu", { weeks: 3 }), (menu) => {
+    const days = (menu.days || []).filter((d) => d.date >= isoToday());
+    if (!days.length) return emptyRow("Noch kein Speiseplan veröffentlicht.");
+    let pick = days[0].date, vegOnly = localStorage.getItem("nak-mensa-veg") === "1";
+    const seg = h("div", { class: "filters", role: "group", "aria-label": "Tag" });
+    const list = h("div", {});
+    const veg = h("button", { type: "button", text: "nur vegetarisch" });
+    const draw = () => {
+      seg.querySelectorAll("button[data-d]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.d === pick)));
+      veg.setAttribute("aria-pressed", String(vegOnly));
+      const day = days.find((d) => d.date === pick);
+      list.replaceChildren(dishRows(day.dishes.filter((d) => !vegOnly || dishVeg(d))));
+    };
+    for (const d of days) {
+      const b = h("button", { type: "button", text: mensaDayLabel(d), onclick: () => { pick = d.date; draw(); } });
+      b.dataset.d = d.date;
+      seg.append(b);
+    }
+    veg.addEventListener("click", () => { vegOnly = !vegOnly; localStorage.setItem("nak-mensa-veg", vegOnly ? "1" : "0"); draw(); });
+    draw();
+    return [seg, h("div", { class: "filters mensa-veg" }, veg), list];
+  });
+  fill(tCard, () => api("mensa_account", { days: 60 }), (acc) => [
+    h("div", { class: "band-num" }, h("div", { class: "avg" }, h("span", { class: "big sens", text: fmtEuro(acc.balance) }), h("span", { class: "empty", text: acc.balance < 5 ? "reicht für kein Menü mehr" : "Guthaben" }))),
+    bookingRows(acc.bookings || [], 8)]);
+}
+
+function mensaSettings() {
+  const on = h("input", { type: "checkbox" });
+  on.checked = mensaSpendingOn();
+  on.addEventListener("change", () => localStorage.setItem("nak-mensa-spending", on.checked ? "1" : "0"));
+  return tile("Mensa", { i: 0 }, h("div", { class: "settings-form" },
+    h("label", { class: "check" }, on, h("span", {}, h("b", { text: "Gesamtausgaben anzeigen" }), h("small", { text: "Auf der Mensa-Seite: wie viel du fürs Essen ausgegeben hast." })))));
+}
+
 async function transferPage(root) {
   root.append(h("div", { class: "page-head" }, h("h1", {}, "Transferleistungen", h("small", { text: "Transfermodule Theorie/Praxis 1–6" }))));
   const grid = h("div", { class: "grid" });
@@ -2932,6 +3036,7 @@ const routes = [
   [/^#\/(?:transferleistungen|transfernoten)$/, transferPage, "#/transferleistungen"],
   [/^#\/(?:bachelorthesis|thesis)$/, thesisPage, "#/bachelorthesis"],
   [/^#\/studium(?:\/(seminare|wahlpflicht|transfer|bescheinigungen|profil))?$/, studiesPage, "#/studium"],
+  [/^#\/mensa$/, mensaPage, "#/mensa"],
   [/^#\/einstellungen$/, settingsPage, "#/einstellungen"],
   [/^#\/module$/, unitsPage, "#/kurse"],
   [/^#\/modul\/([A-Z]{1,2}\d{3})(?:\/(inhalt|forum|abgaben))?(?:\/(\d+))?$/, unitPage, "#/kurse"],
@@ -3021,6 +3126,7 @@ const navDefs = {
   abgaben: ["Abgaben", "Abgaben", "#/abgaben", ["M12 4v11", "M7 10l5 5 5-5", "M5 20h14"]],
   transfer: ["Transferleistungen", "Transfer", "#/transferleistungen", ["M4 19h16", "M7 15l3-4 3 2 4-6"]],
   thesis: ["Bachelorthesis", "Thesis", "#/bachelorthesis", ["M6 3h9l4 4v14H6z", "M14 3v5h5", "M9 13h6", "M9 17h4"]],
+  mensa: ["Mensa", "Mensa", "#/mensa", ["M7 3v18", "M4 3v5a3 3 0 0 0 6 0V3", "M17 21V3c-2 1-3 4-3 8h3"]],
 };
 const defaultNav = ["start", "woche", "kurse", "inbox", "noten", "studium"];
 
@@ -3037,8 +3143,10 @@ const homeDefs = {
   transfer: ["Transferleistungen", "", "", ["M5 4h14v16H5z", "M9 9h6", "M9 13h6"]],
   transfer_grades: ["TL-Noten (rechnerisch)", "", "", ["M4 19h16", "M7 15l3-4 3 2 4-6"]],
   thesis: ["Bachelorthesis", "", "", ["M6 3h9l4 4v14H6z", "M14 3v5h5", "M9 13h6", "M9 17h4"]],
+  mensa: ["Mensa · heute und Guthaben", "", "", navDefs.mensa[3]],
+  mensa_spending: ["Mensa-Ausgaben", "", "", ["M4 19h16", "M7 15l3-4 3 2 4-6"]],
 };
-const defaultHome = ["next", "deadlines", "week", "grades", "exams", "moodle"];
+const defaultHome = ["next", "deadlines", "week", "grades", "exams", "mensa", "moodle"];
 
 function savedHome() {
   try {

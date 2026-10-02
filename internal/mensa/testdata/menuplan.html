@@ -1,0 +1,895 @@
+    <!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge; IE=EmulateIE11; chrome=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <base href="https://mensa.nordakademie.de/">
+<link rel="shortcut icon" type="image/x-icon" href="https://mensa.nordakademie.de/images/favicon/favicon.ico">
+<link rel="icon" type="image/x-icon" href="https://mensa.nordakademie.de/images/favicon/favicon.ico">
+
+<link rel="icon" type="image/png" href="https://mensa.nordakademie.de/images/favicon/web_16.png" sizes="16x16">
+<link rel="icon" type="image/png" href="https://mensa.nordakademie.de/images/favicon/web_32.png" sizes="32x32">
+<link rel="icon" type="image/png" href="https://mensa.nordakademie.de/images/favicon/web_64.png" sizes="64x64">
+<link rel="icon" type="image/png" href="https://mensa.nordakademie.de/images/favicon/web_128.png" sizes="128x128">
+<link rel="icon" type="image/png" href="https://mensa.nordakademie.de/images/favicon/web_152.png" sizes="152x152">
+<link rel="icon" type="image/png" href="https://mensa.nordakademie.de/images/favicon/web_167.png" sizes="167x167">
+<link rel="icon" type="image/png" href="https://mensa.nordakademie.de/images/favicon/web_180.png" sizes="180x180">
+<link rel="icon" type="image/png" href="https://mensa.nordakademie.de/images/favicon/web_192.png" sizes="192x192">
+<link rel="icon" type="image/png" href="https://mensa.nordakademie.de/images/favicon/web_196.png" sizes="196x196">
+<link rel="icon" type="image/png" href="https://mensa.nordakademie.de/images/favicon/web_512.png" sizes="512x512">
+
+<meta name="theme-color" content="#FFFFFF">
+<meta name="mobile-web-app-capable" content="yes">
+    <link rel="manifest" href='data:application/manifest+json;base64,eyJuYW1lIjoiTk9SREFLQURFTUlFIiwic2hvcnRfbmFtZSI6Ik5PUkRBS0FERU1JRSIsInN0YXJ0X3VybCI6Imh0dHBzOi8vbWVuc2Eubm9yZGFrYWRlbWllLmRlIiwiZGlzcGxheSI6InN0YW5kYWxvbmUiLCJiYWNrZ3JvdW5kX2NvbG9yIjoiI0ZGRkZGRiIsImljb25zIjpbeyJzcmMiOiJodHRwczovL21lbnNhLm5vcmRha2FkZW1pZS5kZS9pbWFnZXMvZmF2aWNvbi9hbmRyb2lkXzM2LnBuZyIsInNpemVzIjoiMzZ4MzYiLCJ0eXBlIjoiaW1hZ2UvcG5nIiwiZGVuc2l0eSI6IjAuNzUifSx7InNyYyI6Imh0dHBzOi8vbWVuc2Eubm9yZGFrYWRlbWllLmRlL2ltYWdlcy9mYXZpY29uL2FuZHJvaWRfNDgucG5nIiwic2l6ZXMiOiI0OHg0OCIsInR5cGUiOiJpbWFnZS9wbmciLCJkZW5zaXR5IjoiMS4wIn0seyJzcmMiOiJodHRwczovL21lbnNhLm5vcmRha2FkZW1pZS5kZS9pbWFnZXMvZmF2aWNvbi9hbmRyb2lkXzcyLnBuZyIsInNpemVzIjoiNzJ4NzIiLCJ0eXBlIjoiaW1hZ2UvcG5nIiwiZGVuc2l0eSI6IjEuNSJ9LHsic3JjIjoiaHR0cHM6Ly9tZW5zYS5ub3JkYWthZGVtaWUuZGUvaW1hZ2VzL2Zhdmljb24vYW5kcm9pZF85Ni5wbmciLCJzaXplcyI6Ijk2eDk2IiwidHlwZSI6ImltYWdlL3BuZyIsImRlbnNpdHkiOiIyLjAifSx7InNyYyI6Imh0dHBzOi8vbWVuc2Eubm9yZGFrYWRlbWllLmRlL2ltYWdlcy9mYXZpY29uL2FuZHJvaWRfMTQ0LnBuZyIsInNpemVzIjoiMTQ0eDE0NCIsInR5cGUiOiJpbWFnZS9wbmciLCJkZW5zaXR5IjoiMy4wIn0seyJzcmMiOiJodHRwczovL21lbnNhLm5vcmRha2FkZW1pZS5kZS9pbWFnZXMvZmF2aWNvbi9hbmRyb2lkXzE5Mi5wbmciLCJzaXplcyI6IjE5MngxOTIiLCJ0eXBlIjoiaW1hZ2UvcG5nIiwiZGVuc2l0eSI6IjQuMCJ9XSwidGhlbWVfY29sb3IiOiIjRkZGRkZGIn0='/>
+
+    <meta name="apple-mobile-web-app-title" content="NORDAKADEMIE">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="#FFFFFF">
+<link rel="apple-touch-icon-precomposed" type="image/png" href="https://mensa.nordakademie.de/images/favicon/apple_192.png">
+<link rel="apple-touch-icon" type="image/png" href="https://mensa.nordakademie.de/images/favicon/apple_57.png" sizes="57x57">
+<link rel="apple-touch-icon" type="image/png" href="https://mensa.nordakademie.de/images/favicon/apple_60.png" sizes="60x60">
+<link rel="apple-touch-icon" type="image/png" href="https://mensa.nordakademie.de/images/favicon/apple_72.png" sizes="72x72">
+<link rel="apple-touch-icon" type="image/png" href="https://mensa.nordakademie.de/images/favicon/apple_76.png" sizes="76x76">
+<link rel="apple-touch-icon" type="image/png" href="https://mensa.nordakademie.de/images/favicon/apple_114.png" sizes="114x114">
+<link rel="apple-touch-icon" type="image/png" href="https://mensa.nordakademie.de/images/favicon/apple_120.png" sizes="120x120">
+<link rel="apple-touch-icon" type="image/png" href="https://mensa.nordakademie.de/images/favicon/apple_144.png" sizes="144x144">
+<link rel="apple-touch-icon" type="image/png" href="https://mensa.nordakademie.de/images/favicon/apple_152.png" sizes="152x152">
+<link rel="apple-touch-icon" type="image/png" href="https://mensa.nordakademie.de/images/favicon/apple_180.png" sizes="180x180">
+<link rel="apple-touch-icon" type="image/png" href="https://mensa.nordakademie.de/images/favicon/apple_192.png" sizes="192x192">
+
+<meta name="msapplication-TileImage" content="https://mensa.nordakademie.de/images/favicon/windows_144.png">
+<meta name="msapplication-TileColor" content="#FFFFFF"/>
+
+<meta name="application-name" content="NORDAKADEMIE">
+<meta name="msapplication-square70x70logo" content="https://mensa.nordakademie.de/images/favicon/windows_70.png"/>
+<meta name="msapplication-square144x144logo" content="https://mensa.nordakademie.de/images/favicon/windows_144.png"/>
+<meta name="msapplication-square150x150logo" content="https://mensa.nordakademie.de/images/favicon/windows_150.png"/>
+<meta name="msapplication-square310x310logo" content="https://mensa.nordakademie.de/images/favicon/windows_310.png"/>
+    <title>NORDAKADEMIE</title>
+    <link type="text/css" rel="stylesheet" href="js/webbestellung/webbestellung.9cd7f6d8bbb48c233707.css">
+    <link type="text/css" rel="stylesheet" href="stylesheets/main.042a46e70e26d9d68c987413ea6eafb4.css">
+    <link type="text/css" rel="stylesheet" href="stylesheets/custom.1341d625b97a3f5df62462110960c3ff.css">
+    <script src="js/webbestellung/webbestellung.124cdc0fc01988e749d3.min.js" type="text/javascript"></script>
+
+    <script type="text/javascript">
+      OPC.ROOT_URL                  = "https://mensa.nordakademie.de";
+      OPC.activeLanguage            = "de";
+      OPC.SERVICE_URL               = "https://mensa.nordakademie.de/api/";
+      OPC.WaehrungsFormat           = "%s €";
+      OPC.WaehrungsDecimalSeparator = ",";
+      OPCModalWindow.setCloseLabel("Schließen");
+            OPC.SESSION_MAXTIME      = 0;
+      OPC.SESSION_CURTIMESTAMP = 0;
+          </script>
+<script type="text/javascript">
+
+  OPC.closing = false;
+
+  function setAngImgClicked(value)
+  {
+    clkAngImg = value;
+  }
+
+    OPC.mehrfachBest              = false;
+  OPC.WaehrungsFormat           = "%s €";
+  OPC.WaehrungsDecimalSeparator = ",";
+  OPC.aktuellesKartenSaldo      = parseFloat(0.00);
+  OPC.aktuellesKreditLimit      = parseFloat(0.00);
+  OPC.maxBestProKat             = parseInt(1);
+  OPC.maxBestImVoraus           = parseInt(-1);
+  OPC.LSVerzehr                 = parseInt(0);
+  OPC.maxBestProWoche           = parseInt(0);
+  OPC.noAngClick                = false;
+  var clkAngImg                 = false;
+  OPC.meldungZeit               = parseInt(4000);
+
+  OPC.saldoMeldung = parseInt(-1);
+
+  OPC.essenzwang_option = parseInt(0);
+
+  OPC.kontigent_option = parseInt(0);
+
+  OPC.saldoAusblend = parseInt(-1);
+
+  var kid = parseInt(0);
+
+  function BeimLaden()
+  {
+    OPC.clearErrMsg();
+    OPC.updateSalden();
+    OPC.loadAngebotAenderungen();
+
+    if (OPC.angebotAenderungen.size() > 0 || OPC.stdAngebotAenderungen.size() > 0)
+    {
+      OPC.showHideMenuSaveBtn();
+    }
+
+    OPC.setWochenIndex(0);
+  }
+
+  OPC.angebote = new Hashtable();
+OPC.angebote.clear();
+OPC.angebote.put(2400,{"AngebotID":2400,"Menge":0,"Datum":"2026-09-28","Spalte":1,"AAccessID":null,"ArtNr":1,"ArtBez":"Griechische Hirtenrolle, Tomatenreis, Krautsalat und Tzatziki","bon":"Menü 1","PreisEbene":null,"BID":0,"KID":0,"Storno":0,"Angezeigt":0,"Geloescht":0,"AusgabeTag":"2026-10-02","AusgabeZeit":"21:43:25.205011+02","MKatID":405,"AnzWhBestellt":0,"Bestellt":false,"StandardVorbestellt":false,"InfoAngebot":false,"Symbolik":6,"Bild":null,"Kontigent":-1,"AnzBestellt":null,"KeineBestellung":false,"AusgabeIdx":null,"KeineBestellungSpalte":false,"ArtPreis":"5.0000","BestPreis":"5.0000","AllergeneFromTable":"<img class=\"allergene\" src=\"https:\/\/mensa.nordakademie.de\/images\/allergene\/a.png\" title=\"Glutenhaltiges Getreide\"><img class=\"allergene\" src=\"https:\/\/mensa.nordakademie.de\/images\/allergene\/c.png\" title=\"Eier und daraus gewonnene Erzeugnisse\"><img class=\"allergene\" src=\"https:\/\/mensa.nordakademie.de\/images\/allergene\/g.png\" title=\"Milch und daraus gewonnene Erzeugnisse\"><img class=\"allergene\" src=\"https:\/\/mensa.nordakademie.de\/images\/allergene\/i.png\" title=\"Sellerie und daraus gewonnene Erzeugnisse\"><img class=\"allergene\" src=\"https:\/\/mensa.nordakademie.de\/images\/allergene\/j.png\" title=\"Senf und daraus gewonnene Erzeugnisse\">","AllergeneFromTableAsString":"a: Glutenhaltiges Getreide<br>c: Eier und daraus gewonnene Erzeugnisse<br>g: Milch und daraus gewonnene Erzeugnisse<br>i: Sellerie und daraus gewonnene Erzeugnisse<br>j: Senf und daraus gewonnene Erzeugnisse<br>","Allergene":"a,c,g,i,j","AllergeneCounter":5,"Zusatzstoffe":"","ZusatzstoffeAsString":"","ZusatzstoffeNames":""});
+OPC.angebote.put(2405,{"AngebotID":2405,"Menge":0,"Datum":"2026-09-28","Spalte":2,"AAccessID":null,"ArtNr":2,"ArtBez":"Veg. Hackbällchen, Tomatenreis, Krautsalat und Tzatziki","bon":"Menü 2 veg.","PreisEbene":null,"BID":0,"KID":0,"Storno":0,"Angezeigt":0,"Geloescht":0,"AusgabeTag":"2026-10-02","AusgabeZeit":"21:43:25.205011+02","MKatID":406,"AnzWhBestellt":0,"Bestellt":false,"StandardVorbestellt":false,"InfoAngebot":false,"Symbolik":257,"Bild":null,"Kontigent":-1,"AnzBestellt":null,"KeineBestellung":false,"AusgabeIdx":null,"KeineBestellungSpalte":false,"ArtPreis":"5.0000","BestPreis":"5.0000","AllergeneFromTable":"<img class=\"allergene\" src=\"https:\/\/mensa.nordakademie.de\/images\/allergene\/f.png\" title=\"Soja(bohnen) und daraus gewonnene Erzeugnisse\"><img class=\"allergene\" src=\"https:\/\/mensa.nordakademie.de\/images\/allergene\/g.png\" title=\"Milch und daraus gewonnene Erzeugnisse\"><img class=\"allergene\" src=\"https:\/\/mensa.nordakademie.de\/images\/allergene\/i.png\" title=\"Sellerie und daraus gewonnene Erzeugnisse\">","AllergeneFromTableAsString":"f: Soja(bohnen) und daraus gewonnene Erzeugnisse<br>g: Milch und daraus gewonnene Erzeugnisse<br>i: Sellerie und daraus gewonnene Erzeugnisse<br>","Allergene":"f,g,i","AllergeneCounter":3,"Zusatzstoffe":"","ZusatzstoffeAsString":"","ZusatzstoffeNames":""});
+OPC.angebote.put(2401,{"AngebotID":2401,"Menge":0,"Datum":"2026-09-29","Spalte":1,"AAccessID":null,"ArtNr":1,"ArtBez":"Putengeschnetzeltes mit Schupfnudeln","bon":"Menü 1","PreisEbene":null,"BID":0,"KID":0,"Storno":0,"Angezeigt":0,"Geloescht":0,"AusgabeTag":"2026-10-02","AusgabeZeit":"21:43:25.205011+02","MKatID":405,"AnzWhBestellt":0,"Bestellt":false,"StandardVorbestellt":false,"InfoAngebot":false,"Symbolik":8,"Bild":null,"Kontigent":-1,"AnzBestellt":null,"KeineBestellung":false,"AusgabeIdx":null,"KeineBestellungSpalte":false,"ArtPreis":"5.0000","BestPreis":"5.0000","AllergeneFromTable":"","AllergeneFromTableAsString":"","Allergene":"","AllergeneCounter":0,"Zusatzstoffe":"","ZusatzstoffeAsString":"","ZusatzstoffeNames":""});
+OPC.angebote.put(2406,{"AngebotID":2406,"Menge":0,"Datum":"2026-09-29","Spalte":2,"AAccessID":null,"ArtNr":2,"ArtBez":"Veganes Geschnetzeltes mit Schupfnudeln","bon":"Menü 2 veg.","PreisEbene":null,"BID":0,"KID":0,"Storno":0,"Angezeigt":0,"Geloescht":0,"AusgabeTag":"2026-10-02","AusgabeZeit":"21:43:25.205011+02","MKatID":406,"AnzWhBestellt":0,"Bestellt":false,"StandardVorbestellt":false,"InfoAngebot":false,"Symbolik":256,"Bild":null,"Kontigent":-1,"AnzBestellt":null,"KeineBestellung":false,"AusgabeIdx":null,"KeineBestellungSpalte":false,"ArtPreis":"5.0000","BestPreis":"5.0000","AllergeneFromTable":"<img class=\"allergene\" src=\"https:\/\/mensa.nordakademie.de\/images\/allergene\/a.png\" title=\"Glutenhaltiges Getreide\"><img class=\"allergene\" src=\"https:\/\/mensa.nordakademie.de\/images\/allergene\/c.png\" title=\"Eier und daraus gewonnene Erzeugnisse\"><img class=\"allergene\" src=\"https:\/\/mensa.nordakademie.de\/images\/allergene\/f.png\" title=\"Soja(bohnen) und daraus gewonnene Erzeugnisse\">","AllergeneFromTableAsString":"a: Glutenhaltiges Getreide<br>c: Eier und daraus gewonnene Erzeugnisse<br>f: Soja(bohnen) und daraus gewonnene Erzeugnisse<br>","Allergene":"a,c,f","AllergeneCounter":3,"Zusatzstoffe":"","ZusatzstoffeAsString":"","ZusatzstoffeNames":""});
+OPC.angebote.put(2402,{"AngebotID":2402,"Menge":0,"Datum":"2026-09-30","Spalte":1,"AAccessID":null,"ArtNr":1,"ArtBez":"Linseneintopf","bon":"Menü 1","PreisEbene":null,"BID":0,"KID":0,"Storno":0,"Angezeigt":0,"Geloescht":0,"AusgabeTag":"2026-10-02","AusgabeZeit":"21:43:25.205011+02","MKatID":405,"AnzWhBestellt":0,"Bestellt":false,"StandardVorbestellt":false,"InfoAngebot":false,"Symbolik":260,"Bild":null,"Kontigent":-1,"AnzBestellt":null,"KeineBestellung":false,"AusgabeIdx":null,"KeineBestellungSpalte":false,"ArtPreis":"5.0000","BestPreis":"5.0000","AllergeneFromTable":"<img class=\"allergene\" src=\"https:\/\/mensa.nordakademie.de\/images\/allergene\/i.png\" title=\"Sellerie und daraus gewonnene Erzeugnisse\">","AllergeneFromTableAsString":"i: Sellerie und daraus gewonnene Erzeugnisse<br>","Allergene":"i","AllergeneCounter":1,"Zusatzstoffe":"","ZusatzstoffeAsString":"","ZusatzstoffeNames":""});
+OPC.angebote.put(2407,{"AngebotID":2407,"Menge":0,"Datum":"2026-09-30","Spalte":2,"AAccessID":null,"ArtNr":2,"ArtBez":"Linseneintopf","bon":"Menü 2 veg.","PreisEbene":null,"BID":0,"KID":0,"Storno":0,"Angezeigt":0,"Geloescht":0,"AusgabeTag":"2026-10-02","AusgabeZeit":"21:43:25.205011+02","MKatID":406,"AnzWhBestellt":0,"Bestellt":false,"StandardVorbestellt":false,"InfoAngebot":false,"Symbolik":256,"Bild":null,"Kontigent":-1,"AnzBestellt":null,"KeineBestellung":false,"AusgabeIdx":null,"KeineBestellungSpalte":false,"ArtPreis":"5.0000","BestPreis":"5.0000","AllergeneFromTable":"<img class=\"allergene\" src=\"https:\/\/mensa.nordakademie.de\/images\/allergene\/i.png\" title=\"Sellerie und daraus gewonnene Erzeugnisse\">","AllergeneFromTableAsString":"i: Sellerie und daraus gewonnene Erzeugnisse<br>","Allergene":"i","AllergeneCounter":1,"Zusatzstoffe":"","ZusatzstoffeAsString":"","ZusatzstoffeNames":""});
+OPC.angebote.put(2403,{"AngebotID":2403,"Menge":0,"Datum":"2026-10-01","Spalte":1,"AAccessID":null,"ArtNr":1,"ArtBez":"Überbackene Enchiladas mit Rinderhackfleisch und salat","bon":"Menü 1","PreisEbene":null,"BID":0,"KID":0,"Storno":0,"Angezeigt":0,"Geloescht":0,"AusgabeTag":"2026-10-02","AusgabeZeit":"21:43:25.205011+02","MKatID":405,"AnzWhBestellt":0,"Bestellt":false,"StandardVorbestellt":false,"InfoAngebot":false,"Symbolik":2,"Bild":null,"Kontigent":-1,"AnzBestellt":null,"KeineBestellung":false,"AusgabeIdx":null,"KeineBestellungSpalte":false,"ArtPreis":"5.0000","BestPreis":"5.0000","AllergeneFromTable":"","AllergeneFromTableAsString":"","Allergene":"","AllergeneCounter":0,"Zusatzstoffe":"","ZusatzstoffeAsString":"","ZusatzstoffeNames":""});
+OPC.angebote.put(2408,{"AngebotID":2408,"Menge":0,"Datum":"2026-10-01","Spalte":2,"AAccessID":null,"ArtNr":2,"ArtBez":"Überbackene Enchiladas mit Sojahack und salat","bon":"Menü 1","PreisEbene":null,"BID":0,"KID":0,"Storno":0,"Angezeigt":0,"Geloescht":0,"AusgabeTag":"2026-10-02","AusgabeZeit":"21:43:25.205011+02","MKatID":406,"AnzWhBestellt":0,"Bestellt":false,"StandardVorbestellt":false,"InfoAngebot":false,"Symbolik":0,"Bild":null,"Kontigent":-1,"AnzBestellt":null,"KeineBestellung":false,"AusgabeIdx":null,"KeineBestellungSpalte":false,"ArtPreis":"5.0000","BestPreis":"5.0000","AllergeneFromTable":"","AllergeneFromTableAsString":"","Allergene":"","AllergeneCounter":0,"Zusatzstoffe":"","ZusatzstoffeAsString":"","ZusatzstoffeNames":""});
+OPC.angebote.put(2404,{"AngebotID":2404,"Menge":0,"Datum":"2026-10-02","Spalte":1,"AAccessID":null,"ArtNr":1,"ArtBez":"Warmes Buffet","bon":"Menü 1","PreisEbene":null,"BID":0,"KID":0,"Storno":0,"Angezeigt":0,"Geloescht":0,"AusgabeTag":"2026-10-02","AusgabeZeit":"21:43:25.205011+02","MKatID":405,"AnzWhBestellt":0,"Bestellt":false,"StandardVorbestellt":false,"InfoAngebot":false,"Symbolik":271,"Bild":null,"Kontigent":-1,"AnzBestellt":null,"KeineBestellung":false,"AusgabeIdx":null,"KeineBestellungSpalte":false,"ArtPreis":"5.0000","BestPreis":"5.0000","AllergeneFromTable":"<img class=\"allergene\" src=\"https:\/\/mensa.nordakademie.de\/images\/allergene\/a.png\" title=\"Glutenhaltiges Getreide\"><img class=\"allergene\" src=\"https:\/\/mensa.nordakademie.de\/images\/allergene\/c.png\" title=\"Eier und daraus gewonnene Erzeugnisse\"><img class=\"allergene\" src=\"https:\/\/mensa.nordakademie.de\/images\/allergene\/f.png\" title=\"Soja(bohnen) und daraus gewonnene Erzeugnisse\"><img class=\"allergene\" src=\"https:\/\/mensa.nordakademie.de\/images\/allergene\/g.png\" title=\"Milch und daraus gewonnene Erzeugnisse\"><img class=\"allergene\" src=\"https:\/\/mensa.nordakademie.de\/images\/allergene\/i.png\" title=\"Sellerie und daraus gewonnene Erzeugnisse\"><img class=\"allergene\" src=\"https:\/\/mensa.nordakademie.de\/images\/allergene\/j.png\" title=\"Senf und daraus gewonnene Erzeugnisse\">","AllergeneFromTableAsString":"a: Glutenhaltiges Getreide<br>c: Eier und daraus gewonnene Erzeugnisse<br>f: Soja(bohnen) und daraus gewonnene Erzeugnisse<br>g: Milch und daraus gewonnene Erzeugnisse<br>i: Sellerie und daraus gewonnene Erzeugnisse<br>j: Senf und daraus gewonnene Erzeugnisse<br>","Allergene":"a,c,f,g,i,j","AllergeneCounter":6,"Zusatzstoffe":"","ZusatzstoffeAsString":"","ZusatzstoffeNames":""});
+OPC.angebote.put(2409,{"AngebotID":2409,"Menge":0,"Datum":"2026-10-02","Spalte":2,"AAccessID":null,"ArtNr":2,"ArtBez":"Menü 2 veg.","bon":"Menü 2 veg.","PreisEbene":null,"BID":0,"KID":0,"Storno":0,"Angezeigt":0,"Geloescht":0,"AusgabeTag":"2026-10-02","AusgabeZeit":"21:43:25.205011+02","MKatID":406,"AnzWhBestellt":0,"Bestellt":false,"StandardVorbestellt":false,"InfoAngebot":false,"Symbolik":0,"Bild":null,"Kontigent":-1,"AnzBestellt":null,"KeineBestellung":false,"AusgabeIdx":null,"KeineBestellungSpalte":false,"ArtPreis":"5.0000","BestPreis":"5.0000","AllergeneFromTable":"","AllergeneFromTableAsString":"","Allergene":"","AllergeneCounter":0,"Zusatzstoffe":"","ZusatzstoffeAsString":"","ZusatzstoffeNames":""});
+
+OPC.angeboteSortiert = new Hashtable();
+OPC.angeboteSortiert.clear()
+
+</script>
+</head>
+<body class="menuplan">
+<noscript>
+    <div class="alert alert-danger enablejs abs" role="alert">
+        <strong>JavaScript benötigt!</strong><br><br> Leider haben Sie JavaScript deaktiviert. Um alle Grundfunktionen nutzen zu können muss JavaScript aktiviert sein.<br>Hier finden Sie eine <a href='https://www.enable-javascript.com/de/' target='_blank'>Anleitung um Javascript in Ihrem Browser zu aktivieren.</a>    </div>
+</noscript>
+<nav class="page-header">
+    <div class="header-logo">
+        <a class="logo-link" href="mdhistory.php">
+            <img src="images/logo/opc_logo_white.png" alt="Logo NORDAKADEMIE">
+        </a>
+    </div>
+
+            <div class="options-container vmp">
+            <ul class="menu-desktop actions">
+                                    <li class="mandant-chooser" data-type="single-mandant">
+                        <a href="https://mensa.nordakademie.de/index.php">
+                            <span class="header-sitetitle">NORDAKADEMIE</span>
+                        </a>
+                    </li>
+                                    <li class="login">
+                    <a class="logout_btn" title="Login" href="https://mensa.nordakademie.de/index.php">
+                        <span>Anmelden</span>
+                        <i class="fa fa-sign-in"></i>
+                    </a>
+                </li>
+                                <li class="toggler">
+                    <a class="mobile-toggler" href="javascript:void(0);" onclick="OPC.toggleMobileMenu()">
+                        <i class="far fa-bars"></i>
+                    </a>
+                </li>
+
+            </ul>
+        </div>
+
+            <div class="container-mobile">
+            <ul class="menu-mobile">
+                
+                    <li>
+                        <a href="https://mensa.nordakademie.de/index.php">
+                            <i class="far fa-sign-in"></i>
+                            <span class="title">Anmelden</span>
+                        </a>
+                    </li>
+
+                                </ul>
+
+            <div class="mobile-saldo-info">
+                <i class="fa fa-user"></i>
+                <span class="kontoinfo saldo">&nbsp;|&nbsp;Saldo&nbsp;<span class="saldo-value">0,00 €</span></span>            </div>
+
+        </div>
+    
+</nav>
+<div class="page-content-wrapper">
+    <div class="page-content menuplan">
+        <form action="menuplan.php?VMP=" method="post" name="formular" id="formular" onsubmit="">
+
+            
+                
+                <div id="saldoanzeige" class="hidden" onclick="OPC.onClickOff()">
+                    <table>
+                        <tr class="">
+                            <td>Altes Guthaben:</td>
+                            <td class="right">
+                                <span id="saldoOld">0,00 €</span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="right" colspan="2">
+                                <span id="saldoChange">0,00</span>
+                            </td>
+                        </tr>
+                        <tr class="">
+                            <td class="separator" colspan="2"></td>
+                        </tr>
+                        <tr class="">
+                            <td>Neues Guthaben:</td>
+                            <td class="right">
+                                <span id="saldoNew">0,00</span>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+
+                <div class="menuplanportlet portlet">
+
+                    <div class="mpheadernav">
+                                                <div class="portlet-caption">
+
+                            <div class="caption">
+                                <i class="fa fa-th"></i>
+                                <span id="angebot-title">Angebot</span>
+                                <span style="display:none;" id="component-title">Komponente </span>
+                            </div>
+
+                            <div id="MPWeekNavi">
+                                
+                                    <button id="btnShowDayView" type="button" class="btn far">
+                                        <i class="far fa-reply-all fa-flip-horizontal"></i>
+                                        <i class="fas fa-bars"></i>
+                                        <span>Tagesansicht</span>
+                                    </button>
+
+                                    <button id="btnShowWeekView" type="button" class="btn far">
+                                        <i class="far fa-reply-all"></i>
+                                        <i class="fal fa-table"></i>
+                                        <span>Wochenansicht</span>
+                                    </button>
+
+                                    <button id="btnCloseDetailView" type="button" class="btn far">
+                                        <i class="far fa-reply-all"></i>
+                                        <span id='closeDetailsText'></span>
+                                    </button>
+
+                                    <!-- DetailsView Navigation -->
+                                    <div id="dvMLNav" class="btn-group">
+
+                                        <button id="btnDetailsMenuBack" class="btn btn-default" type="button">
+                                            <i class="far fa-arrow-alt-from-bottom"></i>
+                                        </button>
+
+                                        <button id="dvTitleMenu" class="btn btn-default dropdown-toggle"
+                                                data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" aria-hidden="true"
+                                                type="button">
+
+                                        <span id="ddbTitleMenu" class="btntext">
+                                            <i id="ddbTitleMenuIco" class="far fa-columns"></i>
+                                            <span style="margin-left:5px" class="caret"></span>
+                                        </span>
+
+                                        </button>
+
+                                        <ul class="dropdown-menu">
+                                                                                                <li class="">
+                                                        <a id="ddbTitleItem1" href="javascript:void(0);">
+                                                            Menü 1                                                        </a>
+                                                    </li>
+                                                                                                    <li class="">
+                                                        <a id="ddbTitleItem2" href="javascript:void(0);">
+                                                            Menü 2 Veg.                                                        </a>
+                                                    </li>
+                                                                                        </ul>
+
+                                        <button id="btnDetailsMenuForward" class="btn btn-default" type="button">
+                                            <i class="far fa-arrow-alt-from-top"></i>
+                                        </button>
+                                    </div>
+
+                                    <!-- Normal Navigation -->
+                                    <button type="button" id="WZurueck" name="WZurueck" value="Vorige Woche"
+                                            class="btn disabled""
+                                            onclick="formular.WID.value=parseInt(formular.WID.value)-1;
+                                                    formular.HASH.value='4507c6b4757f6c971bf5185691e9d567';
+                                                    formular.Return.value='-1';
+                                                    formular.DID.value='-1';
+                                                    formular.Richtung.value=-1;
+                                                    OPC.saveBestellungen(true);">
+                                        <i class="far fa-arrow-alt-left"></i>
+                                    </button>
+
+                                    
+                                        <div class="dropdown-wrapper">
+
+                                            <i id="weekSelectionIcon"
+                                               class="far fa-calendar-edit fa-2x mp_calendar_ico dropdown-toggle"
+                                               data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" aria-hidden="true"></i>
+
+                                            <ul class="dropdown-menu weekSelection" aria-labelledby="weekSelectionIcon" id="weekSelection">
+                                                <li class="weekdropdown selected"><a>28.09.2026&nbsp;-&nbsp;02.10.2026</a></li><input id="WIDHASH1" value="8301a050d7a35157d4b8c33f5d73f74b" type="hidden" /><li class="weekdropdown">
+                                                        <a href="javascript:void(0);" 
+                                                        onclick="formular.WID.value=parseInt(formular.WID.value)+(1);formular.HASH.value='8301a050d7a35157d4b8c33f5d73f74b';formular.Richtung.value=0;formular.Return.value=0;OPC.saveBestellungen(true);">05.10.2026&nbsp;-&nbsp;09.10.2026</a></li><input id="WIDHASH2" value="d1fec50ab0136f9442c4a4fea94d7096" type="hidden" /><li class="weekdropdown">
+                                                        <a href="javascript:void(0);" 
+                                                        onclick="formular.WID.value=parseInt(formular.WID.value)+(2);formular.HASH.value='d1fec50ab0136f9442c4a4fea94d7096';formular.Richtung.value=0;formular.Return.value=0;OPC.saveBestellungen(true);">12.10.2026&nbsp;-&nbsp;16.10.2026</a></li>                                            </ul>
+                                        </div>
+
+                                    
+                                    <!-- back from DetailView button -->
+                                    <div id="backDetailView" style="display:none;">
+                                        <button type="button" class="btn" aria-hidden="false">
+                                            <i class="far fa-reply-all"></i>
+                                            <span id="dvZeigeDetailVText">txtDetailansicht</span>
+                                        </button>
+                                    </div>
+
+                                    <div id="dvDatumNav" class="btn-group">
+                                        <button id="btnDetailsDayBack" class="btn" type="button">
+                                            <i class="far fa-arrow-alt-left "></i>
+                                        </button>
+                                        <button id="dvDatum" class="btn" aria-haspopup="true" type="button">
+                                              <span id="dvDatumText" class="btntext">
+                                                  <span id="dvDatumTextWeekday"></span>
+                                                  <span id="dvDatumTextDate"></span>
+                                              </span>
+                                        </button>
+                                        <button id="btnDetailsDayForward" class="btn" type="button">
+                                            <i class="far fa-arrow-alt-right "></i>
+                                        </button>
+                                    </div>
+
+                                    
+                                    <button type='button' id="WVor" name="WVor" value="Nächste Woche"
+                                            class="btn""
+                                            onclick="formular.WID.value=parseInt(formular.WID.value)+1;
+                                                    formular.HASH.value='8301a050d7a35157d4b8c33f5d73f74b';
+                                                    formular.Return.value='-1';
+                                                    formular.DID.value=-1;
+                                                    formular.Richtung.value=1;
+                                                    OPC.saveBestellungen(true);">
+                                        <i class="far fa-arrow-alt-right"></i>
+                                    </button>
+
+                                
+                            </div>
+                        </div>
+
+                        <p id='responsive-week-view'>28.09.2026 - 04.10.2026</p>                        <div id="wochentage">
+                            <div id="wochentage-btn-group" class="btn-group btn-group-justified" role="group"></div>
+                        </div>
+
+                        
+                    </div><!-- mpheadernav -->
+
+                    
+                        <table id="MenuePlanTabelle" class='menuplan-table'>
+                            <thead>
+                            <tr class="menuplan-header">
+                                <th class="MPDatum-header"></th><th id="MKatID_405"
+                                              class="" 
+                                              style="width: 47%;" 
+                                              data-spalte="spalte_1" >Menü 1</th><th id="MKatID_406"
+                                              class="" 
+                                              style="width: 47%;" 
+                                              data-spalte="spalte_2" >Menü 2 Veg.</th>                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr id="mpdatum_20260928" class="menutr mpday_1"><td class="MPDatum">
+                                        <div class="datumstext">
+                                            <b>28.09.2026</b><br>Montag</div></td><td class="menu-td angebot"  
+                      onmousemove="OPC.setAngNoClick(false);" 
+                      data-spalte="spalte_1" 
+                      width="47%" 
+                      id="ang_2400"  style="cursor:default;"  width="50%"><div class="symbolik-container" data-symbolikmask="6" onclick="OPC.showAngebotSymbolikPopup(event)"><img src="https://mensa.nordakademie.de/images/mdsymbolic/icon_0002.png" title="Rind" alt="Rind"><img src="https://mensa.nordakademie.de/images/mdsymbolic/icon_0004.png" title="Schwein" alt="Schwein"></div><input name="AngM_2400" id="AngM_2400" type="hidden" value="0"><div class="menu-td-text mitsymb mitpreis">Griechische Hirtenrolle, Tomatenreis, Krautsalat und Tzatziki </div><span class="menu-td-before-text top-left mitsymb">Menü 1</span><div class='allergene-row'><div class='allergene-div' onclick="OPC.showAngebotAllergenePopup(event, 'a,c,g,i,j');"><img class="allergene" src="https://mensa.nordakademie.de/images/allergene/a.png" title="Glutenhaltiges Getreide"><img class="allergene" src="https://mensa.nordakademie.de/images/allergene/c.png" title="Eier und daraus gewonnene Erzeugnisse"><img class="allergene" src="https://mensa.nordakademie.de/images/allergene/g.png" title="Milch und daraus gewonnene Erzeugnisse"><img class="allergene" src="https://mensa.nordakademie.de/images/allergene/i.png" title="Sellerie und daraus gewonnene Erzeugnisse"><img class="allergene" src="https://mensa.nordakademie.de/images/allergene/j.png" title="Senf und daraus gewonnene Erzeugnisse"></div></div><div class="pricetext-bottom-right">5,00 €</div></td>
+<td class="menu-td angebot"  
+                      onmousemove="OPC.setAngNoClick(false);" 
+                      data-spalte="spalte_2" 
+                      width="47%" 
+                      id="ang_2405"  style="cursor:default;"  width="50%"><div class="symbolik-container" data-symbolikmask="257" onclick="OPC.showAngebotSymbolikPopup(event)"><img src="https://mensa.nordakademie.de/images/mdsymbolic/icon_0001.png" title="Vegetarisch" alt="Vegetarisch"><img src="https://mensa.nordakademie.de/images/mdsymbolic/icon_0100.png" title="Vegan" alt="Vegan"></div><input name="AngM_2405" id="AngM_2405" type="hidden" value="0"><div class="menu-td-text mitsymb mitpreis">Veg. Hackbällchen, Tomatenreis, Krautsalat und Tzatziki </div><span class="menu-td-before-text top-left mitsymb">Menü 2 Veg.</span><div class='allergene-row'><div class='allergene-div' onclick="OPC.showAngebotAllergenePopup(event, 'f,g,i');"><img class="allergene" src="https://mensa.nordakademie.de/images/allergene/f.png" title="Soja(bohnen) und daraus gewonnene Erzeugnisse"><img class="allergene" src="https://mensa.nordakademie.de/images/allergene/g.png" title="Milch und daraus gewonnene Erzeugnisse"><img class="allergene" src="https://mensa.nordakademie.de/images/allergene/i.png" title="Sellerie und daraus gewonnene Erzeugnisse"></div></div><div class="pricetext-bottom-right">5,00 €</div></td>
+</tr><tr id="mpdatum_20260929" class="menutr mpday_2"><td class="MPDatum">
+                                        <div class="datumstext">
+                                            <b>29.09.2026</b><br>Dienstag</div></td><td class="menu-td angebot"  
+                      onmousemove="OPC.setAngNoClick(false);" 
+                      data-spalte="spalte_1" 
+                      width="47%" 
+                      id="ang_2401"  style="cursor:default;"  width="50%"><div class="symbolik-container" data-symbolikmask="8" onclick="OPC.showAngebotSymbolikPopup(event)"><img src="https://mensa.nordakademie.de/images/mdsymbolic/icon_0008.png" title="Geflügel" alt="Geflügel"></div><input name="AngM_2401" id="AngM_2401" type="hidden" value="0"><div class="menu-td-text mitsymb mitpreis">Putengeschnetzeltes mit Schupfnudeln </div><span class="menu-td-before-text top-left mitsymb">Menü 1</span><div class="pricetext-bottom-right">5,00 €</div></td>
+<td class="menu-td angebot"  
+                      onmousemove="OPC.setAngNoClick(false);" 
+                      data-spalte="spalte_2" 
+                      width="47%" 
+                      id="ang_2406"  style="cursor:default;"  width="50%"><div class="symbolik-container" data-symbolikmask="256" onclick="OPC.showAngebotSymbolikPopup(event)"><img src="https://mensa.nordakademie.de/images/mdsymbolic/icon_0100.png" title="Vegan" alt="Vegan"></div><input name="AngM_2406" id="AngM_2406" type="hidden" value="0"><div class="menu-td-text mitsymb mitpreis">Veganes Geschnetzeltes mit Schupfnudeln </div><span class="menu-td-before-text top-left mitsymb">Menü 2 Veg.</span><div class='allergene-row'><div class='allergene-div' onclick="OPC.showAngebotAllergenePopup(event, 'a,c,f');"><img class="allergene" src="https://mensa.nordakademie.de/images/allergene/a.png" title="Glutenhaltiges Getreide"><img class="allergene" src="https://mensa.nordakademie.de/images/allergene/c.png" title="Eier und daraus gewonnene Erzeugnisse"><img class="allergene" src="https://mensa.nordakademie.de/images/allergene/f.png" title="Soja(bohnen) und daraus gewonnene Erzeugnisse"></div></div><div class="pricetext-bottom-right">5,00 €</div></td>
+</tr><tr id="mpdatum_20260930" class="menutr mpday_3"><td class="MPDatum">
+                                        <div class="datumstext">
+                                            <b>30.09.2026</b><br>Mittwoch</div></td><td class="menu-td angebot"  
+                      onmousemove="OPC.setAngNoClick(false);" 
+                      data-spalte="spalte_1" 
+                      width="47%" 
+                      id="ang_2402"  style="cursor:default;"  width="50%"><div class="symbolik-container" data-symbolikmask="260" onclick="OPC.showAngebotSymbolikPopup(event)"><img src="https://mensa.nordakademie.de/images/mdsymbolic/icon_0004.png" title="Schwein" alt="Schwein"><img src="https://mensa.nordakademie.de/images/mdsymbolic/icon_0100.png" title="Vegan" alt="Vegan"></div><input name="AngM_2402" id="AngM_2402" type="hidden" value="0"><div class="menu-td-text mitsymb mitpreis">Linseneintopf </div><span class="menu-td-before-text top-left mitsymb">Menü 1</span><div class='allergene-row'><div class='allergene-div' onclick="OPC.showAngebotAllergenePopup(event, 'i');"><img class="allergene" src="https://mensa.nordakademie.de/images/allergene/i.png" title="Sellerie und daraus gewonnene Erzeugnisse"></div></div><div class="pricetext-bottom-right">5,00 €</div></td>
+<td class="menu-td angebot"  
+                      onmousemove="OPC.setAngNoClick(false);" 
+                      data-spalte="spalte_2" 
+                      width="47%" 
+                      id="ang_2407"  style="cursor:default;"  width="50%"><div class="symbolik-container" data-symbolikmask="256" onclick="OPC.showAngebotSymbolikPopup(event)"><img src="https://mensa.nordakademie.de/images/mdsymbolic/icon_0100.png" title="Vegan" alt="Vegan"></div><input name="AngM_2407" id="AngM_2407" type="hidden" value="0"><div class="menu-td-text mitsymb mitpreis">Linseneintopf </div><span class="menu-td-before-text top-left mitsymb">Menü 2 Veg.</span><div class='allergene-row'><div class='allergene-div' onclick="OPC.showAngebotAllergenePopup(event, 'i');"><img class="allergene" src="https://mensa.nordakademie.de/images/allergene/i.png" title="Sellerie und daraus gewonnene Erzeugnisse"></div></div><div class="pricetext-bottom-right">5,00 €</div></td>
+</tr><tr id="mpdatum_20261001" class="menutr mpday_4"><td class="MPDatum">
+                                        <div class="datumstext">
+                                            <b>01.10.2026</b><br>Donnerstag</div></td><td class="menu-td angebot"  
+                      onmousemove="OPC.setAngNoClick(false);" 
+                      data-spalte="spalte_1" 
+                      width="47%" 
+                      id="ang_2403"  style="cursor:default;"  width="50%"><div class="symbolik-container" data-symbolikmask="2" onclick="OPC.showAngebotSymbolikPopup(event)"><img src="https://mensa.nordakademie.de/images/mdsymbolic/icon_0002.png" title="Rind" alt="Rind"></div><input name="AngM_2403" id="AngM_2403" type="hidden" value="0"><div class="menu-td-text mitsymb mitpreis">Überbackene Enchiladas mit Rinderhackfleisch und salat </div><span class="menu-td-before-text top-left mitsymb">Menü 1</span><div class="pricetext-bottom-right">5,00 €</div></td>
+<td class="menu-td angebot"  
+                      onmousemove="OPC.setAngNoClick(false);" 
+                      data-spalte="spalte_2" 
+                      width="47%" 
+                      id="ang_2408"  style="cursor:default;"  width="50%"><input name="AngM_2408" id="AngM_2408" type="hidden" value="0"><div class="menu-td-text mitpreis">Überbackene Enchiladas mit Sojahack und salat </div><span class="menu-td-before-text top-left">Menü 2 Veg.</span><div class="pricetext-bottom-right">5,00 €</div></td>
+</tr><tr id="mpdatum_20261002" class="menutr mpday_5"><td class="MPDatum">
+                                        <div class="datumstext">
+                                            <b>02.10.2026</b><br>Freitag</div></td><td class="menu-td angebot"  
+                      onmousemove="OPC.setAngNoClick(false);" 
+                      data-spalte="spalte_1" 
+                      width="47%" 
+                      id="ang_2404"  style="cursor:default;"  width="50%"><div class="symbolik-container" data-symbolikmask="271" onclick="OPC.showAngebotSymbolikPopup(event)"><img src="https://mensa.nordakademie.de/images/mdsymbolic/icon_0001.png" title="Vegetarisch" alt="Vegetarisch"><img src="https://mensa.nordakademie.de/images/mdsymbolic/icon_0002.png" title="Rind" alt="Rind"><img src="https://mensa.nordakademie.de/images/mdsymbolic/icon_0004.png" title="Schwein" alt="Schwein"><img src="https://mensa.nordakademie.de/images/mdsymbolic/icon_0008.png" title="Geflügel" alt="Geflügel"><img src="https://mensa.nordakademie.de/images/mdsymbolic/icon_0100.png" title="Vegan" alt="Vegan"></div><input name="AngM_2404" id="AngM_2404" type="hidden" value="0"><div class="menu-td-text mitsymb mitpreis">Warmes Buffet </div><span class="menu-td-before-text top-left mitsymb">Menü 1</span><div class='allergene-row'><div class='allergene-div' onclick="OPC.showAngebotAllergenePopup(event, 'a,c,f,g,i,j');"><img class="allergene" src="https://mensa.nordakademie.de/images/allergene/a.png" title="Glutenhaltiges Getreide"><img class="allergene" src="https://mensa.nordakademie.de/images/allergene/c.png" title="Eier und daraus gewonnene Erzeugnisse"><img class="allergene" src="https://mensa.nordakademie.de/images/allergene/f.png" title="Soja(bohnen) und daraus gewonnene Erzeugnisse"><img class="allergene" src="https://mensa.nordakademie.de/images/allergene/g.png" title="Milch und daraus gewonnene Erzeugnisse"><img class="allergene" src="https://mensa.nordakademie.de/images/allergene/i.png" title="Sellerie und daraus gewonnene Erzeugnisse"><img class="allergene" src="https://mensa.nordakademie.de/images/allergene/j.png" title="Senf und daraus gewonnene Erzeugnisse"></div></div><div class="pricetext-bottom-right">5,00 €</div></td>
+<td class="menu-td angebot"  
+                      onmousemove="OPC.setAngNoClick(false);" 
+                      data-spalte="spalte_2" 
+                      width="47%" 
+                      id="ang_2409"  style="cursor:default;"  width="50%"><input name="AngM_2409" id="AngM_2409" type="hidden" value="0"><div class="menu-td-text mitpreis">Menü 2 veg. </div><span class="menu-td-before-text top-left">Menü 2 Veg.</span><div class="pricetext-bottom-right">5,00 €</div></td>
+</tr>                            </tbody>
+                        </table>
+
+                                                    <div id="detailView">
+
+                                <div class="flex-wrapper header">
+
+                                    <div class="left">
+                                        <div id="dvBild" data-mfp-src=""></div>
+                                    </div>
+
+                                    <div class="right">
+                                        <div>
+                                            <h3 id="dvName"></h3>
+
+                                            <div class="details-row symbols">
+                                                <span id="detailViewMLText"></span>
+                                                <div id="dvSymbolik"></div>
+                                            </div>
+
+                                        </div>
+
+                                        <div class="details-row price">
+
+                                            <p class="date-container">
+                                                <span class="title">Datum:</span>
+                                                <span id="dvDatumTxt"></span>
+                                            </p>
+
+                                                                                            <p class="price-container">
+                                                    <span class="title">Preis:</span>
+                                                    <span id="dvPreis"></span>
+                                                </p>
+                                            
+                                            
+                                        </div>
+                                    </div>
+
+                                </div>
+
+                                <div class="flex-wrapper ingredients">
+                                    <div class="left">
+                                        <div id="allergens-container" class="info-container">
+                                            <h3>Allergene:</h3>
+                                            <div id="dvAllergens"></div>
+                                        </div>
+                                    </div>
+
+                                    <div class="right">
+                                        <div id="additives-container" class="info-container">
+                                            <h3>Zusatzstoffe:</h3>
+                                            <div id="dvAdditives"></div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                
+
+                            </div>
+
+                            <div id="componentView" class="container-fluid" style="margin-top:10px; display:none;">
+                                <div class="col-xs-12"><h3 id="component-dvName"></h3></div>
+                                <hr id="component-line">
+
+                                <div class="row" style="margin-bottom: 2em;">
+
+                                    <div class="col-xs-12 col-sm-6" id="component-allergens-container">
+                                        <div class="dvcards container-fluid" style="margin-bottom: 3em;">
+                                            <h3>Allergene</h3>
+                                            <div id="component-dvAllergens" class="dvcardspadding"></div>
+                                        </div>
+                                    </div>
+                                    <div class="col-xs-12 col-sm-6" id="component-additives-container">
+                                        <div class="dvcards container-fluid">
+                                            <h3>Zusatzstoffe</h3>
+                                            <div id="component-dvAdditives" class="dvcardspadding"></div>
+                                        </div>
+                                    </div>
+
+                                </div>
+
+                                <hr class="visible-xs" id="component-hr-before-tabs">
+
+                                
+                            </div>
+
+                        
+                    
+                </div>
+
+                <!--Haupttabelle-->
+                <input name="WID" type="hidden" id="WID" value="0">
+                <input name="HASH" type="hidden" id="HASH" value="0">
+                <input name="DID" type="hidden" id="DID" value="4">
+                <input name="GTD" type="hidden" id="GTD" value="0">
+                <input name="DAYV" type="hidden" id="DAYV" value="0">
+                <input name="Richtung" type="hidden" id="Richtung" value="0">
+                <input name="Return" type="hidden" id="Return" value="-1">
+                <input name="anzAusBest" type="hidden" id="anzAusBest" value="0">
+                <input name="Save" type="hidden" id="Save" value="0">
+                                <input name="angChanges" type="hidden" id="angChanges">
+                <input name="stdAngChanges" type="hidden" id="stdAngChanges">
+
+                
+    <div class="menuplan-popup-links">
+
+                    <span class="linkAllergenePopup">
+        <a href='javascript:void(0);' onclick="OPC.showAllergeneLegende(event);">
+            Kennzeichnung der Allergene                    </a>
+    </span>
+        
+                    <span class="linkZusatzstoffePopup">
+        <a href='javascript:void(0);' onclick="OPC.showZusatzstoffeLegende(event);">
+            Kennzeichnung der Zusatzstoffe            <span class="txt-laut-zusatz">&nbsp;(laut Zusatzstoff-Zulassungsverordnung - ZZulV/&sect; 9)</span>
+        </a>
+    </span>
+        
+        <span class="linkSymbolicPopup">
+        <a href='javascript:void(0);' onclick="OPC.showSymbolikLegende(event);">Erklärung der Symbole</a>
+    </span>
+    </div>
+    <div id="template-Zusatzstoffe">
+        <span class="title">Kennzeichnung der Zusatzstoffe</span>
+        <span class="title-angebote">In diesem Menü enthaltene Zusatzstoffe</span>
+        <div class="content">
+                            <ul class="zusatz-popup">
+                                    </ul>
+                    </div>
+    </div>
+    <div id="template-Allergene">
+        <span class="title">Kennzeichnung der Allergene:</span>
+        <span class="title-angebote">In diesem Menü enthaltene Allergene:</span>
+        <div class="content">
+                            <ul class="allergen-popup">
+                                                <li class="allergen_a">
+                                <div class="icon">
+                                    <img alt="" src="https://mensa.nordakademie.de/images/allergene/a.png">
+                                </div>
+                                <div class="text">
+                                    <p>Glutenhaltiges Getreide&nbsp;&nbsp;(<b>a</b>)</p>
+                                </div>
+                            </li>
+
+                                                    <li class="allergen_b">
+                                <div class="icon">
+                                    <img alt="" src="https://mensa.nordakademie.de/images/allergene/b.png">
+                                </div>
+                                <div class="text">
+                                    <p>Krebstiere und daraus gewonnene Erzeugnisse&nbsp;&nbsp;(<b>b</b>)</p>
+                                </div>
+                            </li>
+
+                                                    <li class="allergen_c">
+                                <div class="icon">
+                                    <img alt="" src="https://mensa.nordakademie.de/images/allergene/c.png">
+                                </div>
+                                <div class="text">
+                                    <p>Eier und daraus gewonnene Erzeugnisse&nbsp;&nbsp;(<b>c</b>)</p>
+                                </div>
+                            </li>
+
+                                                    <li class="allergen_d">
+                                <div class="icon">
+                                    <img alt="" src="https://mensa.nordakademie.de/images/allergene/d.png">
+                                </div>
+                                <div class="text">
+                                    <p>Fische und daraus gewonnene Erzeugnisse&nbsp;&nbsp;(<b>d</b>)</p>
+                                </div>
+                            </li>
+
+                                                    <li class="allergen_e">
+                                <div class="icon">
+                                    <img alt="" src="https://mensa.nordakademie.de/images/allergene/e.png">
+                                </div>
+                                <div class="text">
+                                    <p>Erdnüsse und daraus gewonnene Erzeugnisse&nbsp;&nbsp;(<b>e</b>)</p>
+                                </div>
+                            </li>
+
+                                                    <li class="allergen_f">
+                                <div class="icon">
+                                    <img alt="" src="https://mensa.nordakademie.de/images/allergene/f.png">
+                                </div>
+                                <div class="text">
+                                    <p>Soja(bohnen) und daraus gewonnene Erzeugnisse&nbsp;&nbsp;(<b>f</b>)</p>
+                                </div>
+                            </li>
+
+                                                    <li class="allergen_g">
+                                <div class="icon">
+                                    <img alt="" src="https://mensa.nordakademie.de/images/allergene/g.png">
+                                </div>
+                                <div class="text">
+                                    <p>Milch und daraus gewonnene Erzeugnisse&nbsp;&nbsp;(<b>g</b>)</p>
+                                </div>
+                            </li>
+
+                                                    <li class="allergen_h">
+                                <div class="icon">
+                                    <img alt="" src="https://mensa.nordakademie.de/images/allergene/h.png">
+                                </div>
+                                <div class="text">
+                                    <p>Schalenfrüchte&nbsp;&nbsp;(<b>h</b>)</p>
+                                </div>
+                            </li>
+
+                                                    <li class="allergen_i">
+                                <div class="icon">
+                                    <img alt="" src="https://mensa.nordakademie.de/images/allergene/i.png">
+                                </div>
+                                <div class="text">
+                                    <p>Sellerie und daraus gewonnene Erzeugnisse&nbsp;&nbsp;(<b>i</b>)</p>
+                                </div>
+                            </li>
+
+                                                    <li class="allergen_j">
+                                <div class="icon">
+                                    <img alt="" src="https://mensa.nordakademie.de/images/allergene/j.png">
+                                </div>
+                                <div class="text">
+                                    <p>Senf und daraus gewonnene Erzeugnisse&nbsp;&nbsp;(<b>j</b>)</p>
+                                </div>
+                            </li>
+
+                                                    <li class="allergen_k">
+                                <div class="icon">
+                                    <img alt="" src="https://mensa.nordakademie.de/images/allergene/k.png">
+                                </div>
+                                <div class="text">
+                                    <p>Sesamsamen und daraus gewonnene Erzeugnisse&nbsp;&nbsp;(<b>k</b>)</p>
+                                </div>
+                            </li>
+
+                                                    <li class="allergen_l">
+                                <div class="icon">
+                                    <img alt="" src="https://mensa.nordakademie.de/images/allergene/l.png">
+                                </div>
+                                <div class="text">
+                                    <p>Schwefeldioxid und Sulphite&nbsp;&nbsp;(<b>l</b>)</p>
+                                </div>
+                            </li>
+
+                                                    <li class="allergen_m">
+                                <div class="icon">
+                                    <img alt="" src="https://mensa.nordakademie.de/images/allergene/m.png">
+                                </div>
+                                <div class="text">
+                                    <p>Lupinen und daraus gewonnene Erzeugnisse&nbsp;&nbsp;(<b>m</b>)</p>
+                                </div>
+                            </li>
+
+                                                    <li class="allergen_n">
+                                <div class="icon">
+                                    <img alt="" src="https://mensa.nordakademie.de/images/allergene/n.png">
+                                </div>
+                                <div class="text">
+                                    <p>Weichtiere und daraus gewonnene Erzeugnisse&nbsp;&nbsp;(<b>n</b>)</p>
+                                </div>
+                            </li>
+
+                                        </ul>
+                    </div>
+    </div>
+    <div id="template-Symbolik">
+        <span class="title">Erklärung der Symbole</span>
+        <span class="title-angebote">In diesem Menü enthaltene Lebensmittel:</span>
+        <div class="content">
+            <div class="symbolik-info">
+                <div class="symbol-wrapper" data-mask="1">
+                            <div class="symbol"><img src="https://mensa.nordakademie.de/images/mdsymbolic/icon_0001.png" title="Vegetarisch" alt="Vegetarisch"></div>
+                            <span class="description">Vegetarisch</span>
+                         </div><div class="symbol-wrapper" data-mask="2">
+                            <div class="symbol"><img src="https://mensa.nordakademie.de/images/mdsymbolic/icon_0002.png" title="Rind" alt="Rind"></div>
+                            <span class="description">Rind</span>
+                         </div><div class="symbol-wrapper" data-mask="4">
+                            <div class="symbol"><img src="https://mensa.nordakademie.de/images/mdsymbolic/icon_0004.png" title="Schwein" alt="Schwein"></div>
+                            <span class="description">Schwein</span>
+                         </div><div class="symbol-wrapper" data-mask="8">
+                            <div class="symbol"><img src="https://mensa.nordakademie.de/images/mdsymbolic/icon_0008.png" title="Geflügel" alt="Geflügel"></div>
+                            <span class="description">Geflügel</span>
+                         </div><div class="symbol-wrapper" data-mask="16">
+                            <div class="symbol"><img src="https://mensa.nordakademie.de/images/mdsymbolic/icon_0010.png" title="Fisch" alt="Fisch"></div>
+                            <span class="description">Fisch</span>
+                         </div><div class="symbol-wrapper" data-mask="32">
+                            <div class="symbol"><img src="https://mensa.nordakademie.de/images/mdsymbolic/icon_0020.png" title="Lamm" alt="Lamm"></div>
+                            <span class="description">Lamm</span>
+                         </div><div class="symbol-wrapper" data-mask="64">
+                            <div class="symbol"><img src="https://mensa.nordakademie.de/images/mdsymbolic/icon_0040.png" title="Wild" alt="Wild"></div>
+                            <span class="description">Wild</span>
+                         </div><div class="symbol-wrapper" data-mask="128">
+                            <div class="symbol"><img src="https://mensa.nordakademie.de/images/mdsymbolic/icon_0080.png" title="Laktosefrei" alt="Laktosefrei"></div>
+                            <span class="description">Laktosefrei</span>
+                         </div><div class="symbol-wrapper" data-mask="256">
+                            <div class="symbol"><img src="https://mensa.nordakademie.de/images/mdsymbolic/icon_0100.png" title="Vegan" alt="Vegan"></div>
+                            <span class="description">Vegan</span>
+                         </div><div class="symbol-wrapper" data-mask="512">
+                            <div class="symbol"><img src="https://mensa.nordakademie.de/images/mdsymbolic/icon_0200.png" title="Schlanker Tag" alt="Schlanker Tag"></div>
+                            <span class="description">Schlanker Tag</span>
+                         </div><div class="symbol-wrapper" data-mask="1024">
+                            <div class="symbol"><img src="https://mensa.nordakademie.de/images/mdsymbolic/icon_0400.png" title="Alkohol" alt="Alkohol"></div>
+                            <span class="description">Alkohol</span>
+                         </div>            </div>
+        </div>
+    </div>
+
+
+
+                <div id="gotodate-picker" class="datepicker"></div>
+
+            <script type="text/javascript">
+
+  if (OPC.activeLanguage === 'en')
+  {
+    DatePickerOptions.toEnglish();
+  } else
+  {
+    DatePickerOptions.toGerman();
+  }
+  
+  var browser  = Bowser.getParser(window.navigator.userAgent),
+      platform = browser.getPlatformType();
+
+  OPC.forceDayView                = parseInt('0') === 1;
+  OPC.isDayView                   = false;
+  OPC.isDetailView                = false;
+  OPC.isVMP                       = parseInt('1') === 1;
+  OPC.isVMPNONAV                  = parseInt('0') === 1;
+  OPC.showSaldoAnzeige            = parseInt('0') === 1;
+  OPC.MP_DetailAnsichtEnabled     = parseInt('0') === 1;
+  OPC.DetailAnsichtTabKomponenten = parseInt('0') === 1;
+  OPC.KundenUnvertraeglichkeiten  = parseInt('0') === 1;
+  OPC.txtTagesansicht             = 'Tagesansicht';
+  OPC.txtWochenansicht            = 'Wochenansicht';
+
+  OPC.SpaltenAnz      = parseInt('2');
+  OPC.WID             = parseInt('0');
+  OPC.AnzahlTage      = parseInt('5');
+  OPC.goToDetailML    = parseInt(0);
+  OPC.currentViewId   = null;
+  OPC.weekday         = parseInt(4);
+  OPC.isMobileBrowser = (platform === Bowser.PLATFORMS_MAP.mobile) || (platform === Bowser.PLATFORMS_MAP.tablet);
+
+  OPC.angeboteSequence = [];
+  OPC.angarray         = OPC.angebote.values();
+  OPC.angarray.forEach(function(item) {
+    OPC.angeboteSequence.push(item['AngebotID']);
+  });
+
+  OPC.ausblendeArrLaenge = parseInt('2');
+  OPC.ausblendenArr      = {"wahr":[false,false],"spalte":[1,2]};
+
+  OPC.date_heuteMontag    = OPC.parseIsoDatetime('2026-09-28');
+  OPC.date_startOfTheWeek = OPC.parseIsoDatetime('2026-09-28');
+  OPC.date_endOfTheWeek   = OPC.parseIsoDatetime('2026-10-02');
+
+  if (!OPC.isVMP)
+  {
+    OPC.aktAnzBestDerWoche      = parseInt(0);
+    OPC.anzAusstehendeBest      = parseInt(0);
+    OPC.kundeIndiStdb           = parseInt(0);
+    OPC.BestBestaetigungMeldung = JSON.parse('null');
+    OPC.stdAngeboteArr          = JSON.parse('[""]');
+  }
+
+  sessionStorage.setItem('angwoche' + OPC.WID, JSON.stringify(OPC.angarray));
+
+  OPC.invokeService(
+      {
+        service: 'menuplan',
+        action: 'load_js_data',
+        WID: OPC.WID
+      },
+      // Success
+      function(data) {
+
+        OPC.allergenearray    = data["allergene"];
+        OPC.zusatzstoffearray = data["zusatzstoffe"];
+        OPC.spaltenAry        = data["spalten"];
+
+        // Generic onLoad
+        $(document).ready(OPC.menuplanOnPageLoadGlobal);
+
+      },
+      // Error
+      function() {
+
+      });
+
+
+</script>
+
+        </form>
+    </div> <!-- div.page-content menuplan -->
+</div> <!-- page-content-wrapper -->
+<footer class="page-footer">
+
+    <div class="page-footer-inner left">
+        <p class="footer-info">
+            2026 © <a rel="noopener" href="http://www.opc.de">OPC</a>&nbsp;
+            <span class="app-name" onclick="OPC.Footer.toggleShowVersion(event)">
+                WebBestellung            </span>
+        </p>
+    </div>
+
+    
+    <div class="page-footer-inner right">
+        <a href="javascript:void(0);" onclick="OPC.Footer.showDocument('dsgvo');">Datenschutzerklärung</a><span class='separator'>●</span><a href="javascript:void(0);" onclick="OPC.Footer.showDocument('impressum');">Impressum</a><span class='separator'>●</span><a href="javascript:void(0);" onclick="OPC.Footer.showDocument('agb');">AGB</a>    </div>
+
+    <div class="version-info">
+        <span>Version: 1.7.3</span>
+        <span>Build: 2021.12.13 16:18:49</span>
+    </div>
+</footer>
+<script id="templateAGB" type="text/template">
+    <input type="hidden" name="doc_format" value="html"><input type="hidden" name="doc_target" value="popup"></script>
+<script id="templateImpressum" type="text/template">
+    <input type="hidden" name="doc_format" value="html"><input type="hidden" name="doc_target" value="popup"></script>
+<script id="templateDSGVO" type="text/template">
+    <input type="hidden" name="doc_format" value="html"><input type="hidden" name="doc_target" value="popup"></script>
+<script id="templateCookieConsent" type="text/template">
+    <div id="cookieWindow" class="cookie-overlay">
+        <div class="cookie-wrapper">
+            <h3>Cookie-Zustimmung</h3>
+            <br>
+            <p id="cookieInfo"></p>
+            <p><b>Mehr erfahren:</b></p>
+            <div class="buttons">
+
+                <ul class="links">
+                    <li>
+                        <a href="javascript:void(0);" onclick="OPC.Footer.showDocument('dsgvo')">
+                            Datenschutzerklärung                        </a>
+                    </li>
+                    <li>
+                        <a href="javascript:void(0);" onclick="OPC.Footer.showDocument('impressum')">
+                            Impressum                        </a>
+                    </li>
+                    <li>
+                        <a href="javascript:void(0);" onclick="OPC.Footer.showDocument('agb')">
+                            Allgemeine Geschäftsbedingungen                        </a>
+                    </li>
+                </ul>
+
+                <button class="btn blue accept_cookies" name="accept_cookies"
+                        onclick="CookieUtil.handleAcceptCookie(event)">
+                    Einverstanden                </button>
+            </div>
+        </div>
+    </div>
+</script>
+<script type="application/javascript">
+
+  CookieUtil.txtCookieInfo      = 'Diese Website verwendet ausschließlich technisch notwendige Cookies. Es werden keine Tracking- oder Drittanbieter-Cookies verwendet. Nähere Informationen dazu und zu Ihren Rechten als Benutzer finden Sie in unserer Datenschutzerklärung. Bitte klicken Sie auf „Einverstanden“, um Cookies zu akzeptieren und direkt unsere Website besuchen zu können.';
+  CookieUtil.txtCookiesDisabled = '<strong>Cookies werden benötigt.</strong><br>Leider haben Sie Cookies deaktiviert! Um dieses Portal nutzen zu können, müssen Cookies akzeptiert werden. Prüfen Sie die Einstellungen Ihres Browsers.';
+  CookieUtil.cookiesAccepted    = parseInt('0');
+
+  OPC.Footer.titleAGB       = 'Allgemeine Geschäftsbedingungen';
+  OPC.Footer.titleDSGVO     = 'Datenschutzerklärung';
+  OPC.Footer.titleImpressum = 'Impressum';
+
+  // on Load
+  $(OPC.Footer.footerInit);
+</script>
+<div class="spinner01-container">
+    <div class="spinner01">
+        <div class="circles"></div>
+        <div class="circles"></div>
+    </div>
+</div>
+</body>
+</html>
+

@@ -555,6 +555,7 @@ func All() *Registry {
 	r.Add(moodleTools()...)
 	r.Add(nakTools()...)
 	r.Add(thesisTools()...)
+	r.Add(mensaTools()...)
 	r.Add(eduvaultTools()...)
 	return r
 }

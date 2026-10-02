@@ -174,6 +174,8 @@ The CIS has no API. nak reads its TYPO3 pages the way a browser does and turns t
 
 **Search and Ctrl+K.** One search for modules, courses, files and activities; a command palette for everything else.
 
+**Mensa.** Today's menu with allergens and a vegetarian filter, the card balance and bookings (with your NAK login); total spent on food if you switch it on.
+
 **Old exams.** With an [EduVault](https://eduvault4.de) credential in the settings, every module page lists the matching old and practice exams.
 
 </td>
@@ -344,7 +346,7 @@ Add it to your MCP client:
 | `NAK_READONLY` | off | `1` blocks all writes |
 | `NAK_DOWNLOAD_DIR` | `~/Downloads/nak` | default download folder; files are never overwritten |
 | `NAK_TZ` | `Europe/Berlin` | time zone of all dates |
-| `MOODLE_URL`, `CIS_BASE_URL` | moodle2 / cis.nordakademie.de | other hosts (tests) |
+| `MOODLE_URL`, `CIS_BASE_URL`, `MENSA_URL` | moodle2 / cis / mensa.nordakademie.de | other hosts (tests) |
 | `NAK_DATA_DIR` | `~/.config/cis-api` | session, settings, cache and downloads in one place |
 | `NAK_CLIENT_CACHE_TTL` | `90s` | identical CIS/Moodle reads are shared this long (`0` = off) |
 | `NAK_WEB_ADDR` | `127.0.0.1:8080` | `nak serve` listen address (`0.0.0.0:8080` in the image) |
@@ -401,6 +403,8 @@ flowchart TB
     forms --> http
     http -- "HTML (TYPO3)" --> CIS[("cis.nordakademie.de")]
     mdl -- "REST · token" --> Moodle[("moodle2.nordakademie.de")]
+    reg --> mensa["Mensa client<br/><sub>OPC · LDAP login</sub>"]
+    mensa -- "HTML + JSON" --> Mensa[("mensa.nordakademie.de")]
 ```
 
 <details>

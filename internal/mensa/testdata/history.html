@@ -1,0 +1,525 @@
+    <!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge; IE=EmulateIE11; chrome=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <base href="https://mensa.nordakademie.de/">
+<link rel="shortcut icon" type="image/x-icon" href="https://mensa.nordakademie.de/images/favicon/favicon.ico">
+<link rel="icon" type="image/x-icon" href="https://mensa.nordakademie.de/images/favicon/favicon.ico">
+
+<link rel="icon" type="image/png" href="https://mensa.nordakademie.de/images/favicon/web_16.png" sizes="16x16">
+<link rel="icon" type="image/png" href="https://mensa.nordakademie.de/images/favicon/web_32.png" sizes="32x32">
+<link rel="icon" type="image/png" href="https://mensa.nordakademie.de/images/favicon/web_64.png" sizes="64x64">
+<link rel="icon" type="image/png" href="https://mensa.nordakademie.de/images/favicon/web_128.png" sizes="128x128">
+<link rel="icon" type="image/png" href="https://mensa.nordakademie.de/images/favicon/web_152.png" sizes="152x152">
+<link rel="icon" type="image/png" href="https://mensa.nordakademie.de/images/favicon/web_167.png" sizes="167x167">
+<link rel="icon" type="image/png" href="https://mensa.nordakademie.de/images/favicon/web_180.png" sizes="180x180">
+<link rel="icon" type="image/png" href="https://mensa.nordakademie.de/images/favicon/web_192.png" sizes="192x192">
+<link rel="icon" type="image/png" href="https://mensa.nordakademie.de/images/favicon/web_196.png" sizes="196x196">
+<link rel="icon" type="image/png" href="https://mensa.nordakademie.de/images/favicon/web_512.png" sizes="512x512">
+
+<meta name="theme-color" content="#FFFFFF">
+<meta name="mobile-web-app-capable" content="yes">
+    <link rel="manifest" href='data:application/manifest+json;base64,eyJuYW1lIjoiTk9SREFLQURFTUlFIiwic2hvcnRfbmFtZSI6Ik5PUkRBS0FERU1JRSIsInN0YXJ0X3VybCI6Imh0dHBzOi8vbWVuc2Eubm9yZGFrYWRlbWllLmRlIiwiZGlzcGxheSI6InN0YW5kYWxvbmUiLCJiYWNrZ3JvdW5kX2NvbG9yIjoiI0ZGRkZGRiIsImljb25zIjpbeyJzcmMiOiJodHRwczovL21lbnNhLm5vcmRha2FkZW1pZS5kZS9pbWFnZXMvZmF2aWNvbi9hbmRyb2lkXzM2LnBuZyIsInNpemVzIjoiMzZ4MzYiLCJ0eXBlIjoiaW1hZ2UvcG5nIiwiZGVuc2l0eSI6IjAuNzUifSx7InNyYyI6Imh0dHBzOi8vbWVuc2Eubm9yZGFrYWRlbWllLmRlL2ltYWdlcy9mYXZpY29uL2FuZHJvaWRfNDgucG5nIiwic2l6ZXMiOiI0OHg0OCIsInR5cGUiOiJpbWFnZS9wbmciLCJkZW5zaXR5IjoiMS4wIn0seyJzcmMiOiJodHRwczovL21lbnNhLm5vcmRha2FkZW1pZS5kZS9pbWFnZXMvZmF2aWNvbi9hbmRyb2lkXzcyLnBuZyIsInNpemVzIjoiNzJ4NzIiLCJ0eXBlIjoiaW1hZ2UvcG5nIiwiZGVuc2l0eSI6IjEuNSJ9LHsic3JjIjoiaHR0cHM6Ly9tZW5zYS5ub3JkYWthZGVtaWUuZGUvaW1hZ2VzL2Zhdmljb24vYW5kcm9pZF85Ni5wbmciLCJzaXplcyI6Ijk2eDk2IiwidHlwZSI6ImltYWdlL3BuZyIsImRlbnNpdHkiOiIyLjAifSx7InNyYyI6Imh0dHBzOi8vbWVuc2Eubm9yZGFrYWRlbWllLmRlL2ltYWdlcy9mYXZpY29uL2FuZHJvaWRfMTQ0LnBuZyIsInNpemVzIjoiMTQ0eDE0NCIsInR5cGUiOiJpbWFnZS9wbmciLCJkZW5zaXR5IjoiMy4wIn0seyJzcmMiOiJodHRwczovL21lbnNhLm5vcmRha2FkZW1pZS5kZS9pbWFnZXMvZmF2aWNvbi9hbmRyb2lkXzE5Mi5wbmciLCJzaXplcyI6IjE5MngxOTIiLCJ0eXBlIjoiaW1hZ2UvcG5nIiwiZGVuc2l0eSI6IjQuMCJ9XSwidGhlbWVfY29sb3IiOiIjRkZGRkZGIn0='/>
+
+    <meta name="apple-mobile-web-app-title" content="NORDAKADEMIE">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="#FFFFFF">
+<link rel="apple-touch-icon-precomposed" type="image/png" href="https://mensa.nordakademie.de/images/favicon/apple_192.png">
+<link rel="apple-touch-icon" type="image/png" href="https://mensa.nordakademie.de/images/favicon/apple_57.png" sizes="57x57">
+<link rel="apple-touch-icon" type="image/png" href="https://mensa.nordakademie.de/images/favicon/apple_60.png" sizes="60x60">
+<link rel="apple-touch-icon" type="image/png" href="https://mensa.nordakademie.de/images/favicon/apple_72.png" sizes="72x72">
+<link rel="apple-touch-icon" type="image/png" href="https://mensa.nordakademie.de/images/favicon/apple_76.png" sizes="76x76">
+<link rel="apple-touch-icon" type="image/png" href="https://mensa.nordakademie.de/images/favicon/apple_114.png" sizes="114x114">
+<link rel="apple-touch-icon" type="image/png" href="https://mensa.nordakademie.de/images/favicon/apple_120.png" sizes="120x120">
+<link rel="apple-touch-icon" type="image/png" href="https://mensa.nordakademie.de/images/favicon/apple_144.png" sizes="144x144">
+<link rel="apple-touch-icon" type="image/png" href="https://mensa.nordakademie.de/images/favicon/apple_152.png" sizes="152x152">
+<link rel="apple-touch-icon" type="image/png" href="https://mensa.nordakademie.de/images/favicon/apple_180.png" sizes="180x180">
+<link rel="apple-touch-icon" type="image/png" href="https://mensa.nordakademie.de/images/favicon/apple_192.png" sizes="192x192">
+
+<meta name="msapplication-TileImage" content="https://mensa.nordakademie.de/images/favicon/windows_144.png">
+<meta name="msapplication-TileColor" content="#FFFFFF"/>
+
+<meta name="application-name" content="NORDAKADEMIE">
+<meta name="msapplication-square70x70logo" content="https://mensa.nordakademie.de/images/favicon/windows_70.png"/>
+<meta name="msapplication-square144x144logo" content="https://mensa.nordakademie.de/images/favicon/windows_144.png"/>
+<meta name="msapplication-square150x150logo" content="https://mensa.nordakademie.de/images/favicon/windows_150.png"/>
+<meta name="msapplication-square310x310logo" content="https://mensa.nordakademie.de/images/favicon/windows_310.png"/>
+    <title>NORDAKADEMIE</title>
+    <link type="text/css" rel="stylesheet" href="js/webbestellung/webbestellung.9cd7f6d8bbb48c233707.css">
+    <link type="text/css" rel="stylesheet" href="stylesheets/main.042a46e70e26d9d68c987413ea6eafb4.css">
+    <link type="text/css" rel="stylesheet" href="stylesheets/custom.1341d625b97a3f5df62462110960c3ff.css">
+    <script src="js/webbestellung/webbestellung.124cdc0fc01988e749d3.min.js" type="text/javascript"></script>
+
+    <script type="text/javascript">
+      OPC.ROOT_URL                  = "https://mensa.nordakademie.de";
+      OPC.activeLanguage            = "de";
+      OPC.SERVICE_URL               = "https://mensa.nordakademie.de/api/";
+      OPC.WaehrungsFormat           = "%s €";
+      OPC.WaehrungsDecimalSeparator = ",";
+      OPCModalWindow.setCloseLabel("Schließen");
+            OPC.SESSION_MAXTIME      = 10;
+      OPC.SESSION_CURTIMESTAMP = 1790970358;
+          </script>
+    </head>
+
+    <body class="mdhistory">
+<noscript>
+    <div class="alert alert-danger enablejs abs" role="alert">
+        <strong>JavaScript benötigt!</strong><br><br> Leider haben Sie JavaScript deaktiviert. Um alle Grundfunktionen nutzen zu können muss JavaScript aktiviert sein.<br>Hier finden Sie eine <a href='https://www.enable-javascript.com/de/' target='_blank'>Anleitung um Javascript in Ihrem Browser zu aktivieren.</a>    </div>
+</noscript>
+<nav class="page-header">
+    <div class="header-logo">
+        <a class="logo-link" href="mdhistory.php?KID=11111">
+            <img src="images/logo/opc_logo_white.png" alt="Logo NORDAKADEMIE">
+        </a>
+    </div>
+
+    
+        <div class="options-container left">
+            <ul class="menu-desktop options">
+                                    <li class="">
+                        <a href="menuplan.php?KID=11111"
+                           onclick="">Menüplan</a>
+                    </li>
+                                        <li class="active">
+                        <a href="javascript:void(0);"
+                           onclick="">Verzehrhistorie</a>
+                    </li>
+                                </ul>
+        </div>
+
+        
+            <div class="options-container middle">
+                <ul class="menu-desktop info">
+
+                                            <li class="header-kontoinfo">
+                            <div class="kontoinfo-text" onclick="OPC.PageHeader.toggleKontoInfo(event)">
+                                    <span>
+                                        <i class="fa fa-user"></i>
+                                        <span class="kontoinfo saldo">&nbsp;|&nbsp;Saldo&nbsp;<span class="saldo-value">8,07 €</span></span>                                    </span>
+                            </div>
+                            <div class="kontoinfo-dropdown">
+                                   <span>
+                                        <b>Kundennummer:&nbsp;</b>
+                                        <br>
+                                         11111                                    </span>
+                                <span>
+                                        <b>Mandant:&nbsp;</b>
+                                        <br>
+                                        NORDAKADEMIE                                    </span>
+                                <span>
+                                        <b>Gruppe:&nbsp;</b>
+                                        <br>
+                                        Studenten                                    </span>
+                                                                    <span>
+                                        <b>Benutzername:&nbsp;</b>
+                                        <br>
+                                        12345                                    </span>
+                                                                    <span>
+                                        <b>Kartennummer:&nbsp;</b>
+                                        <br>
+                                         11111                                    </span>
+                                <span>
+                                        <b>Saldo:&nbsp;</b>
+                                        <br>
+                                        8,07 €                                    </span>
+                            </div>
+                        </li>
+                                            <li class="session-timer">
+                            <i class="far fa-clock" aria-hidden="true"></i>
+                            <span class="time-value">10</span>
+                            <span class="time-label">min</span>
+                        </li>
+                                    </ul>
+            </div>
+
+            <div class="options-container right">
+                <ul class="menu-desktop actions">
+                                            <li class="best_button_header hidden">
+                            <a id='SaveToDB' href="javascript:void(0);"
+                               class="best_icon_header"
+                               title="Speichern"
+                               onclick="OPC.BookingSummary.showBookingSummary()">
+                                <i class="fa fa-shopping-basket"></i>
+                                <span class="best_header_btn_caption">
+                                        Speichern                                    </span>
+                            </a>
+                        </li>
+
+                                            <li class="logout">
+                            <a class="logout_btn" title="Logout"
+                               href="https://mensa.nordakademie.de/logout.php"
+                               onclick="return OPC.checkForChanges(event);">
+                                <span>Abmelden</span>
+                                <i class="far fa-sign-out"></i>
+                            </a>
+                        </li>
+                                            <li class="toggler">
+                        <a class="mobile-toggler" href="javascript:void(0);" onclick="OPC.toggleMobileMenu()">
+                            <i class="far fa-bars"></i>
+                        </a>
+                    </li>
+                </ul>
+            </div>
+                    <div class="container-mobile">
+            <ul class="menu-mobile">
+                                        <li class="">
+                            <a href="menuplan.php?KID=11111" onclick="">
+                                <i class="fa fa-th"></i>
+                                <span class="title">Menüplan</span>
+                            </a>
+                        </li>
+                                                <li class="active">
+                            <a href="javascript:void(0);" onclick="">
+                                <i class="far fa-history"></i>
+                                <span class="title">Verzehrhistorie</span>
+                            </a>
+                        </li>
+                                                <li class="">
+                            <a href="logout.php?KID=11111" onclick="">
+                                <i class="far fa-sign-out"></i>
+                                <span class="title">Abmelden</span>
+                            </a>
+                        </li>
+                                    </ul>
+
+            <div class="mobile-saldo-info">
+                <i class="fa fa-user"></i>
+                <span class="kontoinfo saldo">&nbsp;|&nbsp;Saldo&nbsp;<span class="saldo-value">8,07 €</span></span>            </div>
+
+        </div>
+    
+</nav>
+<div class="page-content-wrapper">
+    <div class="page-content">
+
+        
+        <div >
+
+            <h3 class="page-title">
+                Verzehrhistorie            </h3>
+            <hr>
+
+            <div class="user-wrapper">
+
+                <div class="user-info">
+
+                    
+                    
+                    <div>
+                        <span class="pull-left">Kundennummer:</span>
+                        <span class="pull-right">11111</span>
+                    </div>
+
+                    <div>
+                        <span class="pull-left">Kartennummer:</span>
+                        <span class="pull-right">11111</span>
+                    </div>
+
+                    
+                                            <div></div>
+                        <div>
+                            <span class="pull-left">Guthaben:</span>
+                            <span class="pull-right" style="white-space:nowrap">
+                                    8,07 €                                </span>
+                        </div>
+                                    </div>
+
+                <div class="mdhistory-useractions ohneDruck">
+
+                    <div class="label-export">
+                        <i class="fal fa-file-export"></i>
+                        <span>Exportieren...</span>
+                    </div>
+
+                    <div class="export-options">
+
+                        <button class="btn" onclick="window.print();">
+                            <i class="fal fa-print"></i>&nbsp;
+                            Historie drucken                        </button>
+
+                                                    <button class="btn" onClick="OPC.MDHistory.exportPDF('bb', true)">
+                                <i class="fal fa-file-pdf"></i>&nbsp;
+                                PDF: Kartenbuchungen (alle)                            </button>
+                            <button class="btn" onClick="OPC.MDHistory.exportPDF('bb')">
+                                <i class="fal fa-file-pdf"></i>&nbsp;
+                                PDF: Kartenbuchungen (von/bis)                            </button>
+                        
+                        
+                    </div>
+
+                </div>
+            </div>
+
+            <form class="form" id="formHistory" name="Formular" method="post" action="mdhistory.php?KID=11111">
+
+                <input type="hidden" name="action" id="action" value="">
+                <input type="hidden" name="exportType" id="exportType" value="">
+                                    <div class="section-wrapper">
+                        <div class='title-section bistro'>
+                            <h3 class="date-info">
+                                Bistro-Verzehr                                <span>(01.01.25 - 02.10.26)</span>
+                            </h3>
+
+                            <div class="mdhistory-dateactions ohneDruck">
+                                <i class="calendar-toggle fa fa-calendar-edit"></i>
+                                <i class="calendar-toggle far fa-chevron-down"></i>
+                            </div>
+                        </div>
+
+                        <div class="table-options bistro ohneDruck">
+
+                            <div class="options-container dates">
+
+                                <span class="zeitraum">Zeitraum:</span>
+
+                                <input id="bb_von" name="bb_von" type="text" class="datepicker"
+                                       size="10" data-value="01.01.2025">
+
+                                <span class="bis">bis</span>
+
+                                <input id="bb_bis" name="bb_bis" type="text" class="datepicker"
+                                       size="10" data-value="02.10.2026">
+
+                                <div class="force-break"></div>
+
+                                <button id="BBAnzeigen" type="button" class="btn blue date-action" onclick="OPC.MDHistory.handleClickRefresh('bb')">
+                                    Anzeigen                                </button>
+
+                                                            </div>
+
+                            <div class="options-container allcards">
+                                                            </div>
+
+
+                        </div>
+
+                        <table id="bistrohistorytable" class="">
+                            <thead>
+                            <tr>
+                                <th class="datetime">Buchungszeitpunkt</th>
+                                <th class="description">Artikel/Verwendung</th>
+                                <th class="menge right">Menge</th>
+                                <th class="price right">Preis</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                                                                <tr>
+                                        <td class="datetime" title="23.09.26 13:31">
+                                            <label class="mobile">Buchungszeitpunkt:</label>
+                                            23.09.26 13:31                                        </td>
+                                        <td class="description" title="Hinweis: Putenschnitzel , Paprikasauce oder Champignon-Rahm-Sauce dazu Pommes">
+                                            <label class="mobile">Artikel/Verwendung:</label>
+                                            Hinweis: Putenschnitzel , Paprikasauce oder Champignon-Rahm-Sauce dazu Pommes                                        </td>
+                                        <td class="menge right" title="0">
+                                            <label class="mobile">Menge:</label>
+                                            0                                        </td>
+                                        <td class="price right" title="0,00 &euro;">
+                                            <label class="mobile">Preis:</label>
+                                            0,00 &euro;                                        </td>
+                                    </tr>
+<tr>
+                                        <td class="datetime" title="23.09.26 13:31">
+                                            <label class="mobile">Buchungszeitpunkt:</label>
+                                            23.09.26 13:31                                        </td>
+                                        <td class="description" title="Men&uuml; 1">
+                                            <label class="mobile">Artikel/Verwendung:</label>
+                                            Men&uuml; 1                                        </td>
+                                        <td class="menge right" title="1">
+                                            <label class="mobile">Menge:</label>
+                                            1                                        </td>
+                                        <td class="price right" title="-5,00 &euro;">
+                                            <label class="mobile">Preis:</label>
+                                            -5,00 &euro;                                        </td>
+                                    </tr>
+<tr>
+                                        <td class="datetime" title="23.09.26 13:30">
+                                            <label class="mobile">Buchungszeitpunkt:</label>
+                                            23.09.26 13:30                                        </td>
+                                        <td class="description" title="Hinweis: Putenschnitzel , Paprikasauce oder Champignon-Rahm-Sauce dazu Pommes">
+                                            <label class="mobile">Artikel/Verwendung:</label>
+                                            Hinweis: Putenschnitzel , Paprikasauce oder Champignon-Rahm-Sauce dazu Pommes                                        </td>
+                                        <td class="menge right" title="0">
+                                            <label class="mobile">Menge:</label>
+                                            0                                        </td>
+                                        <td class="price right" title="0,00 &euro;">
+                                            <label class="mobile">Preis:</label>
+                                            0,00 &euro;                                        </td>
+                                    </tr>
+<tr>
+                                        <td class="datetime" title="23.09.26 13:30">
+                                            <label class="mobile">Buchungszeitpunkt:</label>
+                                            23.09.26 13:30                                        </td>
+                                        <td class="description" title="Men&uuml; 1">
+                                            <label class="mobile">Artikel/Verwendung:</label>
+                                            Men&uuml; 1                                        </td>
+                                        <td class="menge right" title="2">
+                                            <label class="mobile">Menge:</label>
+                                            2                                        </td>
+                                        <td class="price right" title="-10,00 &euro;">
+                                            <label class="mobile">Preis:</label>
+                                            -10,00 &euro;                                        </td>
+                                    </tr>
+<tr>
+                                        <td class="datetime" title="02.09.26 13:31">
+                                            <label class="mobile">Buchungszeitpunkt:</label>
+                                            02.09.26 13:31                                        </td>
+                                        <td class="description" title="Aufladung 50&euro;">
+                                            <label class="mobile">Artikel/Verwendung:</label>
+                                            Aufladung 50&euro;                                        </td>
+                                        <td class="menge right" title="1">
+                                            <label class="mobile">Menge:</label>
+                                            1                                        </td>
+                                        <td class="price right" title="50,00 &euro;">
+                                            <label class="mobile">Preis:</label>
+                                            50,00 &euro;                                        </td>
+                                    </tr>
+<tr>
+                                        <td class="datetime" title="16.09.26 13:41">
+                                            <label class="mobile">Buchungszeitpunkt:</label>
+                                            16.09.26 13:41                                        </td>
+                                        <td class="description" title="Belastung Pfand">
+                                            <label class="mobile">Artikel/Verwendung:</label>
+                                            Belastung Pfand                                        </td>
+                                        <td class="menge right" title="1">
+                                            <label class="mobile">Menge:</label>
+                                            1                                        </td>
+                                        <td class="price right" title="-0,08 &euro;">
+                                            <label class="mobile">Preis:</label>
+                                            -0,08 &euro;                                        </td>
+                                    </tr>
+<tr>
+                                        <td class="datetime" title="21.08.26 12:31">
+                                            <label class="mobile">Buchungszeitpunkt:</label>
+                                            21.08.26 12:31                                        </td>
+                                        <td class="description" title="Belastung Pfand">
+                                            <label class="mobile">Artikel/Verwendung:</label>
+                                            Belastung Pfand                                        </td>
+                                        <td class="menge right" title="1">
+                                            <label class="mobile">Menge:</label>
+                                            1                                        </td>
+                                        <td class="price right" title="-0,08 &euro;">
+                                            <label class="mobile">Preis:</label>
+                                            -0,08 &euro;                                        </td>
+                                    </tr>
+                                                                        <tr class="summe">
+                                        <td class="datetime"></td>
+                                        <td class="description right">
+                                            <strong>Summe</strong>
+                                        </td>
+                                        <td class="menge right">
+                                            <label class="mobile">
+                                                <strong>Summe&nbsp;Menge:</strong>
+                                            </label>
+                                            <strong>71</strong>
+                                        </td>
+                                        <td class="price right">
+                                            <label class="mobile">
+                                                <strong>Summe&nbsp;Preis:</strong>
+                                            </label>
+                                            <strong>-13,03 €</strong>
+                                        </td>
+                                    </tr>
+                                                                </tbody>
+                        </table>
+                        
+                    </div>
+                            </form>
+        </div>
+
+    </div>
+</div>
+<footer class="page-footer">
+
+    <div class="page-footer-inner left">
+        <p class="footer-info">
+            2026 © <a rel="noopener" href="http://www.opc.de">OPC</a>&nbsp;
+            <span class="app-name" onclick="OPC.Footer.toggleShowVersion(event)">
+                WebBestellung            </span>
+        </p>
+    </div>
+
+            <div class="page-footer-inner middle footer-kontoinfo">
+            <i class="fa fa-user"></i>
+            <span><span class="kontoinfo saldo">&nbsp;|&nbsp;Saldo&nbsp;<span class="saldo-value">8,07 €</span></span></span>
+        </div>
+    
+    <div class="page-footer-inner right">
+        <a href="javascript:void(0);" onclick="OPC.Footer.showDocument('dsgvo');">Datenschutzerklärung</a><span class='separator'>●</span><a href="javascript:void(0);" onclick="OPC.Footer.showDocument('impressum');">Impressum</a><span class='separator'>●</span><a href="javascript:void(0);" onclick="OPC.Footer.showDocument('agb');">AGB</a>    </div>
+
+    <div class="version-info">
+        <span>Version: 1.7.3</span>
+        <span>Build: 2021.12.13 16:18:49</span>
+    </div>
+</footer>
+<script id="templateAGB" type="text/template">
+    <input type="hidden" name="doc_format" value="html"><input type="hidden" name="doc_target" value="popup"></script>
+<script id="templateImpressum" type="text/template">
+    <input type="hidden" name="doc_format" value="html"><input type="hidden" name="doc_target" value="popup"></script>
+<script id="templateDSGVO" type="text/template">
+    <input type="hidden" name="doc_format" value="html"><input type="hidden" name="doc_target" value="popup"></script>
+<script id="templateCookieConsent" type="text/template">
+    <div id="cookieWindow" class="cookie-overlay">
+        <div class="cookie-wrapper">
+            <h3>Cookie-Zustimmung</h3>
+            <br>
+            <p id="cookieInfo"></p>
+            <p><b>Mehr erfahren:</b></p>
+            <div class="buttons">
+
+                <ul class="links">
+                    <li>
+                        <a href="javascript:void(0);" onclick="OPC.Footer.showDocument('dsgvo')">
+                            Datenschutzerklärung                        </a>
+                    </li>
+                    <li>
+                        <a href="javascript:void(0);" onclick="OPC.Footer.showDocument('impressum')">
+                            Impressum                        </a>
+                    </li>
+                    <li>
+                        <a href="javascript:void(0);" onclick="OPC.Footer.showDocument('agb')">
+                            Allgemeine Geschäftsbedingungen                        </a>
+                    </li>
+                </ul>
+
+                <button class="btn blue accept_cookies" name="accept_cookies"
+                        onclick="CookieUtil.handleAcceptCookie(event)">
+                    Einverstanden                </button>
+            </div>
+        </div>
+    </div>
+</script>
+<script type="application/javascript">
+
+  CookieUtil.txtCookieInfo      = 'Diese Website verwendet ausschließlich technisch notwendige Cookies. Es werden keine Tracking- oder Drittanbieter-Cookies verwendet. Nähere Informationen dazu und zu Ihren Rechten als Benutzer finden Sie in unserer Datenschutzerklärung. Bitte klicken Sie auf „Einverstanden“, um Cookies zu akzeptieren und direkt unsere Website besuchen zu können.';
+  CookieUtil.txtCookiesDisabled = '<strong>Cookies werden benötigt.</strong><br>Leider haben Sie Cookies deaktiviert! Um dieses Portal nutzen zu können, müssen Cookies akzeptiert werden. Prüfen Sie die Einstellungen Ihres Browsers.';
+  CookieUtil.cookiesAccepted    = parseInt('1');
+
+  OPC.Footer.titleAGB       = 'Allgemeine Geschäftsbedingungen';
+  OPC.Footer.titleDSGVO     = 'Datenschutzerklärung';
+  OPC.Footer.titleImpressum = 'Impressum';
+
+  // on Load
+  $(OPC.Footer.footerInit);
+</script>
+<script type="application/javascript">
+  OPC.WaehrungsFormat           = "%s €";
+  OPC.WaehrungsDecimalSeparator = ",";
+
+  // Date minimum interval
+  OPC.MDHistory.DATE_MIN_INTERVAL_MONTHS = 12;
+
+  if (OPC.activeLanguage === 'en')
+  {
+    DatePickerOptions.toEnglish();
+  } else
+  {
+    DatePickerOptions.toGerman();
+  }
+
+  $(OPC.MDHistory.pageRenderedInit);
+</script>
+</body>
+</html>

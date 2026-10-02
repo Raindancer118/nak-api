@@ -6,6 +6,7 @@ package demo
 
 import (
 	"fmt"
+	"github.com/Raindancer118/nak-api/internal/mensa"
 	"os"
 	"path/filepath"
 	"strings"
@@ -575,6 +576,13 @@ func Registry() *tools.Registry {
 			return map[string]any{"name": "Max Mustermann", "zenturie": "I24a", "studiengang": "Angewandte Informatik (B.Sc.)"}, nil
 		}),
 		read("cis_timetable", "Demo-Stundenplan", func(a *app.App, args tools.Args) (any, error) { return timetable(a, args), nil }),
+		read("mensa_menu", "Demo-Speiseplan", func(a *app.App, _ tools.Args) (any, error) { return demoMenu(a.Now().In(a.Zone)), nil }),
+		read("mensa_account", "Demo-Mensakarte", func(a *app.App, _ tools.Args) (any, error) {
+			return mensa.Account{Balance: 12.35, Card: "10001", Bookings: demoBookings(a.Now().In(a.Zone))}, nil
+		}),
+		read("mensa_spending", "Demo-Mensaausgaben", func(a *app.App, _ tools.Args) (any, error) {
+			return map[string]any{"balance": 12.35, "spending": mensa.Spend(demoBookings(a.Now().In(a.Zone)))}, nil
+		}),
 		read("cis_balance", "Demo-Guthaben", func(*app.App, tools.Args) (any, error) { return map[string]any{"Kopierguthaben": "7,40 €"}, nil }),
 		&tools.Tool{Name: "cis_download_cert", Kind: tools.Local, Desc: "Demo-Bescheinigung", Params: []tools.Param{{Name: "download_url"}},
 			Run: func(a *app.App, args tools.Args) (any, error) {
@@ -715,4 +723,51 @@ func demoReviewers() []thesis.Reviewer {
 		r("Weiss, Hanna", "Wirtschaftswissenschaften", 0, "Wissenschaftliches Arbeiten", "Projektmanagement", "Change Management"),
 		r("Engel, Paul", "Informatik, Wirtschaftswissenschaften", 0, "Betriebliche Anwendungssysteme", "ERP-Systeme", "Prozessmanagement"),
 	}
+}
+
+var demoDishes = [][2]string{
+	{"Hähnchen-Curry mit Basmatireis", "Gemüse-Curry mit Basmatireis"},
+	{"Spaghetti Bolognese", "Spaghetti mit Linsenbolognese"},
+	{"Kartoffelsuppe mit Würstchen", "Kartoffelsuppe mit Kräutercroûtons"},
+	{"Schnitzel mit Pommes und Salat", "Gemüseschnitzel mit Pommes und Salat"},
+	{"Fischfilet mit Kartoffeln und Remoulade", "Falafel mit Couscous und Joghurtdip"},
+}
+
+// two weeks of menus from this Monday on
+func demoMenu(now time.Time) map[string]any {
+	names := []string{"Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"}
+	monday := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location()).AddDate(0, 0, -((int(now.Weekday()) + 6) % 7))
+	var days []map[string]any
+	for i := 0; i < 12; i++ {
+		d := monday.AddDate(0, 0, i)
+		if d.Weekday() == time.Saturday || d.Weekday() == time.Sunday {
+			continue
+		}
+		pair := demoDishes[(i+d.YearDay())%len(demoDishes)]
+		date := d.Format("2006-01-02")
+		days = append(days, map[string]any{"date": date, "weekday": names[d.Weekday()], "dishes": []mensa.Dish{
+			{Date: date, Line: "Menü 1", Name: pair[0], Price: 5, Tags: []string{"Geflügel"}, Allergens: []string{"Glutenhaltiges Getreide", "Milch"}},
+			{Date: date, Line: "Menü 2 Veg.", Name: pair[1], Price: 5, Tags: []string{"Vegetarisch"}, Allergens: []string{"Sellerie"}},
+		}})
+	}
+	return map[string]any{"days": days}
+}
+
+func demoBookings(now time.Time) []mensa.Booking {
+	var out []mensa.Booking
+	for i := 1; i <= 160; i++ {
+		d := now.AddDate(0, 0, -i*3)
+		if d.Weekday() == time.Saturday || d.Weekday() == time.Sunday {
+			continue
+		}
+		at := time.Date(d.Year(), d.Month(), d.Day(), 12, 40, 0, 0, now.Location())
+		out = append(out, mensa.Booking{At: at, Item: "Menü 1", Dish: demoDishes[i%len(demoDishes)][i%2], Qty: 1, Amount: -5})
+		if i%4 == 0 {
+			out = append(out, mensa.Booking{At: at.Add(-time.Minute), Item: "Becher Filterkaffee 0,3", Qty: 1, Amount: -1})
+		}
+		if i%10 == 0 {
+			out = append(out, mensa.Booking{At: at.Add(-2 * time.Minute), Item: "Aufladung 50€", Qty: 1, Amount: 50})
+		}
+	}
+	return out
 }

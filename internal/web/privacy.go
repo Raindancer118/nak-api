@@ -19,7 +19,7 @@ Alles, was diese naknak-Instanz über dich gespeichert hat (Stand: siehe Dateida
 
 account.json        dein NAK-Konto (ohne Passwort)
 settings.json       Einstellungen (EduVault-Zugang ohne Geheimnisse)
-cache.json          zwischengespeicherte Antworten von CIS, Moodle und EduVault
+cache.json          zwischengespeicherte Antworten von CIS, Moodle, Mensa und EduVault
 history.json        gesehene Klausurtermine und Notenstände
 notifications.json  Benachrichtigungen
 stats.json          wie oft CIS/Moodle gefragt wurden

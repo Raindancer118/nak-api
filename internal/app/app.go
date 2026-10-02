@@ -14,6 +14,7 @@ import (
 	"github.com/Raindancer118/nak-api/internal/auth"
 	"github.com/Raindancer118/nak-api/internal/client"
 	"github.com/Raindancer118/nak-api/internal/eduvault"
+	"github.com/Raindancer118/nak-api/internal/mensa"
 	"github.com/Raindancer118/nak-api/internal/moodle"
 )
 
@@ -38,6 +39,7 @@ type App struct {
 	cis      *client.Client
 	moodle   *moodle.Service
 	eduvault *eduvault.Client
+	mensa    *mensa.Client
 	settings *Settings
 }
 
@@ -151,7 +153,7 @@ func (a *App) SaveAccount(user, pass string) error {
 	if a.accountSource == "" {
 		a.accountSource = "file"
 	}
-	a.cis, a.moodle = nil, nil
+	a.cis, a.moodle, a.mensa = nil, nil, nil
 	a.mu.Unlock()
 	return nil
 }
@@ -237,6 +239,25 @@ func (a *App) CISClient() (*client.Client, error) {
 		a.cis = c
 	}
 	return a.cis, nil
+}
+
+// Mensa: the canteen with the NAK login (balance and bookings need it, the
+// menu does not).
+func (a *App) Mensa() *mensa.Client {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.mensa == nil {
+		a.mensa = mensa.New(envOr("MENSA_URL", mensa.DefaultURL), a.cisUser, a.cisPass)
+		a.mensa.Zone = a.Zone
+	}
+	return a.mensa
+}
+
+// UseMensa injects a client (tests).
+func (a *App) UseMensa(c *mensa.Client) {
+	a.mu.Lock()
+	a.mensa = c
+	a.mu.Unlock()
 }
 
 func (a *App) Moodle() (*moodle.Service, error) {

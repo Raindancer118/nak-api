@@ -1378,3 +1378,11 @@ html.private .toast { filter: blur(6px); }
   background: radial-gradient(closest-side, var(--tile) 76%, transparent 78%), conic-gradient(var(--cis) calc(var(--p) * 1%), color-mix(in oklab, var(--line) 70%, transparent) 0); }
 .row.match { gap: .8rem; }
 .settings-form textarea { font: inherit; padding: .6rem .85rem; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); resize: vertical; }
+
+/* Mensa */
+.ext.veg { color: var(--ok); }
+ul.spend-bars { list-style: none; margin: .75rem 0 0; padding: 0; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: .35rem; align-items: end; height: 7rem; }
+ul.spend-bars li { display: grid; grid-template-rows: 1fr auto; height: 100%; gap: .25rem; }
+ul.spend-bars .bar { align-self: end; justify-self: center; width: min(100%, 2.4rem); height: calc(var(--v) * 100%); min-height: 2px; border-radius: .35rem .35rem .15rem .15rem; background: var(--ink); opacity: .85; }
+ul.spend-bars .lbl { font-size: .7rem; color: var(--dim); text-align: center; }
+.filters.mensa-veg { margin: .5rem 0 .25rem; }
