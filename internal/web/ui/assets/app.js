@@ -1722,8 +1722,8 @@ function paletteCommands() {
     { group: "Seiten", title: "Studienbescheinigung & Notenspiegel", run: go("#/studium/bescheinigungen") },
     { group: "Seiten", title: "Profil", run: go("#/studium/profil") },
     { group: "Seiten", title: "Einstellungen", run: go("#/einstellungen") },
-    { group: "Aktionen", title: "Neu laden (frisch aus CIS und Moodle)", run: () => $(".top .icon-btn")?.click() },
-    { group: "Aktionen", title: "Design wechseln (System → Hell → Dunkel)", run: () => $(".theme-btn")?.click() },
+    { group: "Aktionen", title: "Neu laden (frisch aus CIS und Moodle)", run: refreshPage },
+    { group: "Aktionen", title: "Design wechseln (System → Hell → Dunkel)", run: () => { const cur = localStorage.getItem("nak-theme") || "system"; const next = themes[(themes.indexOf(cur) + 1) % themes.length]; localStorage.setItem("nak-theme", next); applyTheme(next); } },
     { group: "Aktionen", title: "Alle Benachrichtigungen als gelesen markieren", run: markAllRead },
     { group: "Aktionen", title: "Kalender-Abo einrichten", run: go("#/einstellungen") },
     { group: "Aktionen", title: "Abmelden", run: () => $(".top form[action='/logout']")?.requestSubmit() },
@@ -2125,7 +2125,7 @@ function switchTheme(e) {
 
 function header() {
   const links = [["Übersicht", "#/"], ["Woche", "#/woche"], ["Kurse", "#/kurse"], ["Neuigkeiten", "#/neu"], ["Nachrichten", "#/nachrichten"], ["Noten", "#/noten"], ["Studium", "#/studium"]];
-  const refresh = h("button", { class: "icon-btn", type: "button", title: "Neu laden (frisch aus CIS und Moodle)", "aria-label": "Neu laden" }, svg(icons.refresh));
+  const refresh = h("button", { class: "icon-btn hide-sm", type: "button", title: "Neu laden (frisch aus CIS und Moodle)", "aria-label": "Neu laden" }, svg(icons.refresh));
   refresh.addEventListener("click", async () => {
     refresh.classList.add("spin");
     fresh = true;

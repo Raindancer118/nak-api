@@ -709,19 +709,29 @@ html.theme-switch::view-transition-new(root) {
   .tile.half { grid-column: span 12; }
   .top-in { gap: .75rem; padding: .6rem 1rem; }
   .stamp { display: none; }
-  nav {
+  /* backdrop-filter would make the header the containing block of the fixed
+     bottom bar — on phones the header is solid instead */
+  .top { backdrop-filter: none; background: var(--bg); }
+  .top nav {
     position: fixed;
-    left: .75rem;
-    right: .75rem;
-    bottom: .75rem;
-    justify-content: space-around;
-    background: color-mix(in oklab, var(--tile) 88%, transparent);
+    left: .5rem;
+    right: .5rem;
+    bottom: max(.5rem, env(safe-area-inset-bottom));
+    z-index: 20;
+    justify-content: flex-start;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+    background: color-mix(in oklab, var(--tile) 94%, transparent);
     backdrop-filter: blur(14px);
     border: 1px solid var(--line);
     border-radius: 16px;
     padding: .25rem;
-    box-shadow: var(--shadow);
+    box-shadow: 0 10px 30px -12px #0008;
   }
+  .top nav::-webkit-scrollbar { display: none; }
+  .top nav a { scroll-snap-align: start; flex: none; }
+  .tools .icon-btn.hide-sm, .tools .theme-btn { display: none; }
   main { padding: 1.5rem 1rem 6.5rem; }
   .next { grid-template-columns: 1fr; }
   .countdown { text-align: left; }
@@ -988,8 +998,7 @@ main.quiet *, main.quiet { animation: none !important; }
 
 @media (max-width: 960px) { .chat { grid-template-columns: 1fr; } }
 @media (max-width: 680px) {
-  nav { overflow-x: auto; justify-content: flex-start; }
-  nav a { padding: .55rem .6rem; font-size: .9rem; }
+  .top nav a { padding: .55rem .7rem; font-size: .9rem; }
   .composer { grid-template-columns: 1fr; }
 }
 
