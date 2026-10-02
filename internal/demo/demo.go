@@ -254,12 +254,12 @@ func pdf(a *app.App, name, title string) (map[string]any, error) {
 }
 
 func read(name, desc string, run func(a *app.App, args tools.Args) (any, error)) *tools.Tool {
-	return &tools.Tool{Name: name, Kind: tools.Read, Desc: desc, Run: run, Params: []tools.Param{{Name: "days", Type: "integer"}, {Name: "courseid", Type: "integer"}, {Name: "classification"}, {Name: "module_nr"}, {Name: "title"}, {Name: "query"}, {Name: "discussionid", Type: "integer"}, {Name: "conversationid", Type: "integer"}, {Name: "assignid", Type: "integer"}, {Name: "limit", Type: "integer"}, {Name: "only_open", Type: "boolean"}}}
+	return &tools.Tool{Name: name, Kind: tools.Read, Desc: desc, Run: run, Params: []tools.Param{{Name: "days", Type: "integer"}, {Name: "courseid", Type: "integer"}, {Name: "classification"}, {Name: "module_nr"}, {Name: "title"}, {Name: "query"}, {Name: "discussionid", Type: "integer"}, {Name: "conversationid", Type: "integer"}, {Name: "assignid", Type: "integer"}, {Name: "limit", Type: "integer"}, {Name: "only_open", Type: "boolean"}, {Name: "mine", Type: "boolean"}, {Name: "available_only", Type: "boolean"}, {Name: "quarter"}, {Name: "seminar_id"}, {Name: "transfer_id"}}}
 }
 
 func write(name, desc string, preview func(args tools.Args) any) *tools.Tool {
 	return &tools.Tool{Name: name, Kind: tools.Write, Desc: desc,
-		Params:  []tools.Param{{Name: "exam_id"}, {Name: "action"}, {Name: "postid", Type: "integer"}, {Name: "message"}, {Name: "conversationid", Type: "integer"}, {Name: "text"}, {Name: "assignid", Type: "integer"}, {Name: "files", Type: "array:string"}, {Name: "online_text"}, {Name: "submit_for_grading", Type: "boolean"}},
+		Params:  []tools.Param{{Name: "exam_id"}, {Name: "action"}, {Name: "seminar_id"}, {Name: "module_id"}, {Name: "termin_id"}, {Name: "postid", Type: "integer"}, {Name: "message"}, {Name: "conversationid", Type: "integer"}, {Name: "text"}, {Name: "assignid", Type: "integer"}, {Name: "files", Type: "array:string"}, {Name: "online_text"}, {Name: "submit_for_grading", Type: "boolean"}},
 		Preview: func(a *app.App, args tools.Args) (any, error) { return preview(args), nil },
 		Do: func(a *app.App, args tools.Args) (any, error) {
 			return map[string]any{"demo": "Demo – nichts gesendet. In einer echten Instanz wäre das jetzt verbindlich passiert."}, nil
@@ -417,6 +417,65 @@ func Registry() *tools.Registry {
 			Run: func(a *app.App, args tools.Args) (any, error) {
 				return pdf(a, "altklausur-"+args.Str("exam_id")[30:]+".pdf", "Altklausur (Demo)")
 			}},
+		read("cis_list_seminars", "Demo-Seminare", func(_ *app.App, args tools.Args) (any, error) {
+			mine := []map[string]any{
+				{"id": "7001", "title": "Moderation und Präsentation", "lecturer": "Clara Yilmaz", "from": "Samstag, 07.03.2026", "to": "Sonntag, 08.03.2026", "info": "Sa. und So. 9:00-16:30 Uhr", "category": "Methodenkompetenz / Kommunikation", "status": []string{"Seminar besucht", "Teilnehmer am Seminar"}},
+			}
+			if args.Bool("mine", false) {
+				return map[string]any{"quarter": "Meine Seminare", "seminars": mine}, nil
+			}
+			return map[string]any{"quarter": "2026 - 4", "available_quarters": map[string]any{"2026 - 3": "903", "2026 - 4": "904"}, "notice": "Anmeldungen sind bis 14 Tage vor Beginn möglich.",
+				"seminars": []map[string]any{
+					{"id": "7101", "title": "Agiles Projektmanagement in der Praxis", "lecturer": "Jonas Weber", "from": "Samstag, 07.11.2026", "to": "Sonntag, 08.11.2026", "info": "Sa. und So. 9:00-16:30 Uhr", "category": "Methodenkompetenz / Management", "actions": []map[string]any{{"action": "subscribeToSeminar", "label": "zum Seminar anmelden"}}},
+					{"id": "7102", "title": "Ethik der künstlichen Intelligenz", "lecturer": "Dr. Nadia Petrov", "from": "Freitag, 20.11.2026", "to": "Samstag, 21.11.2026", "info": "Fr. 14:00-18:00, Sa. 9:00-16:30", "category": "Ethik / Soziales", "has_waitlist": true, "actions": []map[string]any{{"action": "anWartelisteAnmelden", "label": "auf die Warteliste"}}},
+				}}, nil
+		}),
+		read("cis_seminar_detail", "Demo-Seminardetail", func(*app.App, tools.Args) (any, error) {
+			return map[string]any{"themenbereich": "Methodenkompetenz", "pruefungsform": "Teilnahme", "kreditpunkte": "1,5", "workload": "16 Stunden", "bemerkung": "Bitte Laptop mitbringen."}, nil
+		}),
+		read("cis_seminar_participation", "Demo-Belegung", func(*app.App, tools.Args) (any, error) {
+			return map[string]any{"teilnehmende": 14, "warteliste": 0, "mindestteilnehmerzahl": 16, "du": "nicht angemeldet"}, nil
+		}),
+		read("cis_list_wahlpflicht", "Demo-Wahlpflicht", func(*app.App, tools.Args) (any, error) {
+			return map[string]any{"chosen": []map[string]any{{"id": "8801", "name": "WP Data Engineering", "termin": "Q3/26", "chosen": true}}, "available": nil, "selection_open": false,
+				"notice": "Der nächste Wahlzeitraum beginnt im November."}, nil
+		}),
+		read("cis_list_transfer", "Demo-Transferleistungen", func(*app.App, tools.Args) (any, error) {
+			return []map[string]any{
+				{"id": "6601", "no": "5", "abgabedatum": "15.06.2026", "korrekturfrist": "15.07.2026", "topic": "Automatisierte Tests in einer gewachsenen Codebasis", "module": "Softwaretechnik (I151)", "wertung": "bestanden", "versuch": "1", "status": "bewertet"},
+				{"id": "6602", "no": "6", "abgabedatum": "22.10.2026", "korrekturfrist": "22.11.2026", "topic": "Datenqualität im Betrieb", "module": "Datenbanksysteme (I160)", "wertung": "", "versuch": "1", "status": "angemeldet"},
+			}, nil
+		}),
+		read("cis_transfer_bewertung", "Demo-Bewertung", func(*app.App, tools.Args) (any, error) {
+			return map[string]any{"kriterien": []map[string]any{{"kriterium": "Problemstellung", "note": "1,7", "gewichtung": "20 %"}, {"kriterium": "Methodik", "note": "2,0", "gewichtung": "40 %"}, {"kriterium": "Form", "note": "1,3", "gewichtung": "40 %"}}, "gesamt": "1,7"}, nil
+		}),
+		read("cis_list_certs", "Demo-Bescheinigungen", func(*app.App, tools.Args) (any, error) {
+			return []map[string]any{
+				{"name": "Studienbescheinigung WS 2026 (de)", "semester": "WS 2026", "period": "01.10.2026 - 31.03.2027", "lang": "de", "download_url": "https://cis.example/cert/ws2026-de"},
+				{"name": "Certificate of enrolment WS 2026 (en)", "semester": "WS 2026", "period": "01.10.2026 - 31.03.2027", "lang": "en", "download_url": "https://cis.example/cert/ws2026-en"},
+			}, nil
+		}),
+		read("cis_profile", "Demo-Profil", func(*app.App, tools.Args) (any, error) {
+			return map[string]any{"all": map[string]any{"Vorname": "Max", "Nachname": "Mustermann", "Matrikelnr.": "99999", "Zenturie": "I24a", "Studiengang": "Angewandte Informatik", "Firma": "Beispiel GmbH", "Email (NAK)": "max.mustermann@nordakademie.example"}}, nil
+		}),
+		read("cis_sharing", "Demo-Freigaben", func(*app.App, tools.Args) (any, error) {
+			return map[string]any{"noten_fuer_betrieb": true, "sichtbar_fuer_kommilitonen": false}, nil
+		}),
+		read("cis_balance", "Demo-Guthaben", func(*app.App, tools.Args) (any, error) { return map[string]any{"Kopierguthaben": "7,40 €"}, nil }),
+		&tools.Tool{Name: "cis_download_cert", Kind: tools.Local, Desc: "Demo-Bescheinigung", Params: []tools.Param{{Name: "download_url"}},
+			Run: func(a *app.App, args tools.Args) (any, error) {
+				return pdf(a, "studienbescheinigung.pdf", "Studienbescheinigung (Demo)")
+			}},
+		&tools.Tool{Name: "cis_transcript", Kind: tools.Local, Desc: "Demo-Notenspiegel", Params: []tools.Param{{Name: "lang"}},
+			Run: func(a *app.App, args tools.Args) (any, error) {
+				return pdf(a, "notenspiegel-"+args.Str("lang")+".pdf", "Notenspiegel (Demo)")
+			}},
+		write("cis_seminar_action", "Demo: Seminaranmeldung", func(args tools.Args) any {
+			return map[string]any{"would": args.Str("action"), "seminar": args.Str("seminar_id")}
+		}),
+		write("cis_select_wahlpflicht", "Demo: Wahlpflicht", func(args tools.Args) any {
+			return map[string]any{"would": "Wahlpflichtmodul wählen", "module": args.Str("module_id")}
+		}),
 		write("cis_klausur_action", "Demo: Prüfungsanmeldung", func(args tools.Args) any {
 			return map[string]any{"action": map[string]string{"register": "Prüfungsanmeldung", "deregister": "Prüfungsabmeldung"}[args.Str("action")], "exam": "Demo-Prüfung " + args.Str("exam_id")}
 		}),

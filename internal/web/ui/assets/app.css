@@ -1170,3 +1170,21 @@ a.icon-btn { color: inherit; }
 .exam-row .t a:hover { color: var(--cis); }
 .exam-row .action { margin: 0 0 .6rem 1.6rem; }
 html.still *, html.still *::before, html.still *::after { animation: none !important; transition: none !important; }
+
+/* ── studies ────────────────────────────────────────────── */
+
+.seminar { border-bottom: 1px solid var(--line); padding-bottom: .4rem; }
+.seminar:last-child { border-bottom: 0; }
+.chips { display: flex; gap: .3rem; flex-wrap: wrap; justify-content: flex-end; max-width: 16rem; }
+.lazy { margin: .1rem 0 .4rem 1.6rem; }
+.lazy summary { cursor: pointer; color: var(--dim); font-size: .85rem; min-height: 36px; display: inline-flex; align-items: center; }
+.lazy summary:hover, .lazy[open] summary { color: var(--ink); }
+.lazy-body { padding: .5rem 0; display: grid; gap: .75rem; }
+.seminar .action { margin-left: 1.6rem; }
+.toolbar { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; margin-bottom: .75rem; }
+.toolbar select { font: inherit; min-height: 40px; padding: 0 .75rem; border-radius: 10px; border: 1px solid var(--line); background: var(--tile); color: var(--ink); }
+.inline-check { display: inline-flex; gap: .5rem; align-items: center; color: var(--text); font-size: .9rem; cursor: pointer; }
+.inline-check input { width: 18px; height: 18px; accent-color: var(--cis); }
+h2.sub { margin: 1rem 0 .4rem; }
+.kv.generic dd { overflow-wrap: anywhere; }
+.row.file .ext.tl { background: color-mix(in oklab, var(--cis) 14%, transparent); color: var(--cis); }

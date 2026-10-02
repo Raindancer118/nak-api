@@ -37,10 +37,12 @@ func fakeRegistry(c *counters) *tools.Registry {
 			Preview: func(a *app.App, args tools.Args) (any, error) { c.previews.Add(1); return "would do", nil },
 			Do:      func(a *app.App, args tools.Args) (any, error) { c.dos.Add(1); return "done", nil }},
 		&tools.Tool{Name: "fake_download", Kind: tools.Local, Desc: "Lädt herunter.",
-			Params: []tools.Param{{Name: "out", Desc: "Zielpfad"}},
+			Params: []tools.Param{{Name: "out", Desc: "Zielpfad"}, {Name: "output_path"}, {Name: "target_dir"}},
 			Run: func(a *app.App, args tools.Args) (any, error) {
-				if args.Has("out") {
-					return nil, errors.New("out must not reach the tool from the web")
+				for _, k := range []string{"out", "output_path", "target_dir"} {
+					if args.Has(k) {
+						return nil, errors.New(k + " must not reach the tool from the web")
+					}
 				}
 				c.downloads.Add(1)
 				p := filepath.Join(a.DownloadDir, "sub", "Skript 1.pdf")
@@ -418,7 +420,7 @@ func TestErrors(t *testing.T) {
 
 func TestDownloadedFilesAreServed(t *testing.T) {
 	h := newHarness(t)
-	m := decode(t, h.do(t, "POST", "/api/tools/fake_download", `{"out":"/etc/evil"}`, bearer))
+	m := decode(t, h.do(t, "POST", "/api/tools/fake_download", `{"out":"/etc/evil","output_path":"/etc/evil2","target_dir":"/tmp/x"}`, bearer))
 	u, _ := m["download_url"].(string)
 	if u != "/files/sub/Skript%201.pdf" {
 		t.Fatalf("download_url %q (%v)", u, m)

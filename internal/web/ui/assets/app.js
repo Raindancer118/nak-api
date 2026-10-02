@@ -1677,6 +1677,11 @@ function paletteCommands() {
     { group: "Seiten", title: "Nachrichten", run: go("#/nachrichten") },
     { group: "Seiten", title: "Noten", run: go("#/noten") },
     { group: "Seiten", title: "Prüfungen & Anmeldungen", run: go("#/pruefungen") },
+    { group: "Seiten", title: "Seminare", run: go("#/studium/seminare") },
+    { group: "Seiten", title: "Wahlpflicht", run: go("#/studium/wahlpflicht") },
+    { group: "Seiten", title: "Transferleistungen", run: go("#/studium/transfer") },
+    { group: "Seiten", title: "Studienbescheinigung & Notenspiegel", run: go("#/studium/bescheinigungen") },
+    { group: "Seiten", title: "Profil", run: go("#/studium/profil") },
     { group: "Seiten", title: "Einstellungen", run: go("#/einstellungen") },
     { group: "Aktionen", title: "Neu laden (frisch aus CIS und Moodle)", run: () => $(".top .icon-btn")?.click() },
     { group: "Aktionen", title: "Design wechseln (System → Hell → Dunkel)", run: () => $(".theme-btn")?.click() },
@@ -1851,6 +1856,174 @@ async function examsPage(root) {
   });
 }
 
+// ── studies: seminars, electives, Transferleistungen, certificates, profile ─
+
+// openLocal runs a download tool on the server and shows the file.
+async function openLocal(tool, args, btn) {
+  const win = window.open("", "_blank");
+  btn?.classList.add("busy");
+  try {
+    const r = await post(tool, args);
+    if (!r.download_url) throw new Error("Datei konnte nicht bereitgestellt werden");
+    if (win) win.location = `${r.download_url}?inline=1`;
+  } catch (err) {
+    win?.close();
+    alertBox(err.message);
+  } finally {
+    btn?.classList.remove("busy");
+  }
+}
+
+// genericView renders an unknown tool result readably (detail pages of the
+// CIS differ a lot): labels, lists and tables, never raw HTML.
+function genericView(v, depth = 0) {
+  if (v == null || v === "") return null;
+  if (typeof v !== "object") return h("span", { text: String(v) });
+  if (Array.isArray(v)) {
+    if (!v.length) return null;
+    if (v.every((x) => typeof x !== "object")) return h("span", { text: v.join(", ") });
+    const keys = [...new Set(v.flatMap((x) => Object.keys(x || {})))].filter((k) => !/(_|^)(url|id)$/.test(k)).slice(0, 6);
+    return h("div", { class: "table-wrap" }, h("table", {},
+      h("thead", {}, h("tr", {}, keys.map((k) => h("th", { text: k.replace(/_/g, " ") })))),
+      h("tbody", {}, v.map((row, j) => h("tr", { vars: { "--j": Math.min(j, 15) } }, keys.map((k) => h("td", {}, typeof row?.[k] === "object" ? genericView(row[k], depth + 1) : String(row?.[k] ?? ""))))))));
+  }
+  const entries = Object.entries(v).filter(([k, x]) => x !== null && x !== "" && !/(_|^)(url|id)$/.test(k));
+  return h("dl", { class: "kv generic" }, entries.map(([k, x]) => [h("dt", { text: k.replace(/_/g, " ") }), h("dd", {}, genericView(x, depth + 1))]));
+}
+
+function lazyDetails(summary, load) {
+  const body = h("div", { class: "lazy-body" });
+  const d = h("details", { class: "lazy" }, h("summary", { text: summary }), body);
+  d.addEventListener("toggle", async () => {
+    if (!d.open || body.dataset.loaded) return;
+    body.dataset.loaded = "1";
+    body.replaceChildren(skeleton()[1]);
+    try { body.replaceChildren(...[await load()].flat().filter(Boolean)); } catch (err) { body.replaceChildren(errorBox(err)); }
+  });
+  return d;
+}
+
+async function studiesPage(root, tab = "seminare") {
+  root.append(h("div", { class: "page-head" }, h("h1", {}, "Studium", h("small", { text: "Seminare, Wahlpflicht, Transferleistungen, Bescheinigungen" }))));
+  const tabs = [["seminare", "Seminare"], ["wahlpflicht", "Wahlpflicht"], ["transfer", "Transferleistungen"], ["bescheinigungen", "Bescheinigungen"], ["profil", "Profil"]];
+  root.append(h("nav", { class: "tabs", "aria-label": "Bereiche" }, tabs.map(([k, label]) => h("a", { href: `#/studium/${k}`, text: label, ...(k === tab ? { "aria-current": "page" } : {}) }))));
+  const grid = h("div", { class: "grid" });
+  root.append(grid);
+  if (tab === "seminare") return seminarsTab(grid);
+  if (tab === "wahlpflicht") return electivesTab(grid);
+  if (tab === "transfer") return transferTab(grid);
+  if (tab === "bescheinigungen") return certsTab(grid);
+  return profileTab(grid);
+}
+
+function seminarRow(s, j) {
+  const statuses = Array.isArray(s.status) ? s.status : s.status ? [s.status] : [];
+  const actions = (s.actions || []).filter((a) => a.action);
+  return h("li", { class: "seminar", vars: { "--j": Math.min(j, 14) } },
+    h("div", { class: "row" },
+      h("span", { class: "dot", "data-src": "cis" }),
+      h("span", { class: "t" }, s.title, h("span", { class: "s", text: [s.lecturer, [s.from, s.to].filter(Boolean).join(" – "), s.info].filter(Boolean).join(" · ") })),
+      h("span", { class: "chips" }, s.category && h("span", { class: "chip", text: s.category }), statuses.map((x) => h("span", { class: `chip ${/angemeldet|zugelassen|bestätigt|besucht|teilnehmer/i.test(x) ? "ok" : /warte/i.test(x) ? "due" : /abgesagt/i.test(x) ? "bad" : ""}`, text: x })))),
+    lazyDetails("Details & Belegung", async () => {
+      const [d, p] = await Promise.allSettled([api("cis_seminar_detail", { seminar_id: s.id }), api("cis_seminar_participation", { seminar_id: s.id })]);
+      return [p.status === "fulfilled" && genericView(p.value), d.status === "fulfilled" ? genericView(d.value) : errorBox(d.reason)];
+    }),
+    actions.map((a) => confirmFlow({ tool: "cis_seminar_action", args: { seminar_id: s.id, action: a.action }, label: a.label || a.action, confirm: `Verbindlich: ${a.label || a.action}`, done: refreshPage })));
+}
+
+function seminarsTab(grid) {
+  const tMine = tile("Meine Seminare", { cls: "w12", i: 0 });
+  const tAll = tile("Seminarprogramm", { cls: "w12", i: 1 });
+  grid.append(tMine, tAll);
+  fill(tMine, () => api("cis_list_seminars", { mine: true }), (r) => {
+    const list = r.seminars || [];
+    return list.length ? h("ul", { class: "rows" }, list.map(seminarRow)) : emptyRow("Noch keine Seminare.");
+  });
+  let quarter = "", onlyOpen = true;
+  const box = h("div");
+  const load = () => fill(box.replaceChildren() || box, () => api("cis_list_seminars", { ...(quarter ? { quarter } : {}), available_only: onlyOpen }), (r) => {
+    const list = r.seminars || [];
+    const quarters = Object.keys(r.available_quarters || {});
+    const sel = h("select", { "aria-label": "Quartal", onchange: (e) => { quarter = e.currentTarget.value; load(); } }, quarters.map((q) => h("option", { value: q, text: q, ...(q === (quarter || r.quarter) ? { selected: true } : {}) })));
+    const tog = h("label", { class: "inline-check" }, h("input", { type: "checkbox", checked: onlyOpen, onchange: (e) => { onlyOpen = e.currentTarget.checked; load(); } }), "nur mit Anmeldung");
+    return [h("div", { class: "toolbar" }, quarters.length > 0 && sel, tog), r.notice && h("p", { class: "empty", text: r.notice }),
+      list.length ? h("ul", { class: "rows" }, list.map(seminarRow)) : emptyRow("Keine Seminare in dieser Auswahl.")];
+  });
+  tAll.append(box);
+  load();
+}
+
+function electivesTab(grid) {
+  const t = tile("Wahlpflichtmodule", { cls: "w12", i: 0 });
+  grid.append(t);
+  fill(t, () => api("cis_list_wahlpflicht"), (r) => {
+    const chosen = r.chosen || [], avail = r.available || [];
+    return [
+      r.notice && h("p", { class: "empty", text: r.notice }),
+      h("h2", { class: "sub", text: "Gewählt" }),
+      chosen.length ? h("ul", { class: "rows" }, chosen.map((m, j) => h("li", {}, h("div", { class: "row", vars: { "--j": j } },
+        h("span", { class: "dot", "data-src": "cis" }), h("span", { class: "t" }, m.name, h("span", { class: "s", text: m.termin || "" })), h("span", { class: "chip ok", text: "gewählt" }))))) : emptyRow("Noch nichts gewählt."),
+      h("h2", { class: "sub", text: r.selection_open ? "Wählbar" : "Wahlzeitraum geschlossen" }),
+      r.selection_open && (avail.length ? h("ul", { class: "rows" }, avail.map((m, j) => h("li", { class: "seminar" },
+        h("div", { class: "row", vars: { "--j": j } }, h("span", { class: "dot", "data-src": "cis" }), h("span", { class: "t" }, m.name, h("span", { class: "s", text: [m.lecturer, m.vertiefung, m.termin].filter(Boolean).join(" · ") }))),
+        lazyDetails("Details & Termine", async () => {
+          const d = await api("cis_wahlpflicht_detail", { module_id: m.id });
+          const termine = d.termine || d.dates || [];
+          return [genericView(d), (termine.length ? termine : [null]).map((tm) => confirmFlow({
+            tool: "cis_select_wahlpflicht", args: { module_id: m.id, ...(tm?.id ? { termin_id: tm.id } : {}) },
+            label: tm ? `Wählen: ${tm.label || tm.name || tm.id}` : "Wählen", confirm: "Verbindlich wählen", done: refreshPage }))];
+        })))) : emptyRow("Gerade nichts wählbar.")),
+    ];
+  });
+}
+
+function transferTab(grid) {
+  const t = tile("Transferleistungen", { cls: "w12", i: 0 });
+  grid.append(t);
+  fill(t, () => api("cis_list_transfer"), (list) => {
+    if (!list?.length) return emptyRow("Keine Transferleistungen.");
+    return h("ul", { class: "rows" }, list.map((x, j) => h("li", { class: "seminar", vars: { "--j": j } },
+      h("div", { class: "row" },
+        h("span", { class: "ext tl", text: `T${x.no}` }),
+        h("span", { class: "t" }, x.topic || "Thema offen", h("span", { class: "s", text: [x.module, x.abgabedatum && `Abgabe ${x.abgabedatum}`, x.korrekturfrist && `Korrektur bis ${x.korrekturfrist}`, x.versuch && `${x.versuch}. Versuch`].filter(Boolean).join(" · ") })),
+        h("span", { class: `chip ${/bestanden|bewertet/i.test(`${x.status} ${x.wertung}`) && !/nicht/i.test(`${x.status} ${x.wertung}`) ? "ok" : /nicht/i.test(`${x.status} ${x.wertung}`) ? "bad" : ""}`, text: x.wertung || x.status || "–" })),
+      lazyDetails("Bewertung & Dokumente", async () => {
+        const b = await api("cis_transfer_bewertung", { transfer_id: x.id });
+        const docs = b.documents || b.dokumente || [];
+        return [genericView({ ...b, documents: undefined, dokumente: undefined }),
+          docs.length > 0 && h("ul", { class: "rows files" }, docs.map((d, k) => h("li", {}, h("button", { class: "row file", type: "button", vars: { "--j": k }, onclick: (e) => openLocal("cis_download_transfer_document", { download_url: d.url || d.download_url }, e.currentTarget) },
+            h("span", { class: "ext", text: "PDF" }), h("span", { class: "t", text: d.name || d.title || "Dokument" }), h("span", { class: "chip", text: "öffnen" })))))];
+      }))));
+  });
+}
+
+function certsTab(grid) {
+  const tCert = tile("Studienbescheinigungen", { cls: "w8", i: 0 });
+  const tTr = tile("Notenspiegel", { i: 1 },
+    h("p", { class: "empty", text: "Offizieller Notenspiegel aus dem CIS als PDF." }),
+    h("div", { class: "row-actions" },
+      h("button", { class: "primary", type: "button", text: "Deutsch", onclick: (e) => openLocal("cis_transcript", { lang: "de" }, e.currentTarget) }),
+      h("button", { class: "ghost", type: "button", text: "English", onclick: (e) => openLocal("cis_transcript", { lang: "en" }, e.currentTarget) })));
+  grid.append(tCert, tTr);
+  fill(tCert, () => api("cis_list_certs"), (list) => {
+    if (!list?.length) return emptyRow("Keine Bescheinigungen.");
+    return h("ul", { class: "rows files" }, list.map((c, j) => h("li", {}, h("button", { class: "row file", type: "button", vars: { "--j": Math.min(j, 12) }, onclick: (e) => openLocal("cis_download_cert", { download_url: c.download_url }, e.currentTarget) },
+      h("span", { class: "ext", text: (c.lang || "de").toUpperCase() }),
+      h("span", { class: "t" }, c.name || c.semester, h("span", { class: "s", text: c.period || "" })),
+      h("span", { class: "chip", text: "öffnen" })))));
+  });
+}
+
+function profileTab(grid) {
+  const t = tile("Meine Daten", { cls: "w8", i: 0 });
+  const tSide = tile("Freigaben & Konto", { i: 1 });
+  grid.append(t, tSide);
+  fill(t, () => api("cis_profile"), (p) => genericView(p.all || p));
+  fill(tSide, () => Promise.allSettled([api("cis_sharing"), api("cis_balance")]), ([sh, bal]) => [
+    sh.status === "fulfilled" && genericView(sh.value), bal.status === "fulfilled" && genericView(bal.value),
+    h("p", { class: "empty meter", text: "Ändern geht hier noch nicht; das CIS-Profil bleibt dafür zuständig." })]);
+}
+
 // ── header, theme, routing ──────────────────────────────────────────────────
 
 const routes = [
@@ -1865,6 +2038,7 @@ const routes = [
   [/^#\/nachrichten(?:\/(\d+))?$/, messagesPage, "#/nachrichten"],
   [/^#\/noten$/, gradesPage, "#/noten"],
   [/^#\/pruefungen$/, examsPage, "#/noten"],
+  [/^#\/studium(?:\/(seminare|wahlpflicht|transfer|bescheinigungen|profil))?$/, studiesPage, "#/studium"],
   [/^#\/einstellungen$/, settingsPage, "#/einstellungen"],
   [/^#\/module$/, unitsPage, "#/kurse"],
   [/^#\/modul\/([A-Z]{1,2}\d{3})(?:\/(inhalt|forum|abgaben))?(?:\/(\d+))?$/, unitPage, "#/kurse"],
@@ -1911,7 +2085,7 @@ function switchTheme(e) {
 }
 
 function header() {
-  const links = [["Übersicht", "#/"], ["Woche", "#/woche"], ["Kurse", "#/kurse"], ["Neuigkeiten", "#/neu"], ["Nachrichten", "#/nachrichten"], ["Noten", "#/noten"]];
+  const links = [["Übersicht", "#/"], ["Woche", "#/woche"], ["Kurse", "#/kurse"], ["Neuigkeiten", "#/neu"], ["Nachrichten", "#/nachrichten"], ["Noten", "#/noten"], ["Studium", "#/studium"]];
   const refresh = h("button", { class: "icon-btn", type: "button", title: "Neu laden (frisch aus CIS und Moodle)", "aria-label": "Neu laden" }, svg(icons.refresh));
   refresh.addEventListener("click", async () => {
     refresh.classList.add("spin");

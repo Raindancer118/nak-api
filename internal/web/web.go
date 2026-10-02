@@ -434,8 +434,11 @@ func (s *Server) callTool(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if t.Kind == tools.Local {
-		// Downloads stay in the download dir so /files can serve them.
-		delete(args, "out")
+		// Downloads stay in the download dir so /files can serve them (the
+		// tools name their target parameter differently).
+		for _, k := range []string{"out", "output_path", "target_dir"} {
+			delete(args, k)
+		}
 	}
 	if t.Kind == tools.Write && args.Bool("confirm", false) && r.Header.Get(confirmHeader) != "JA" {
 		writeJSON(w, http.StatusPreconditionRequired, map[string]any{"error": "verbindliche Aktion: confirm=true braucht zusätzlich den Header " + confirmHeader + ": JA"})
