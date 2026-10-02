@@ -514,3 +514,171 @@ func TestTokenIsCreatedOnceAndPrivate(t *testing.T) {
 		t.Fatal("token changed on restart")
 	}
 }
+
+func fakeEduVaultLogin(t *testing.T) *httptest.Server {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var in struct{ Token string }
+		json.NewDecoder(r.Body).Decode(&in)
+		if in.Token != "evm_good_secretpart" {
+			w.WriteHeader(401)
+			io.WriteString(w, `{"error":"Ungültige Zugangsdaten"}`)
+			return
+		}
+		io.WriteString(w, `{"session":"s","expires_in":7200}`)
+	}))
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+func TestEduVaultSettings(t *testing.T) {
+	t.Setenv("EDUVAULT_TOKEN", "")
+	t.Setenv("EDUVAULT_MCP_SECRET", "")
+	h := newHarness(t)
+	h.app.ConfigDir = t.TempDir()
+	ev := fakeEduVaultLogin(t)
+
+	m := decode(t, h.do(t, "GET", "/api/settings", "", bearer))
+	if e := m["eduvault"].(map[string]any); e["configured"] != false {
+		t.Fatalf("initial: %v", m)
+	}
+	// wrong credentials are rejected and not stored
+	res := h.do(t, "PUT", "/api/settings/eduvault", `{"url":"`+ev.URL+`","token":"evm_bad_x","secret":"JBSWY3DPEHPK3PXP"}`, bearer)
+	if res.StatusCode != http.StatusBadRequest {
+		t.Fatalf("bad credentials: %d", res.StatusCode)
+	}
+	if h.app.EduVaultSource() != "" {
+		t.Fatal("bad credentials were saved")
+	}
+	res = h.do(t, "PUT", "/api/settings/eduvault", `{"url":"`+ev.URL+`","token":"evm_good_secretpart","secret":"JBSWY3DPEHPK3PXP"}`, bearer)
+	if res.StatusCode != 200 {
+		t.Fatalf("good credentials: %d", res.StatusCode)
+	}
+	res = h.do(t, "GET", "/api/settings", "", bearer)
+	b, _ := io.ReadAll(res.Body)
+	if strings.Contains(string(b), "secretpart") || strings.Contains(string(b), "JBSWY3DPEHPK3PXP") {
+		t.Fatalf("settings leak secrets: %s", b)
+	}
+	if !strings.Contains(string(b), `"configured":true`) || !strings.Contains(string(b), "evm_good") {
+		t.Fatalf("settings: %s", b)
+	}
+	if res := h.do(t, "DELETE", "/api/settings/eduvault", "", bearer); res.StatusCode != 200 || h.app.EduVaultSource() != "" {
+		t.Fatalf("delete: %d %s", res.StatusCode, h.app.EduVaultSource())
+	}
+	// settings need auth and same-origin like everything else
+	if res := h.do(t, "PUT", "/api/settings/eduvault", `{}`, nil); res.StatusCode != 401 {
+		t.Fatalf("no auth: %d", res.StatusCode)
+	}
+	if res := h.do(t, "DELETE", "/api/settings/eduvault", "", with(map[string]string{"Origin": "https://evil.example"})); res.StatusCode != 403 {
+		t.Fatalf("cross-site delete: %d", res.StatusCode)
+	}
+}
+
+func TestCacheClearEndpoint(t *testing.T) {
+	h := newHarness(t)
+	h.do(t, "POST", "/api/tools/fake_read", `{}`, bearer)
+	if res := h.do(t, "POST", "/api/cache/clear", `{}`, bearer); res.StatusCode != 200 {
+		t.Fatalf("clear: %d", res.StatusCode)
+	}
+	h.do(t, "POST", "/api/tools/fake_read", `{}`, bearer)
+	if h.c.reads.Load() != 2 {
+		t.Fatalf("cache not cleared: reads=%d", h.c.reads.Load())
+	}
+}
+
+// fakeCISLogin is a minimal TYPO3 felogin: one account 12345 / right.
+func fakeCISLogin(t *testing.T) (*httptest.Server, *atomic.Int32) {
+	var posts atomic.Int32
+	form := `<html><body><form action="/" method="post"><input name="user"><input type="password" name="pass"><input type="hidden" name="logintype" value="login"><button type="submit">Anmelden</button></form></body></html>`
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			posts.Add(1)
+			r.ParseForm()
+			if r.PostForm.Get("user") == "12345" && r.PostForm.Get("pass") == "right" {
+				http.SetCookie(w, &http.Cookie{Name: "fe_typo_user_cae070b", Value: "sess", Path: "/"})
+				io.WriteString(w, `<main>Willkommen</main><a href="/login/?logintype=logout">Abmelden</a>`)
+				return
+			}
+			w.WriteHeader(http.StatusForbidden)
+		}
+		io.WriteString(w, form)
+	}))
+	t.Cleanup(srv.Close)
+	return srv, &posts
+}
+
+func accountHarness(t *testing.T) (*harness, *atomic.Int32) {
+	cis, posts := fakeCISLogin(t)
+	t.Setenv("CIS_BASE_URL", cis.URL)
+	t.Setenv("CIS_USER", "")
+	t.Setenv("CIS_PASS", "")
+	t.Setenv("NAK_DATA_DIR", t.TempDir())
+	return newHarness(t), posts
+}
+
+func (h *harness) accountLogin(t *testing.T, user, pass string) *http.Response {
+	t.Helper()
+	req, _ := http.NewRequest("POST", h.srv.URL+"/login", strings.NewReader(url.Values{"username": {user}, "password": {pass}}.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	res, err := noRedirect().Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { res.Body.Close() })
+	return res
+}
+
+func TestFirstLoginClaimsTheInstance(t *testing.T) {
+	h, posts := accountHarness(t)
+	res := h.do(t, "GET", "/login", "", nil)
+	b, _ := io.ReadAll(res.Body)
+	if !strings.Contains(string(b), `name="username"`) || !strings.Contains(string(b), `name="password"`) {
+		t.Fatalf("login form without account fields: %s", b)
+	}
+	if res := h.accountLogin(t, "12345", "wrong"); res.StatusCode != 401 || h.app.AccountUser() != "" {
+		t.Fatalf("wrong password: %d owner=%q", res.StatusCode, h.app.AccountUser())
+	}
+	res = h.accountLogin(t, "12345", "right")
+	if res.StatusCode != http.StatusSeeOther || len(res.Cookies()) == 0 {
+		t.Fatalf("first login: %d", res.StatusCode)
+	}
+	if h.app.AccountUser() != "12345" || h.app.AccountSource() != "file" {
+		t.Fatalf("owner = %q (%s)", h.app.AccountUser(), h.app.AccountSource())
+	}
+	// later logins are checked locally — no extra CIS round trip
+	before := posts.Load()
+	if res := h.accountLogin(t, "12345", "right"); res.StatusCode != http.StatusSeeOther || posts.Load() != before {
+		t.Fatalf("second login: %d, CIS posts %d→%d", res.StatusCode, before, posts.Load())
+	}
+	// another NAK account cannot take over, even with valid credentials
+	if res := h.accountLogin(t, "99999", "right"); res.StatusCode != 401 {
+		t.Fatalf("other account: %d", res.StatusCode)
+	}
+	b2, _ := io.ReadAll(h.accountLogin(t, "99999", "x").Body)
+	if !strings.Contains(string(b2), "anderen") {
+		t.Fatalf("other account message: %s", b2)
+	}
+}
+
+func TestEmptyCredentialsAndRateLimit(t *testing.T) {
+	h, _ := accountHarness(t)
+	if res := h.accountLogin(t, "", ""); res.StatusCode != 400 {
+		t.Fatalf("empty: %d", res.StatusCode)
+	}
+	var last int
+	for i := 0; i < maxLoginFailures+1; i++ {
+		last = h.accountLogin(t, "12345", "wrong").StatusCode
+	}
+	if last != http.StatusTooManyRequests {
+		t.Fatalf("rate limit: %d", last)
+	}
+}
+
+func TestSettingsShowAccountButNoPassword(t *testing.T) {
+	h, _ := accountHarness(t)
+	h.accountLogin(t, "12345", "right")
+	res := h.do(t, "GET", "/api/settings", "", bearer)
+	b, _ := io.ReadAll(res.Body)
+	if !strings.Contains(string(b), `"user":"12345"`) || strings.Contains(string(b), "right") {
+		t.Fatalf("settings: %s", b)
+	}
+}

@@ -4,20 +4,51 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
-<title>nak · Anmelden</title>
+<title>naknak · Anmelden</title>
+<link rel="icon" href="/assets/naknak.svg" type="image/svg+xml">
 <link rel="preload" href="/assets/fonts/space-grotesk.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/app.css">
 <script src="/assets/theme.js"></script>
 </head>
 <body class="login">
-<form class="login-card" method="post" action="/login">
-  <span class="mark"><i></i>nak</span>
-  <label for="token">Zugangsschlüssel</label>
-  <input id="token" name="token" type="password" autocomplete="current-password" required autofocus>
-  {{if .Error}}<p class="err" role="alert">{{.Error}}</p>{{end}}
-  <button class="primary" type="submit">Anmelden</button>
-  <p class="hint">Der Schlüssel steht beim ersten Start im Log und danach in <code>web-token</code> im Datenverzeichnis.</p>
-</form>
+<main class="login-wrap">
+  <section class="login-card" aria-labelledby="login-title">
+    <span class="mark login-mark"><img src="/assets/naknak.svg" alt="" width="34" height="34">naknak</span>
+    <h1 id="login-title">{{if .FirstRun}}Willkommen bei naknak.{{else}}Schön, dass du da bist.{{end}}</h1>
+    <p class="lead">{{if .FirstRun}}Melde dich mit deinem NORDAKADEMIE-Konto an. Das erste Konto, das sich anmeldet, gehört zu dieser Instanz.{{else}}CIS und Moodle an einem Ort. Melde dich mit deinem NORDAKADEMIE-Konto an.{{end}}</p>
+
+    <form class="account-form" method="post" action="/login">
+      <label for="username">Benutzername</label>
+      <input id="username" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" value="{{.User}}" required {{if not .TokenMode}}autofocus{{end}}>
+      <label for="password">Passwort</label>
+      <div class="pw">
+        <input id="password" name="password" type="password" autocomplete="current-password" required>
+        <button class="pw-toggle" type="button" aria-label="Passwort anzeigen" aria-pressed="false">zeigen</button>
+      </div>
+      {{if .Error}}<p class="err" role="alert">{{.Error}}</p>{{end}}
+      <button class="primary" type="submit"><span class="label">Anmelden</span><span class="spin" aria-hidden="true"></span></button>
+    </form>
+
+    <details class="alt"{{if .TokenMode}} open{{end}}>
+      <summary>Mit Zugangsschlüssel anmelden</summary>
+      <form class="token-form" method="post" action="/login">
+        <label for="token">Zugangsschlüssel</label>
+        <input id="token" name="token" type="password" autocomplete="off" required>
+        <button class="primary" type="submit"><span class="label">Mit Schlüssel anmelden</span><span class="spin" aria-hidden="true"></span></button>
+        <p class="hint">Steht beim ersten Start im Log und danach in <code>web-token</code> im Datenverzeichnis.</p>
+      </form>
+    </details>
+
+    <p class="fine">Deine Zugangsdaten bleiben auf diesem Server und gehen nur an CIS und Moodle der NORDAKADEMIE. naknak ist kein offizielles Angebot der NORDAKADEMIE.</p>
+  </section>
+
+  <div class="login-art" aria-hidden="true">
+    <div class="pond">
+      <span class="ripple"></span><span class="ripple r2"></span><span class="ripple r3"></span>
+      <img class="duck" src="/assets/naknak.svg" alt="" width="220" height="220">
+    </div>
+  </div>
+</main>
 <script src="/assets/login.js"></script>
 </body>
 </html>

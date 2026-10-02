@@ -2,6 +2,8 @@
 package app
 
 import (
+	"crypto/subtle"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -11,6 +13,7 @@ import (
 
 	"github.com/Raindancer118/nak-api/internal/auth"
 	"github.com/Raindancer118/nak-api/internal/client"
+	"github.com/Raindancer118/nak-api/internal/eduvault"
 	"github.com/Raindancer118/nak-api/internal/moodle"
 )
 
@@ -26,13 +29,16 @@ type App struct {
 	ClientCache time.Duration
 
 	cisUser, cisPass       string
+	accountSource          string
 	moodleUser, moodlePass string
 	moodleURL              string
 	cisBase                string
 
-	mu     sync.Mutex
-	cis    *client.Client
-	moodle *moodle.Service
+	mu       sync.Mutex
+	cis      *client.Client
+	moodle   *moodle.Service
+	eduvault *eduvault.Client
+	settings *Settings
 }
 
 // FromEnv reads CIS_USER/CIS_PASS, MOODLE_USER/MOODLE_PASS (falling back to
@@ -67,7 +73,97 @@ func FromEnv() *App {
 	if d, err := time.ParseDuration(strings.TrimSpace(os.Getenv("NAK_CLIENT_CACHE_TTL"))); err == nil {
 		a.ClientCache = d
 	}
+	if a.cisUser != "" && a.cisPass != "" {
+		a.accountSource = "env"
+	} else if acc, ok := loadAccount(a.ConfigDir); ok {
+		a.useAccount(acc.User, acc.Pass)
+		a.accountSource = "file"
+	}
 	return a
+}
+
+type account struct {
+	User string `json:"user"`
+	Pass string `json:"pass"`
+}
+
+func loadAccount(dir string) (account, bool) {
+	var acc account
+	b, err := os.ReadFile(filepath.Join(dir, "account.json"))
+	if err != nil || json.Unmarshal(b, &acc) != nil || acc.User == "" || acc.Pass == "" {
+		return account{}, false
+	}
+	return acc, true
+}
+
+func (a *App) useAccount(user, pass string) {
+	a.cisUser, a.cisPass = user, pass
+	if os.Getenv("MOODLE_USER") == "" || os.Getenv("MOODLE_PASS") == "" {
+		a.moodleUser, a.moodlePass = user, pass
+	}
+}
+
+// AccountUser is the NAK account this instance belongs to ("" before the
+// first web login when no CIS_USER is set).
+func (a *App) AccountUser() string {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.cisUser
+}
+
+// AccountSource is "env", "file" (saved by the web login) or "".
+func (a *App) AccountSource() string {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.accountSource
+}
+
+// PasswordMatches compares in constant time (login without asking the CIS).
+func (a *App) PasswordMatches(user, pass string) bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.cisUser == "" || !strings.EqualFold(strings.TrimSpace(user), a.cisUser) {
+		return false
+	}
+	return subtle.ConstantTimeCompare([]byte(pass), []byte(a.cisPass)) == 1
+}
+
+// SaveAccount stores the NAK login (0600; the CIS and Moodle need the
+// password itself for their own logins) and resets both clients.
+func (a *App) SaveAccount(user, pass string) error {
+	user = strings.TrimSpace(user)
+	b, err := json.Marshal(account{user, pass})
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(a.ConfigDir, 0o700); err != nil {
+		return err
+	}
+	f := filepath.Join(a.ConfigDir, "account.json")
+	if err := os.WriteFile(f+".tmp", b, 0o600); err != nil {
+		return err
+	}
+	if err := os.Rename(f+".tmp", f); err != nil {
+		return err
+	}
+	a.mu.Lock()
+	a.useAccount(user, pass)
+	if a.accountSource == "" {
+		a.accountSource = "file"
+	}
+	a.cis, a.moodle = nil, nil
+	a.mu.Unlock()
+	return nil
+}
+
+// CheckLogin tries user/pass against the CIS without touching the stored
+// session (a wrong password must not log the instance out).
+func (a *App) CheckLogin(user, pass string) error {
+	c, err := client.NewWith(client.Options{BaseURL: a.cisBase})
+	if err != nil {
+		return err
+	}
+	return auth.Login(c, strings.TrimSpace(user), pass)
 }
 
 func envOr(k, d string) string {

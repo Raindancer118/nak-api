@@ -116,6 +116,13 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("GET /api/tools", s.authed(http.HandlerFunc(s.listTools)))
 	mux.Handle("POST /api/tools/{name}", s.authed(http.HandlerFunc(s.callTool)))
 	mux.Handle("GET /files/{path...}", s.authed(http.HandlerFunc(s.file)))
+	mux.Handle("GET /api/settings", s.authed(http.HandlerFunc(s.getSettings)))
+	mux.Handle("PUT /api/settings/eduvault", s.authed(s.jsonOnly(s.putEduVault)))
+	mux.Handle("DELETE /api/settings/eduvault", s.authed(s.sameOriginOnly(s.deleteEduVault)))
+	mux.Handle("POST /api/cache/clear", s.authed(s.jsonOnly(func(w http.ResponseWriter, r *http.Request) {
+		s.store.clear()
+		writeJSON(w, http.StatusOK, map[string]any{"cleared": true})
+	})))
 	assets := http.FileServerFS(s.ui)
 	mux.Handle("GET /assets/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// revalidate on every load (cheap: Last-Modified), so an update or a
@@ -251,14 +258,18 @@ func (s *Server) failed(ip string) {
 func (s *Server) tryLogin(w http.ResponseWriter, r *http.Request, tok string) {
 	ip := clientIP(r)
 	if s.locked(ip) {
-		s.renderLogin(w, http.StatusTooManyRequests, "Zu viele Fehlversuche. Bitte in ein paar Minuten erneut versuchen.")
+		s.renderLogin(w, r, http.StatusTooManyRequests, "Zu viele Fehlversuche. Bitte in ein paar Minuten erneut versuchen.")
 		return
 	}
 	if !eq(strings.TrimSpace(tok), s.cfg.Token) {
 		s.failed(ip)
-		s.renderLogin(w, http.StatusUnauthorized, "Der Zugangsschlüssel stimmt nicht.")
+		s.renderLogin(w, r, http.StatusUnauthorized, "Der Zugangsschlüssel stimmt nicht.")
 		return
 	}
+	s.loggedIn(w, r, ip)
+}
+
+func (s *Server) loggedIn(w http.ResponseWriter, r *http.Request, ip string) {
 	s.loginMu.Lock()
 	delete(s.logins, ip)
 	s.loginMu.Unlock()
@@ -273,7 +284,7 @@ func (s *Server) tryLogin(w http.ResponseWriter, r *http.Request, tok string) {
 // browser history and proxy logs); the log link carries it as #fragment and
 // login.js posts it.
 func (s *Server) loginPage(w http.ResponseWriter, r *http.Request) {
-	s.renderLogin(w, http.StatusOK, "")
+	s.renderLogin(w, r, http.StatusOK, "")
 }
 
 func (s *Server) loginPost(w http.ResponseWriter, r *http.Request) {
@@ -282,17 +293,23 @@ func (s *Server) loginPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 4096)
-	s.tryLogin(w, r, r.PostFormValue("token"))
+	if tok := r.PostFormValue("token"); tok != "" {
+		s.tryLogin(w, r, tok)
+		return
+	}
+	s.tryAccountLogin(w, r, r.PostFormValue("username"), r.PostFormValue("password"))
 }
 
-func (s *Server) renderLogin(w http.ResponseWriter, status int, msg string) {
+func (s *Server) renderLogin(w http.ResponseWriter, r *http.Request, status int, msg string) {
 	var buf bytes.Buffer
 	tmpl, err := s.loginTemplate()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	if err := tmpl.Execute(&buf, map[string]string{"Error": msg, "Version": s.cfg.Version}); err != nil {
+	data := map[string]any{"Error": msg, "Version": s.cfg.Version, "FirstRun": s.app.AccountUser() == "",
+		"User": strings.TrimSpace(r.PostFormValue("username")), "TokenMode": r.PostFormValue("token") != "" || r.URL.Query().Get("mode") == "token"}
+	if err := tmpl.Execute(&buf, data); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

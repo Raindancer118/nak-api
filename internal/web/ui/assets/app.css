@@ -125,15 +125,6 @@ button { font: inherit; color: inherit; }
   gap: .45rem;
 }
 
-.mark i {
-  width: .55rem;
-  height: .55rem;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--cis) 50%, var(--moodle) 50%);
-  transition: rotate .6s var(--spring);
-}
-
-.mark:hover i { rotate: 180deg; }
 
 nav { display: flex; gap: .25rem; }
 
@@ -579,50 +570,115 @@ th.r, td.r { text-align: right; }
 
 /* ── login ──────────────────────────────────────────────── */
 
-body.login { display: grid; place-items: center; padding: 1.5rem; }
+body.login { min-height: 100dvh; display: grid; padding: 1.25rem; }
+
+.login-wrap {
+  width: min(64rem, 100%);
+  margin: auto;
+  display: grid;
+  grid-template-columns: minmax(0, 27rem) 1fr;
+  gap: 3rem;
+  align-items: center;
+}
 
 .login-card {
-  width: min(24rem, 100%);
   background: var(--tile);
   border: 1px solid var(--line);
-  border-radius: 22px;
+  border-radius: 24px;
   box-shadow: var(--shadow);
-  padding: 2rem;
+  padding: 2.25rem 2rem 1.75rem;
   display: grid;
-  gap: .9rem;
+  gap: .85rem;
   animation: rise .8s var(--spring) both;
 }
 
-.login-card .mark { font-size: 2rem; margin-bottom: .5rem; }
-.login-card label { font-size: .85rem; color: var(--dim); }
-.login-card p { margin: 0; font-size: .9rem; }
-.login-card .hint { color: var(--dim); }
-.login-card code { font-size: .85em; background: var(--tile-2); padding: .1rem .35rem; border-radius: 5px; overflow-wrap: anywhere; }
+.login-mark { font-size: 1.6rem; gap: .55rem; margin-bottom: .75rem; }
+.login-mark img { width: 34px; height: 34px; }
+
+.login-card h1 { font-size: clamp(1.7rem, 3.5vw, 2.2rem); view-transition-name: none; }
+.login-card .lead { margin: 0 0 .5rem; color: var(--text); }
+.login-card label { font-size: .82rem; color: var(--dim); font-weight: 500; margin-top: .35rem; }
+.login-card form { display: grid; gap: .45rem; }
+.login-card .err { margin: .35rem 0 0; animation: shake .45s var(--ease); }
+
+@keyframes shake { 20%, 60% { translate: -5px 0; } 40%, 80% { translate: 5px 0; } }
 
 .login-card input {
   font: inherit;
-  min-height: 48px;
-  padding: .6rem .85rem;
+  width: 100%;
+  min-height: 50px;
+  padding: .7rem .9rem;
   border-radius: 12px;
   border: 1px solid var(--line);
   background: var(--bg);
   color: var(--ink);
+  transition: border-color .2s, box-shadow .25s;
 }
 
-.login-card input:focus { outline: 2px solid var(--cis); outline-offset: 1px; }
+.login-card input:focus { outline: none; border-color: color-mix(in oklab, var(--cis) 60%, transparent); box-shadow: 0 0 0 4px color-mix(in oklab, var(--cis) 16%, transparent); }
 
-.primary {
-  min-height: 48px;
-  border: 0;
-  border-radius: 12px;
-  background: var(--ink);
-  color: var(--bg);
-  font-weight: 600;
-  cursor: pointer;
-  transition: transform .3s var(--spring);
+.pw { position: relative; }
+.pw input { padding-right: 5.5rem; }
+.pw-toggle {
+  position: absolute; right: .35rem; top: 50%; translate: 0 -50%;
+  min-height: 40px; padding: 0 .75rem; border: 0; border-radius: 9px;
+  background: transparent; color: var(--dim); cursor: pointer; font-size: .82rem;
+}
+.pw-toggle:hover { color: var(--ink); background: var(--tile-2); }
+
+.login-card .primary { margin-top: .6rem; position: relative; display: grid; place-items: center; }
+.primary .spin {
+  position: absolute; width: 20px; height: 20px; border-radius: 50%;
+  border: 2px solid color-mix(in oklab, var(--bg) 35%, transparent); border-top-color: var(--bg);
+  opacity: 0; transition: opacity .2s;
+}
+.primary.busy .label { opacity: 0; }
+.primary.busy .spin { opacity: 1; animation: spin .8s linear infinite; }
+.primary:disabled { cursor: progress; }
+
+.alt { border-top: 1px solid var(--line); padding-top: .75rem; margin-top: .5rem; }
+.alt summary { cursor: pointer; color: var(--dim); font-size: .88rem; min-height: 40px; display: flex; align-items: center; }
+.alt summary:hover { color: var(--ink); }
+.alt[open] summary { color: var(--ink); }
+.alt form { padding-top: .35rem; animation: drop .35s var(--spring) both; }
+
+.login-card .hint { color: var(--dim); font-size: .82rem; margin: .25rem 0 0; }
+.login-card code { font-size: .85em; background: var(--tile-2); padding: .1rem .35rem; border-radius: 5px; }
+.fine { margin: .75rem 0 0; font-size: .78rem; color: var(--dim); line-height: 1.45; }
+
+/* the duck, afloat */
+.login-art { display: grid; place-items: center; min-height: 26rem; }
+.pond { position: relative; width: 22rem; height: 22rem; display: grid; place-items: center; }
+.duck {
+  position: relative; width: 13.75rem; height: auto;
+  filter: drop-shadow(0 18px 24px color-mix(in oklab, var(--due) 25%, transparent));
+  animation: float 4.2s ease-in-out infinite, bob 4.2s ease-in-out infinite;
+  transform-origin: 50% 85%;
+}
+.ripple {
+  position: absolute; left: 50%; top: 78%; width: 15rem; height: 3.2rem; translate: -50% -50%;
+  border-radius: 50%; border: 1.5px solid color-mix(in oklab, var(--cis) 40%, transparent);
+  animation: ripple 4.2s ease-out infinite;
+}
+.ripple.r2 { animation-delay: 1.4s; }
+.ripple.r3 { animation-delay: 2.8s; }
+
+@keyframes float { 50% { translate: 0 -10px; } }
+@keyframes bob { 0%, 100% { rotate: -3deg; } 50% { rotate: 3deg; } }
+@keyframes ripple { from { scale: .55; opacity: .9; } to { scale: 1.5; opacity: 0; } }
+
+@media (max-width: 860px) {
+  .login-wrap { grid-template-columns: 1fr; gap: 0; }
+  .login-art { grid-row: 1; min-height: 0; }
+  .pond { width: 10rem; height: 9rem; }
+  .duck { width: 6.5rem; }
+  .ripple { width: 8rem; height: 1.8rem; }
 }
 
-.primary:active { transform: scale(.97); }
+/* the logo in the header: a rubber duck that wobbles when you look at it */
+.mark img { width: 26px; height: 26px; transform-origin: 50% 80%; transition: rotate .2s; }
+.mark:hover img { animation: wobble .7s var(--ease); }
+@keyframes wobble { 20% { rotate: -14deg; } 45% { rotate: 10deg; } 70% { rotate: -5deg; } 100% { rotate: 0deg; } }
 
 /* ── view transitions ───────────────────────────────────── */
 
@@ -968,3 +1024,38 @@ a.what:hover { color: var(--cis); }
 .course-switch a.on { color: var(--ink); border-color: color-mix(in oklab, var(--moodle) 55%, transparent); background: color-mix(in oklab, var(--moodle) 10%, var(--tile)); }
 .tabs { scrollbar-width: none; }
 .tabs::-webkit-scrollbar { display: none; }
+
+/* main action button (login, composer, settings) */
+.primary {
+  min-height: 48px;
+  padding: 0 1.2rem;
+  border: 0;
+  border-radius: 12px;
+  background: var(--ink);
+  color: var(--bg);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform .3s var(--spring), opacity .2s;
+}
+.primary:hover { opacity: .92; }
+.primary:active { transform: scale(.97); }
+
+/* ── settings ───────────────────────────────────────────── */
+
+.settings-form { display: grid; gap: .75rem; margin-top: 1rem; max-width: 34rem; }
+.settings-form label { display: grid; gap: .35rem; font-size: .82rem; color: var(--dim); font-weight: 500; }
+.settings-form input {
+  font: inherit; min-height: 48px; padding: .6rem .85rem; border-radius: 12px;
+  border: 1px solid var(--line); background: var(--bg); color: var(--ink);
+}
+.settings-form input:focus { outline: none; border-color: color-mix(in oklab, var(--cis) 60%, transparent); box-shadow: 0 0 0 4px color-mix(in oklab, var(--cis) 16%, transparent); }
+.settings-form .primary { position: relative; display: grid; place-items: center; }
+.ev-status { margin: 0; display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; color: var(--text); }
+.form-msg:empty { display: none; }
+.mono-ish { overflow-wrap: anywhere; font-size: .88rem; }
+a.icon-btn { color: inherit; }
+.ext.ev { background: color-mix(in oklab, var(--ok) 14%, transparent); color: var(--ok); }
+.row.file .ext.ev { background: color-mix(in oklab, var(--ok) 14%, transparent); color: var(--ok); }
+.ev-filters { margin-bottom: .75rem; }
+.more-btn { margin-top: .75rem; width: 100%; }

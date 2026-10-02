@@ -502,5 +502,6 @@ func All() *Registry {
 	r.Add(cisTools()...)
 	r.Add(moodleTools()...)
 	r.Add(nakTools()...)
+	r.Add(eduvaultTools()...)
 	return r
 }

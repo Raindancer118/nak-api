@@ -1,4 +1,4 @@
-// nak web UI. Vanilla ES module; all data goes into the DOM via textContent,
+// naknak web UI. Vanilla ES module; all data goes into the DOM via textContent,
 // never as HTML, and inline styles are avoided (CSP) — custom properties are
 // set through the CSSOM instead.
 
@@ -25,9 +25,14 @@ function h(tag, props = {}, ...kids) {
   return el;
 }
 
+// Only in-app links (#…, /path) and https URLs; "//host" is protocol-relative
+// and would leave the site, "/\\host" is treated the same way by browsers.
 function safeHref(v) {
-  const s = String(v);
-  return s.startsWith("#") || s.startsWith("/") || s.startsWith("https://") ? s : "#";
+  const s = String(v ?? "").trim();
+  if (s.startsWith("#")) return s;
+  if (s.startsWith("/") && !s.startsWith("//") && !s.startsWith("/\\")) return s;
+  if (/^https:\/\/[^/\\]/i.test(s)) return s;
+  return "#";
 }
 
 const svg = (paths) => {
@@ -48,6 +53,7 @@ const icons = {
   light: ["M12 4V2", "M12 22v-2", "M4.9 4.9 3.5 3.5", "M20.5 20.5l-1.4-1.4", "M4 12H2", "M22 12h-2", "M4.9 19.1l-1.4 1.4", "M20.5 3.5l-1.4 1.4", "M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"],
   dark: ["M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"],
   back: ["M15 18l-6-6 6-6"],
+  gear: ["M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z", "M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"],
 };
 
 // ── API ─────────────────────────────────────────────────────────────────────
@@ -762,7 +768,7 @@ async function allAssignmentsPage(root) {
 }
 
 async function discussionPage(root, id) {
-  root.append(h("a", { class: "back", href: "javascript:history.back()" }, svg(icons.back), "zurück"));
+  root.append(h("a", { class: "back", href: "#", onclick: (e) => { e.preventDefault(); history.back(); } }, svg(icons.back), "zurück"));
   const head = h("div", { class: "page-head" }, h("h1", { text: "Diskussion" }));
   root.append(head);
   const box = h("div", { class: "thread" }, skeleton());
@@ -994,7 +1000,7 @@ function unitCard(u, i) {
 
 // The unified module page: CIS facts and every linked Moodle course.
 async function unitPage(root, nr, tab = "", courseArg = "") {
-  root.append(h("a", { class: "back", href: "javascript:history.back()" }, svg(icons.back), "zurück"));
+  root.append(h("a", { class: "back", href: "#", onclick: (e) => { e.preventDefault(); history.back(); } }, svg(icons.back), "zurück"));
   const title = h("h1", { text: nr });
   const head = h("div", { class: "page-head" }, title);
   root.append(head);
@@ -1031,7 +1037,12 @@ async function unitPage(root, nr, tab = "", courseArg = "") {
   const tNext = tile("Nächste Termine", { cls: "half", i: 2 });
   const tMoodle = tile("Moodle", { cls: "w6", i: 3 });
   const tNews = tile("Neu in Moodle", { cls: "w6", i: 4 });
-  grid.append(tGrade, tPlan, tNext, tMoodle, tNews);
+  const tEv = tile("Altklausuren · EduVault", { cls: "w12", i: 5 });
+  grid.append(tGrade, tPlan, tNext, tMoodle, tNews, tEv);
+  fill(tEv, () => api("eduvault_module_exams", { title: u?.title || nr }), evRows).then(() => {
+    const err = tEv.querySelector(".err");
+    if (err && /eingerichtet|Einstellungen/.test(err.textContent)) err.replaceWith(h("p", { class: "empty" }, "Hinterlege in den ", h("a", { href: "#/einstellungen", text: "Einstellungen" }), " deinen EduVault-Zugang, dann stehen hier die Altklausuren zu diesem Modul."));
+  });
   const data = api("nak_module", { module_nr: nr });
   fill(tGrade, () => data, (m) => gradeTile(m, u));
   const examsOf = (m) => dedupeExams([...(m.exams || []), ...(u?.exams || [])]);
@@ -1166,6 +1177,151 @@ async function courseTab(body, cid, tab) {
   }
 }
 
+// ── settings ────────────────────────────────────────────────────────────────
+
+async function settingsPage(root) {
+  root.append(h("div", { class: "page-head" }, h("h1", {}, "Einstellungen", h("small", { text: "Gilt für diese naknak-Instanz" }))));
+  const grid = h("div", { class: "grid" });
+  root.append(grid);
+  let st;
+  try {
+    st = await (await fetch("/api/settings", { credentials: "same-origin" })).json();
+  } catch (err) {
+    grid.append(errorBox(err));
+    return;
+  }
+
+  // EduVault
+  const ev = st.eduvault || {};
+  const tEv = tile("EduVault · Altklausuren", { cls: "w8", i: 0 });
+  const status = h("p", { class: "ev-status" }, ev.configured
+    ? [h("span", { class: "chip ok", text: "verbunden" }), ` ${ev.token_hint || ""} · ${ev.url}`, ev.source === "env" ? " (aus Umgebungsvariablen)" : ""]
+    : [h("span", { class: "chip", text: "nicht eingerichtet" }), " Mit Zugangsdaten zeigt naknak auf jeder Modulseite die passenden Altklausuren."]);
+  const url = h("input", { name: "url", type: "url", value: ev.url || "https://eduvault4.de", autocomplete: "off", spellcheck: "false" });
+  const token = h("input", { name: "token", autocomplete: "off", spellcheck: "false", placeholder: "evm_…" });
+  const secret = h("input", { name: "secret", type: "password", autocomplete: "off", spellcheck: "false", placeholder: "Base32, z.B. JBSW…" });
+  const msg = h("div", { class: "form-msg", "aria-live": "polite" });
+  const save = h("button", { class: "primary", type: "submit" }, h("span", { class: "label", text: "Prüfen & speichern" }), h("span", { class: "spin", "aria-hidden": "true" }));
+  const form = h("form", { class: "settings-form" },
+    h("label", {}, "Adresse", url),
+    h("label", {}, "Token", token),
+    h("label", {}, "TOTP-Secret", secret),
+    h("p", { class: "empty", text: "Beides bekommst du in EduVault unter Profil → MCP / KI-Zugang → Zugangsdaten erstellen. naknak prüft die Daten mit einer Anmeldung, bevor es sie speichert; sie verlassen diesen Server danach nur Richtung EduVault." }),
+    h("div", { class: "row-actions" }, save,
+      ev.configured && ev.source === "settings" && h("button", { class: "ghost", type: "button", text: "Entfernen", onclick: async () => {
+        await fetch("/api/settings/eduvault", { method: "DELETE", credentials: "same-origin" });
+        unitsP = null;
+        render();
+      } })),
+    msg);
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    save.classList.add("busy");
+    save.disabled = true;
+    msg.replaceChildren();
+    try {
+      const res = await fetch("/api/settings/eduvault", {
+        method: "PUT", credentials: "same-origin", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: url.value, token: token.value, secret: secret.value }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+      msg.replaceChildren(h("p", { class: "ok-note", text: "Verbunden. Altklausuren erscheinen jetzt auf den Modulseiten." }));
+      token.value = secret.value = "";
+      setTimeout(render, 900);
+    } catch (err) {
+      msg.replaceChildren(errorBox(err));
+    } finally {
+      save.classList.remove("busy");
+      save.disabled = false;
+    }
+  });
+  tEv.append(status, form);
+
+  // account & instance
+  const acc = st.account || {};
+  const tAcc = tile("Konto & Instanz", { i: 1 },
+    h("dl", { class: "kv" },
+      h("dt", { text: "NAK-Konto" }), h("dd", { text: acc.user || "–" }),
+      h("dt", { text: "Herkunft" }), h("dd", { text: acc.source === "env" ? "Umgebungsvariablen" : acc.source === "file" ? "Web-Anmeldung" : "–" }),
+      h("dt", { text: "Modus" }), h("dd", {}, st.read_only ? h("span", { class: "chip due", text: "nur lesen" }) : h("span", { class: "chip ok", text: "voll" })),
+      h("dt", { text: "Version" }), h("dd", { text: st.version || "–" }),
+      h("dt", { text: "Daten" }), h("dd", { class: "mono-ish", text: st.data_dir || "–" })));
+
+  // appearance
+  const tLook = tile("Darstellung", { i: 2 });
+  const cur = localStorage.getItem("nak-theme") || "system";
+  const seg = h("div", { class: "filters", role: "group", "aria-label": "Design" }, themes.map((t) =>
+    h("button", { type: "button", "aria-pressed": t === cur ? "true" : "false", text: { system: "System", light: "Hell", dark: "Dunkel" }[t], onclick: (e) => {
+      localStorage.setItem("nak-theme", t);
+      for (const b of seg.children) b.setAttribute("aria-pressed", b === e.currentTarget ? "true" : "false");
+      applyTheme(t);
+    } })));
+  tLook.append(seg, h("p", { class: "empty meter", text: "Bewegungen richten sich nach „Bewegung reduzieren“ im Betriebssystem." }));
+
+  // cache
+  const tCache = tile("Zwischenspeicher", { cls: "w8", i: 3 },
+    h("p", { class: "empty", text: "naknak merkt sich Antworten von CIS und Moodle und zeigt sie sofort an; veraltete Daten werden im Hintergrund erneuert (Nachrichten nach 1 Minute, Fristen nach 5, Stundenplan nach 30, Noten nach 2 Stunden)." }),
+    h("div", { class: "row-actions" }, h("button", { class: "ghost", type: "button", text: "Zwischenspeicher leeren", onclick: async (e) => {
+      e.currentTarget.disabled = true;
+      await fetch("/api/cache/clear", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: "{}" });
+      unitsP = null;
+      alertBox("Zwischenspeicher geleert.");
+      e.currentTarget.disabled = false;
+    } })));
+  grid.append(tEv, tAcc, tLook, tCache);
+}
+
+// ── EduVault on module pages ────────────────────────────────────────────────
+
+const evType = { exam: "Klausur", probeklausur: "Probeklausur", note: "Lernzettel", script: "Skript" };
+
+function evRows(r) {
+  const docs = r.documents || [];
+  if (!docs.length) return emptyRow(`Noch keine Altklausuren zu „${r.module}“ in EduVault.`);
+  let filter = "all", all = false;
+  const counts = { exam: 0, probeklausur: 0, solved: 0 };
+  for (const d of docs) { if (d.type in counts) counts[d.type]++; if (d.has_solutions) counts.solved++; }
+  const list = h("ul", { class: "rows" });
+  const more = h("button", { class: "ghost more-btn", type: "button" });
+  const draw = () => {
+    const shown = docs.filter((d) => filter === "all" || (filter === "solved" ? d.has_solutions : d.type === filter));
+    list.replaceChildren(...(all ? shown : shown.slice(0, 8)).map((d, j) => h("li", {}, h("button", { class: "row file", type: "button", vars: { "--j": Math.min(j, 12) }, onclick: (e) => openEduVault(d.id, e.currentTarget) },
+      h("span", { class: "ext ev", text: /^\d{4}$/.test(String(d.jahr)) ? String(d.jahr).slice(-2) : "EV" }),
+      h("span", { class: "t" }, `${evType[d.type] || "Dokument"} ${d.jahr || ""}`.trim(), h("span", { class: "s", text: [d.modul, Array.isArray(d.dozenten) ? d.dozenten.join(", ") : d.dozenten, Number(d.rating) > 0 && `★ ${Number(d.rating).toFixed(1)}`, d.download_count > 0 && `${d.download_count}× geladen`].filter(Boolean).join(" · ") })),
+      h("span", { class: `chip ${d.has_solutions ? "ok" : ""}`, text: d.has_solutions ? "mit Lösung" : "öffnen" })))));
+    if (!shown.length) list.append(h("li", { class: "empty", text: "Keine Dokumente in dieser Auswahl." }));
+    more.hidden = shown.length <= 8;
+    more.textContent = all ? "Weniger anzeigen" : `Alle ${shown.length} anzeigen`;
+  };
+  more.addEventListener("click", () => { all = !all; draw(); });
+  const opts = [["all", `Alle ${docs.length}`], ["exam", `Klausuren ${counts.exam}`], ["probeklausur", `Probeklausuren ${counts.probeklausur}`], ["solved", `mit Lösung ${counts.solved}`]].filter(([k], i) => i === 0 || (k === "solved" ? counts.solved : counts[k]));
+  const filters = h("div", { class: "filters ev-filters", role: "group", "aria-label": "Auswahl" }, opts.map(([k, label]) =>
+    h("button", { type: "button", "aria-pressed": k === filter ? "true" : "false", text: label, onclick: (e) => {
+      filter = k;
+      all = false;
+      for (const b of filters.children) b.setAttribute("aria-pressed", b === e.currentTarget ? "true" : "false");
+      draw();
+    } })));
+  draw();
+  return [filters, list, more];
+}
+
+async function openEduVault(id, btn) {
+  const win = window.open("", "_blank");
+  btn?.classList.add("busy");
+  try {
+    const r = await post("eduvault_download", { exam_id: id });
+    if (!r.download_url) throw new Error("Datei konnte nicht bereitgestellt werden");
+    if (win) win.location = `${r.download_url}?inline=1`;
+  } catch (err) {
+    win?.close();
+    alertBox(err.message);
+  } finally {
+    btn?.classList.remove("busy");
+  }
+}
+
 // ── header, theme, routing ──────────────────────────────────────────────────
 
 const routes = [
@@ -1179,6 +1335,7 @@ const routes = [
   [/^#\/neu$/, newsPage, "#/neu"],
   [/^#\/nachrichten(?:\/(\d+))?$/, messagesPage, "#/nachrichten"],
   [/^#\/noten$/, gradesPage, "#/noten"],
+  [/^#\/einstellungen$/, settingsPage, "#/einstellungen"],
   [/^#\/module$/, unitsPage, "#/kurse"],
   [/^#\/modul\/([A-Z]{1,2}\d{3})(?:\/(inhalt|forum|abgaben))?(?:\/(\d+))?$/, unitPage, "#/kurse"],
   [/^#\/module\/([A-Za-z]{1,2}\d{3})$/, (root, nr) => { location.replace(`#/modul/${nr.toUpperCase()}`); }, "#/kurse"],
@@ -1229,11 +1386,12 @@ function header() {
     try { await render(); } finally { fresh = false; refresh.classList.remove("spin"); }
   });
   return h("header", { class: "top" }, h("div", { class: "top-in" },
-    h("a", { class: "mark", href: "#/", "aria-label": "nak – Übersicht" }, h("i"), "nak"),
+    h("a", { class: "mark", href: "#/", "aria-label": "naknak – Übersicht" }, h("img", { src: "/assets/naknak.svg", alt: "", width: 26, height: 26 }), "naknak"),
     h("nav", { "aria-label": "Bereiche" }, links.map(([t, href]) => h("a", { href, text: t }))),
     h("div", { class: "tools" },
       h("span", { class: "stamp", "aria-live": "polite" }),
       refresh,
+      h("a", { class: "icon-btn", href: "#/einstellungen", title: "Einstellungen", "aria-label": "Einstellungen" }, svg(icons.gear)),
       h("button", { class: "icon-btn theme-btn", type: "button", onclick: switchTheme }),
       h("form", { method: "post", action: "/logout" }, h("button", { class: "icon-btn", type: "submit", title: "Abmelden", "aria-label": "Abmelden" }, svg(["M15 4h4v16h-4", "M10 8l-4 4 4 4", "M6 12h10"]))))));
 }
