@@ -36,7 +36,7 @@ public class NextUpWidget extends AppWidgetProvider {
         try {
             String raw = Prefs.of(c).getString(Prefs.WIDGET_JSON, null);
             JSONObject cache = raw == null ? new JSONObject() : new JSONObject(raw);
-            if (cache.optBoolean("login")) {
+            if (cache.optBoolean("login") && cache.optJSONObject("agenda") == null) {
                 v.setTextViewText(R.id.title, c.getString(R.string.widget_login));
                 v.setTextViewText(R.id.detail, "");
                 v.setViewVisibility(R.id.badge, View.GONE);
@@ -51,7 +51,7 @@ public class NextUpWidget extends AppWidgetProvider {
                     v.setViewVisibility(R.id.badge, View.VISIBLE);
                 } else {
                     v.setTextViewText(R.id.title, c.getString(agenda == null ? R.string.widget_loading : R.string.widget_free));
-                    v.setTextViewText(R.id.detail, "");
+                    v.setTextViewText(R.id.detail, agenda == null && cache.has("error") ? c.getString(R.string.widget_error, cache.optString("error")) : "");
                     v.setViewVisibility(R.id.badge, View.GONE);
                 }
                 JSONObject dl = cache.optJSONObject("deadlines");

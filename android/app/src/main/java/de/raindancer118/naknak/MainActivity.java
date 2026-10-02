@@ -264,6 +264,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onStart() {
         super.onStart();
+        WidgetWorker.now(this);
         if (web == null) return;
         boolean lock = Prefs.lock(this);
         // no screenshots / recents preview of grades while the lock is on

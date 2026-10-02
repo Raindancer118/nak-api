@@ -12,7 +12,9 @@ import androidx.preference.Preference;
 import androidx.preference.PreferenceFragmentCompat;
 import androidx.preference.SwitchPreferenceCompat;
 import androidx.work.OneTimeWorkRequest;
+import androidx.work.WorkInfo;
 import androidx.work.WorkManager;
+import org.json.JSONObject;
 
 public class SettingsActivity extends AppCompatActivity {
     @Override
@@ -66,8 +68,22 @@ public class SettingsActivity extends AppCompatActivity {
             if (now != null) now.setOnPreferenceClickListener(p -> {
                 WorkManager wm = WorkManager.getInstance(requireContext());
                 wm.enqueue(OneTimeWorkRequest.from(NotifyWorker.class));
-                wm.enqueue(OneTimeWorkRequest.from(WidgetWorker.class));
+                OneTimeWorkRequest widgets = OneTimeWorkRequest.from(WidgetWorker.class);
+                wm.enqueue(widgets);
                 Toast.makeText(requireContext(), R.string.checking, Toast.LENGTH_SHORT).show();
+                // say what came of it: the widgets' cache records the last error
+                wm.getWorkInfoByIdLiveData(widgets.getId()).observe(this, info -> {
+                    if (info == null || !(info.getState().isFinished() || info.getRunAttemptCount() > 0 && info.getState() == WorkInfo.State.ENQUEUED)) return;
+                    String err = null, raw = Prefs.of(requireContext()).getString(Prefs.WIDGET_JSON, "{}");
+                    try {
+                        JSONObject cache = new JSONObject(raw);
+                        if (cache.optBoolean("login")) err = getString(R.string.widget_login);
+                        else if (cache.has("error")) err = cache.optString("error");
+                    } catch (Exception ignored) {
+                    }
+                    Toast.makeText(requireContext(), err == null ? getString(R.string.check_done) : getString(R.string.check_failed, err), Toast.LENGTH_LONG).show();
+                    wm.getWorkInfoByIdLiveData(widgets.getId()).removeObservers(this);
+                });
                 return true;
             });
             Preference pin = findPreference("widget_pin");

@@ -76,4 +76,7 @@
     <string name="preview_next_row">morgen · Übungsblatt 4</string>
     <string name="preview_grade_avg">2,1</string>
     <string name="preview_grade_credits">126 Credits</string>
+    <string name="widget_error">Nicht aktualisiert: %1$s</string>
+    <string name="check_done">Geprüft: alles aktuell.</string>
+    <string name="check_failed">Geprüft, aber: %1$s</string>
 </resources>

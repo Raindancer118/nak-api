@@ -53,12 +53,10 @@ public class GradeWidget extends AppWidgetProvider {
             String raw = Prefs.of(c).getString(Prefs.WIDGET_JSON, null);
             JSONObject cache = raw == null ? new JSONObject() : new JSONObject(raw);
             JSONObject grades = cache.optJSONObject("grades");
-            if (cache.optBoolean("login")) {
+            if (grades == null) {
                 v.setTextViewText(R.id.grade_avg, c.getString(R.string.grade_placeholder));
-                v.setTextViewText(R.id.grade_credits, c.getString(R.string.widget_login));
-            } else if (grades == null) {
-                v.setTextViewText(R.id.grade_avg, c.getString(R.string.grade_placeholder));
-                v.setTextViewText(R.id.grade_credits, c.getString(R.string.widget_loading));
+                v.setTextViewText(R.id.grade_credits, cache.optBoolean("login") ? c.getString(R.string.widget_login)
+                    : cache.has("error") ? c.getString(R.string.widget_error, cache.optString("error")) : c.getString(R.string.widget_loading));
             } else {
                 GradeSummary s = GradeSummary.from(grades);
                 v.setTextViewText(R.id.grade_avg, hidden ? c.getString(R.string.grade_hidden) : s.average);
