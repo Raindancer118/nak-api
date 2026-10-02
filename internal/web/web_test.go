@@ -3,6 +3,7 @@ package web
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/cookiejar"
@@ -767,5 +768,32 @@ func TestPageLoadExtendsSession(t *testing.T) {
 	}
 	if res.StatusCode != 200 || again == nil || again.Value != sess.Value || again.MaxAge < 30*24*3600 || !again.HttpOnly {
 		t.Fatalf("page load must renew the session cookie: %d %+v", res.StatusCode, again)
+	}
+}
+
+func TestNavSettings(t *testing.T) {
+	h := newHarness(t)
+	h.app.ConfigDir = t.TempDir()
+	get := func() []any {
+		m := decode(t, h.do(t, "GET", "/api/settings", "", bearer))
+		nav, _ := m["nav"].([]any)
+		return nav
+	}
+	if n := get(); len(n) != 6 || n[0] != "start" {
+		t.Fatalf("default nav = %v", n)
+	}
+	if res := h.do(t, "PUT", "/api/settings/nav", `{"nav":["noten","start","pruefungen"]}`, bearer); res.StatusCode != 200 {
+		t.Fatalf("save: %d", res.StatusCode)
+	}
+	if n := get(); fmt.Sprint(n) != "[noten start pruefungen]" {
+		t.Fatalf("saved nav = %v", n)
+	}
+	for _, bad := range []string{`{"nav":["start"]}`, `{"nav":["start","start"]}`, `{"nav":["start","evil"]}`, `{"nav":["start","woche","kurse","inbox","noten","studium","pruefungen","abgaben"]}`} {
+		if res := h.do(t, "PUT", "/api/settings/nav", bad, bearer); res.StatusCode != 400 {
+			t.Errorf("%s: %d, want 400", bad, res.StatusCode)
+		}
+	}
+	if res := h.do(t, "PUT", "/api/settings/nav", `{"nav":[]}`, bearer); res.StatusCode != 200 || len(get()) != 6 {
+		t.Errorf("empty list must reset to the default")
 	}
 }

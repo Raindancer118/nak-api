@@ -1545,6 +1545,103 @@ async function courseTab(body, cid, tab) {
 
 // ── settings ────────────────────────────────────────────────────────────────
 
+function navSettings(st) {
+  let order = [...(st.nav || defaultNav)];
+  const all = (st.nav_items || Object.keys(navDefs)).filter((id) => navDefs[id]);
+  const list = h("ol", { class: "nav-edit" });
+  const msg = h("div", { class: "form-msg", "aria-live": "polite" });
+  const draw = () => {
+    const off = all.filter((id) => !order.includes(id));
+    list.replaceChildren(...[...order, ...off].map((id) => {
+      const on = order.includes(id);
+      const i = order.indexOf(id);
+      const move = (d) => { [order[i], order[i + d]] = [order[i + d], order[i]]; draw(); };
+      const box = h("input", { type: "checkbox", "aria-label": `${navDefs[id][0]} in der Leiste`, ...(on ? { checked: true } : {}) });
+      box.addEventListener("change", () => {
+        if (box.checked && order.length >= 7) { box.checked = false; msg.replaceChildren(h("p", { class: "empty", text: "Mehr als 7 passen nicht in die Leiste." })); return; }
+        if (!box.checked && order.length <= 2) { box.checked = true; msg.replaceChildren(h("p", { class: "empty", text: "Mindestens 2 Einträge." })); return; }
+        order = box.checked ? [...order, id] : order.filter((x) => x !== id);
+        msg.replaceChildren();
+        draw();
+      });
+      const grip = on && h("button", { class: "grip", type: "button", "aria-label": `${navDefs[id][0]} verschieben (Pfeiltasten)` }, svg(["M9 6h.01", "M15 6h.01", "M9 12h.01", "M15 12h.01", "M9 18h.01", "M15 18h.01"]));
+      if (grip) {
+        grip.addEventListener("pointerdown", (e) => dragRow(e, grip, i));
+        grip.addEventListener("keydown", (e) => {
+          const d = e.key === "ArrowUp" ? -1 : e.key === "ArrowDown" ? 1 : 0;
+          if (!d || !order[i + d]) return;
+          e.preventDefault();
+          reorder(i, i + d);
+          list.querySelectorAll(".grip")[i + d]?.focus();
+        });
+      }
+      return h("li", { class: on ? "on" : "off" }, h("label", {}, box, svg(navDefs[id][3]), h("span", { text: navDefs[id][0] })), grip);
+    }));
+  };
+  const reorder = (from, to) => {
+    const [id] = order.splice(from, 1);
+    order.splice(to, 0, id);
+    draw();
+  };
+  // touch-friendly drag: the row follows the finger, the others make room
+  const dragRow = (e, grip, from) => {
+    e.preventDefault();
+    const rows = [...list.querySelectorAll("li.on")];
+    const li = rows[from];
+    const rects = rows.map((r) => r.getBoundingClientRect());
+    const step = rows.length > 1 ? Math.abs(rects[1].top - rects[0].top) : rects[0].height;
+    const y0 = e.clientY;
+    let to = from;
+    grip.setPointerCapture(e.pointerId);
+    window.NaknakApp?.holdGesture?.(true); // the Android app's pull-to-refresh
+    li.classList.add("dragging");
+    const move = (ev) => {
+      const dy = Math.max(rects[0].top - rects[from].top, Math.min(rects[rows.length - 1].top - rects[from].top, ev.clientY - y0));
+      li.style.translate = `0 ${dy}px`;
+      const center = rects[from].top + rects[from].height / 2 + dy;
+      to = rows.filter((r, k) => k !== from && rects[k].top + rects[k].height / 2 < center).length;
+      rows.forEach((r, k) => {
+        if (k === from) return;
+        const shift = from < to && k > from && k <= to ? -step : to < from && k >= to && k < from ? step : 0;
+        r.style.translate = shift ? `0 ${shift}px` : "";
+      });
+    };
+    const end = () => {
+      grip.removeEventListener("pointermove", move);
+      grip.removeEventListener("pointerup", end);
+      grip.removeEventListener("pointercancel", end);
+      window.NaknakApp?.holdGesture?.(false);
+      rows.forEach((r) => { r.style.translate = ""; });
+      li.classList.remove("dragging");
+      if (to !== from) reorder(from, to);
+    };
+    grip.addEventListener("pointermove", move);
+    grip.addEventListener("pointerup", end);
+    grip.addEventListener("pointercancel", end);
+  };
+  const save = async (nav) => {
+    try {
+      const res = await fetch("/api/settings/nav", { method: "PUT", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ nav }) });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+      order = [...body.nav];
+      applyNav(body.nav);
+      draw();
+      msg.replaceChildren(h("p", { class: "ok-note", text: "Gespeichert. Gilt in der App und im Browser." }));
+    } catch (err) {
+      msg.replaceChildren(errorBox(err));
+    }
+  };
+  draw();
+  return tile("Navigationsleiste", { cls: "w6", i: 0 },
+    h("p", { class: "empty", text: "Was unten in der Leiste steht (2 bis 7 Einträge); zum Umsortieren am Griff ziehen." }),
+    list,
+    h("div", { class: "row-actions" },
+      h("button", { class: "primary", type: "button", text: "Speichern", onclick: () => save(order) }),
+      h("button", { class: "ghost", type: "button", text: "Standard", onclick: () => save([]) })),
+    msg);
+}
+
 async function settingsPage(root) {
   root.append(h("div", { class: "page-head" }, h("h1", {}, "Einstellungen", h("small", { text: "Gilt für diese naknak-Instanz" }))));
   const grid = h("div", { class: "grid" });
@@ -1563,6 +1660,8 @@ async function settingsPage(root) {
       h("p", { class: "empty", text: `Version ${window.NaknakApp.version()}. App-Sperre, Benachrichtigungen und Server stellst du in der App selbst ein.` }),
       h("div", { class: "row-actions" }, h("button", { class: "primary", type: "button", text: "App-Einstellungen", onclick: () => window.NaknakApp.openSettings() }))));
   }
+
+  grid.append(navSettings(st));
 
   // EduVault
   const ev = st.eduvault || {};
@@ -1984,14 +2083,38 @@ const previewLabels = {
   zenturien: "Gruppe", section: "Bereich", message: "Nachricht", subject: "Betreff", text: "Text", course: "Kurs", name: "Name",
   files: "Dateien", online_text: "Online-Text", submit_for_grading: "Endgültig einreichen", assignment: "Aufgabe", to: "An",
   conversation: "Unterhaltung", forum: "Forum", discussion: "Diskussion", count: "Anzahl", would: "Würde", status: "Status",
+  email: "Private E-Mail", mobile: "Mobil", phone: "Festnetz", fax: "Fax", infopost: "Infopost", strasse: "Straße", plz: "PLZ", ort: "Ort",
+  zusatz: "Zusatz", delete: "Löschen", noten_betrieb: "Noten für den Betrieb", anmeldungen_betrieb: "Anmeldungen für den Betrieb", conversations: "Unterhaltungen", names: "Namen",
 };
-const previewSkip = /(^|_)(id|ids|url|urls|token|cmid|hash)$|^(next|mode|tool|deadlines|action_url|days_until_exam)$/;
+const previewSkip = /(^|_)(id|ids|url|urls|token|cmid|hash)$|^(next|mode|tool|deadlines|action_url|days_until_exam|request|type)$/;
 
 // previewView turns a tool preview into a readable list: German labels,
 // no ids or URLs, nested objects flattened one level.
+// CIS form fields as they appear in a preview's changes, readable
+const fieldLabels = {
+  "telefon.mobil": "Mobil", "telefon.fest": "Festnetz", "telefon.fax": "Fax", "email.privat": "Private E-Mail", "email.infopost": "Infopost",
+  notenfreigabe: "Noten für den Betrieb", anmeldungfreigabe: "Anmeldungen für den Betrieb", Fest: "Festnetz (Kommiliton:innen)", Mail: "E-Mail (Kommiliton:innen)",
+};
+const shareLevels = { 0: "nicht anzeigen", 1: "nur meine Zenturie", 2: "alle Zenturien" };
+
+function changeRow(c) {
+  const i = c.field.indexOf("[");
+  const key = i < 0 ? c.field : c.field.slice(i).replace(/\]\[/g, ".").replace(/[[\]]/g, "");
+  const yesNo = /freigabe|infopost/.test(key);
+  const kommi = ["Name", "Firma", "Geburtsdatum", "Adresse", "Fest", "Mobil", "Mail"].includes(key);
+  const show = (v) => v === "" ? "leer" : yesNo ? (v === "1" ? "ja" : "nein") : kommi ? shareLevels[v] || v : v;
+  return [h("dt", { text: fieldLabels[key] || (kommi ? `${key} (Kommiliton:innen)` : key.split(".").pop()) }), h("dd", { text: `${show(c.old)} → ${show(c.new)}` })];
+}
+
 function previewView(pre) {
   const p = pre?.preview ?? pre;
   if (typeof p === "string") return h("pre", { text: p });
+  // several form submissions behind one action (e.g. e-mail and phone)
+  if (Array.isArray(p) && p.length && p.every((x) => x && typeof x === "object")) return h("div", { class: "preview-list" }, p.map(previewView));
+  if (p && Array.isArray(p.changes) && p.changes.every((c) => c && typeof c.field === "string")) {
+    return h("dl", { class: "kv" }, p.action && [h("dt", { text: "Aktion" }), h("dd", { text: p.action })],
+      p.changes.length ? p.changes.map(changeRow) : [h("dt", { text: "Änderungen" }), h("dd", { text: "keine" })]);
+  }
   const rows = [];
   const val = (v) => Array.isArray(v) ? v.map((x) => typeof x === "object" ? JSON.stringify(x) : String(x)).join(", ") : typeof v === "boolean" ? (v ? "ja" : "nein") : String(v);
   const walk = (obj, depth) => {
@@ -2255,12 +2378,119 @@ function certsTab(grid) {
 
 function profileTab(grid) {
   const t = tile("Meine Daten", { cls: "w8", i: 0 });
-  const tSide = tile("Freigaben & Konto", { i: 1 });
-  grid.append(t, tSide);
+  const tSide = tile("Konto", { i: 1 });
+  const tContact = tile("Kontakt ändern", { cls: "w6", i: 2 });
+  const tAddr = tile("Adresse ändern", { cls: "w6", i: 3 });
+  const tShare = tile("Freigaben ändern", { cls: "w12", i: 4 });
+  grid.append(t, tSide, tContact, tAddr, tShare);
   fill(t, () => api("cis_profile"), (p) => h("div", { class: "sens" }, genericView(p.all || p)));
-  fill(tSide, () => Promise.allSettled([api("cis_sharing"), api("cis_balance")]), ([sh, bal]) => [
-    sh.status === "fulfilled" && genericView(sh.value), bal.status === "fulfilled" && genericView(bal.value),
-    h("p", { class: "empty meter", text: "Ändern geht hier noch nicht; das CIS-Profil bleibt dafür zuständig." })]);
+  fill(tSide, () => api("cis_balance"), (bal) => genericView(bal));
+  fill(tContact, () => api("cis_contact"), contactForm);
+  fill(tAddr, () => api("cis_address"), addressForm);
+  fill(tShare, () => api("cis_sharing"), sharingForm);
+}
+
+// The profile forms send only what was changed, behind the usual preview and
+// confirmation; nothing reaches the CIS before "Ja, ändern".
+function field(label, input) {
+  return h("label", {}, label, input);
+}
+
+function changes(pairs) {
+  const out = {};
+  for (const [key, el, old] of pairs) {
+    const v = el.type === "checkbox" ? el.checked : el.value.trim();
+    if (v !== (el.type === "checkbox" ? Boolean(old) : String(old ?? "").trim())) out[key] = v;
+  }
+  return out;
+}
+
+function noChange(form) {
+  form.querySelector(".form-msg")?.replaceChildren(h("p", { class: "empty", text: "Nichts geändert." }));
+  return null;
+}
+
+function contactForm(c) {
+  const email = h("input", { type: "email", value: c.email_privat || "", autocomplete: "email", spellcheck: "false" });
+  const mobile = h("input", { type: "tel", value: c.telefon_mobil || "", placeholder: "0170-1234567", autocomplete: "tel" });
+  const phone = h("input", { type: "tel", value: c.telefon_festnetz || "", placeholder: "040-123456" });
+  const fax = h("input", { type: "tel", value: c.fax || "" });
+  const infopost = h("input", { type: "checkbox", ...(c.infopost ? { checked: true } : {}) });
+  const form = h("form", { class: "settings-form sens", onsubmit: (e) => e.preventDefault() },
+    field("Private E-Mail", email), field("Mobil", mobile), field("Festnetz", phone), field("Fax", fax),
+    h("label", { class: "check" }, infopost, "Infopost nach dem Studium"),
+    h("p", { class: "empty", text: "Telefon als Vorwahl-Rufnummer; ein leeres Feld löscht die Nummer im CIS." }),
+    h("div", { class: "form-msg", "aria-live": "polite" }));
+  form.append(confirmFlow({
+    tool: "cis_update_contact", label: "Änderungen prüfen", confirm: "Ja, ändern", cls: "primary", done: refreshPage,
+    args: () => {
+      const d = changes([["email", email, c.email_privat], ["mobile", mobile, c.telefon_mobil], ["phone", phone, c.telefon_festnetz], ["fax", fax, c.fax], ["infopost", infopost, c.infopost]]);
+      return Object.keys(d).length ? d : noChange(form);
+    },
+  }));
+  return form;
+}
+
+function addressForm(a) {
+  const types = a.available_types || {};
+  const type = h("select", {}, Object.entries(types).map(([id, name]) => h("option", { value: id, text: name, ...(id === a.type_id ? { selected: true } : {}) })));
+  const box = h("div", {});
+  const draw = (cur) => {
+    const zusatz = h("input", { value: cur.adresszusatz || "" });
+    const strasse = h("input", { value: cur.strasse || "", autocomplete: "street-address" });
+    const plz = h("input", { value: cur.plz || "", inputmode: "numeric", autocomplete: "postal-code", class: "short-in" });
+    const ort = h("input", { value: cur.ort || "", autocomplete: "address-level2" });
+    const form = h("form", { class: "settings-form", onsubmit: (e) => e.preventDefault() },
+      field("Straße und Nr.", strasse), field("Zusatz", zusatz), h("div", { class: "pair" }, field("PLZ", plz), field("Ort", ort)),
+      cur.letter_form && h("p", { class: "empty", text: `So steht es in Briefen: ${cur.letter_form}` }),
+      h("div", { class: "form-msg", "aria-live": "polite" }));
+    form.append(confirmFlow({
+      tool: "cis_update_address", label: "Änderungen prüfen", confirm: "Ja, ändern", cls: "primary", done: refreshPage,
+      args: () => {
+        const d = changes([["zusatz", zusatz, cur.adresszusatz], ["strasse", strasse, cur.strasse], ["plz", plz, cur.plz], ["ort", ort, cur.ort]]);
+        return Object.keys(d).length ? { type: cur.type_id || type.value, ...d } : noChange(form);
+      },
+    }));
+    // the main address cannot be removed, others (e.g. Semesteradresse) can
+    if (cur.strasse && (cur.type_id || type.value) !== Object.keys(types)[0]) {
+      form.append(confirmFlow({ tool: "cis_update_address", args: { type: cur.type_id || type.value, delete: true }, label: "Diese Adresse löschen", confirm: "Ja, löschen", done: refreshPage }));
+    }
+    box.replaceChildren(h("div", { class: "sens" }, form));
+  };
+  type.addEventListener("change", async () => {
+    box.replaceChildren(...skeleton());
+    try { draw(await api("cis_address", { type: type.value })); } catch (err) { box.replaceChildren(errorBox(err)); }
+  });
+  draw(a);
+  return [Object.keys(types).length > 1 && h("div", { class: "settings-form" }, field("Adresstyp", type)), box];
+}
+
+function sharingForm(sh) {
+  const b = sh.betrieb || {};
+  const levels = sh.levels || { 0: "nicht anzeigen", 1: "nur meine Zenturie", 2: "alle Zenturien" };
+  const noten = h("input", { type: "checkbox", ...(b.noten_fuer_betrieb_freigegeben ? { checked: true } : {}) });
+  const anm = h("input", { type: "checkbox", ...(b.pruefungsanmeldungen_fuer_betrieb_freigegeben ? { checked: true } : {}) });
+  const order = ["Name", "Firma", "Geburtsdatum", "Adresse", "Fest", "Mobil", "Mail"]; // as in the CIS
+  const cur = Object.fromEntries(Object.entries(sh.kommilitonen || {}).sort(([a], [b]) => order.indexOf(a) - order.indexOf(b)).map(([k, v]) => [k, String(v).trim().charAt(0)]));
+  const selects = Object.entries(cur).map(([k, v]) => [k, h("select", { "aria-label": k }, Object.entries(levels).map(([id, label]) => h("option", { value: id, text: label, ...(id === v ? { selected: true } : {}) })))]);
+  const label = { Fest: "Festnetz", Mail: "E-Mail" };
+  const form = h("form", { class: "settings-form", onsubmit: (e) => e.preventDefault() },
+    h("h2", { class: "sub", text: "Ausbildungsbetrieb" }),
+    h("label", { class: "check" }, noten, "Noten für den Betrieb freigeben"),
+    h("label", { class: "check" }, anm, "Prüfungs- und Transferanmeldungen für den Betrieb freigeben"),
+    selects.length > 0 && h("h2", { class: "sub", text: "Für Kommiliton:innen sichtbar" }),
+    selects.length > 0 && h("div", { class: "share-grid" }, selects.map(([k, sel]) => field(label[k] || k, sel))),
+    h("div", { class: "form-msg", "aria-live": "polite" }));
+  form.append(confirmFlow({
+    tool: "cis_set_sharing", label: "Änderungen prüfen", confirm: "Ja, ändern", cls: "primary", done: refreshPage,
+    args: () => {
+      const d = changes([["noten_betrieb", noten, b.noten_fuer_betrieb_freigegeben], ["anmeldungen_betrieb", anm, b.pruefungsanmeldungen_fuer_betrieb_freigegeben]]);
+      const k = Object.fromEntries(selects.filter(([key, sel]) => sel.value !== cur[key]).map(([key, sel]) => [key, sel.value]));
+      if (Object.keys(k).length) d.kommilitonen = k;
+      return Object.keys(d).length ? d : noChange(form);
+    },
+  }));
+  return form;
 }
 
 // ── header, theme, routing ──────────────────────────────────────────────────
@@ -2352,16 +2582,46 @@ function switchTheme(e) {
   document.startViewTransition(() => applyTheme(next)).finished.finally(() => root.classList.remove("theme-switch"));
 }
 
+// every page the navigation bar can hold: [label, short label for the phone
+// tab bar, route, icon]; which ones and their order is a setting
+const navDefs = {
+  start: ["Übersicht", "Start", "#/", ["M3 11l9-7 9 7", "M5 10v10h14V10", "M10 20v-6h4v6"]],
+  woche: ["Woche", "Woche", "#/woche", ["M4 6h16v14H4z", "M4 10h16", "M9 3v4", "M15 3v4"]],
+  kurse: ["Kurse", "Kurse", "#/kurse", ["M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z", "M4 19V5", "M8 7h7"]],
+  inbox: ["Inbox", "Inbox", "#/nachrichten", ["M4 5h16v11H8l-4 4z"]],
+  noten: ["Noten", "Noten", "#/noten", ["M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.4 6.8 19.1l1-5.8L3.5 9.2l5.9-.9z"]],
+  studium: ["Studium", "Studium", "#/studium", ["M2 9l10-5 10 5-10 5z", "M6 11v5c3 2 9 2 12 0v-5", "M22 9v6"]],
+  pruefungen: ["Prüfungen", "Prüfung", "#/pruefungen", ["M6 3h9l4 4v14H6z", "M14 3v5h5", "M9 13l2 2 4-4"]],
+  abgaben: ["Abgaben", "Abgaben", "#/abgaben", ["M12 4v11", "M7 10l5 5 5-5", "M5 20h14"]],
+};
+const defaultNav = ["start", "woche", "kurse", "inbox", "noten", "studium"];
+
+function savedNav() {
+  try {
+    const n = JSON.parse(localStorage.getItem("nak-nav") || "null");
+    if (Array.isArray(n) && n.length >= 2 && n.every((id) => navDefs[id])) return n;
+  } catch {}
+  return defaultNav;
+}
+
+function navBar(ids = savedNav()) {
+  return h("nav", { "aria-label": "Bereiche" }, ids.map((id) => {
+    const [t, short, href, icon] = navDefs[id];
+    return h("a", { href, title: t }, svg(icon), h("span", { class: "full", text: t }), h("span", { class: "short", text: short }));
+  }));
+}
+
+// the server keeps the setting (same bar in browser and app); localStorage
+// only makes the first paint right
+function applyNav(ids) {
+  if (!Array.isArray(ids) || !ids.every((id) => navDefs[id])) return;
+  if (JSON.stringify(ids) === localStorage.getItem("nak-nav") && $(".top nav")) return;
+  localStorage.setItem("nak-nav", JSON.stringify(ids));
+  $(".top nav")?.replaceWith(navBar(ids));
+  markNav();
+}
+
 function header() {
-  // [label, short label for the phone tab bar, route, icon]
-  const links = [
-    ["Übersicht", "Start", "#/", ["M3 11l9-7 9 7", "M5 10v10h14V10", "M10 20v-6h4v6"]],
-    ["Woche", "Woche", "#/woche", ["M4 6h16v14H4z", "M4 10h16", "M9 3v4", "M15 3v4"]],
-    ["Kurse", "Kurse", "#/kurse", ["M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z", "M4 19V5", "M8 7h7"]],
-    ["Inbox", "Inbox", "#/nachrichten", ["M4 5h16v11H8l-4 4z"]],
-    ["Noten", "Noten", "#/noten", ["M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.4 6.8 19.1l1-5.8L3.5 9.2l5.9-.9z"]],
-    ["Studium", "Studium", "#/studium", ["M2 9l10-5 10 5-10 5z", "M6 11v5c3 2 9 2 12 0v-5", "M22 9v6"]],
-  ];
   const refresh = h("button", { class: "icon-btn hide-sm", type: "button", title: "Neu laden (frisch aus CIS und Moodle)", "aria-label": "Neu laden" }, svg(icons.refresh));
   refresh.addEventListener("click", async () => {
     refresh.classList.add("spin");
@@ -2370,7 +2630,7 @@ function header() {
   });
   return h("header", { class: "top" }, h("div", { class: "top-in" },
     h("a", { class: "mark", href: "#/", "aria-label": "naknak – Übersicht" }, h("img", { src: "/assets/naknak.svg", alt: "", width: 26, height: 26 }), "naknak"),
-    h("nav", { "aria-label": "Bereiche" }, links.map(([t, short, href, icon]) => h("a", { href, title: t }, svg(icon), h("span", { class: "full", text: t }), h("span", { class: "short", text: short })))),
+    navBar(),
     h("div", { class: "tools" },
       h("span", { class: "stamp", "aria-live": "polite" }),
       refresh,
@@ -2382,6 +2642,19 @@ function header() {
 }
 
 let renderSeq = 0;
+
+// the page's own entry if it is in the bar (Prüfungen, Abgaben), else the
+// section it belongs to
+function markNav(r = route()) {
+  if (!r) return;
+  const links = [...document.querySelectorAll(".top nav a")];
+  const own = links.find((a) => a.getAttribute("href") === (location.hash || "#/"));
+  const target = own || links.find((a) => a.getAttribute("href") === r.nav);
+  for (const a of links) {
+    if (a === target) a.setAttribute("aria-current", "page");
+    else a.removeAttribute("aria-current");
+  }
+}
 
 function route() {
   const hash = location.hash || "#/";
@@ -2396,10 +2669,7 @@ async function render() {
   const seq = ++renderSeq;
   const r = route();
   if (!r) { location.hash = "#/"; return; }
-  for (const a of document.querySelectorAll(".top nav a")) {
-    if (a.getAttribute("href") === r.nav) a.setAttribute("aria-current", "page");
-    else a.removeAttribute("aria-current");
-  }
+  markNav(r);
   newest = null;
   staleSeen.clear();
   const main = h("main", { id: "main" });
@@ -2441,6 +2711,9 @@ function boot() {
   applyPrivate(localStorage.getItem("nak-private") === "1");
   addEventListener("hashchange", render);
   render();
+  if (!document.documentElement.classList.contains("still")) {
+    fetch("/api/settings", { credentials: "same-origin" }).then((r) => r.ok ? r.json() : null).then((st) => st && applyNav(st.nav)).catch(() => {});
+  }
 }
 
 boot();

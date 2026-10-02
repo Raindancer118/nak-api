@@ -26,6 +26,13 @@ public class SettingsActivity extends AppCompatActivity {
         }
     }
 
+    @Override
+    protected void onPause() {
+        super.onPause();
+        // the app lock decides whether the grade widget may show numbers
+        WidgetWorker.refreshAll(this);
+    }
+
     public static class Fragment extends PreferenceFragmentCompat {
         @Override
         public void onCreatePreferences(Bundle state, String rootKey) {
@@ -69,14 +76,20 @@ public class SettingsActivity extends AppCompatActivity {
                 Preference cat = findPreference("home_cat");
                 if (cat != null) cat.setVisible(false);
             } else if (pin != null) {
-                pin.setOnPreferenceClickListener(p -> {
-                    awm.requestPinAppWidget(new ComponentName(requireContext(), NextUpWidget.class), null, null);
-                    WorkManager.getInstance(requireContext()).enqueue(OneTimeWorkRequest.from(WidgetWorker.class));
-                    return true;
-                });
+                pinOnClick(pin, NextUpWidget.class);
+                Preference gradePin = findPreference("grade_widget_pin");
+                if (gradePin != null) pinOnClick(gradePin, GradeWidget.class);
             }
             Preference version = findPreference("version");
             if (version != null) version.setSummary(BuildConfig.VERSION_NAME);
+        }
+
+        private void pinOnClick(Preference p, Class<?> provider) {
+            p.setOnPreferenceClickListener(x -> {
+                AppWidgetManager.getInstance(requireContext()).requestPinAppWidget(new ComponentName(requireContext(), provider), null, null);
+                WorkManager.getInstance(requireContext()).enqueue(OneTimeWorkRequest.from(WidgetWorker.class));
+                return true;
+            });
         }
     }
 }

@@ -146,6 +146,7 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("POST /api/notifications/read", s.authed(s.jsonOnly(s.notificationsRead)))
 	mux.Handle("GET /api/events", s.authed(http.HandlerFunc(s.events)))
 	mux.Handle("PUT /api/settings/notify", s.authed(s.jsonOnly(s.putNotify)))
+	mux.Handle("PUT /api/settings/nav", s.authed(s.jsonOnly(s.putNav)))
 	mux.Handle("POST /api/calendar/rotate", s.authed(s.jsonOnly(s.calendarRotate)))
 	mux.HandleFunc("GET /calendar/{file}", s.calendarFeed)
 	mux.Handle("PUT /api/settings/eduvault", s.authed(s.jsonOnly(s.putEduVault)))

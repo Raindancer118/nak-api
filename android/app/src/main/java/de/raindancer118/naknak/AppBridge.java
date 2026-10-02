@@ -13,6 +13,7 @@ import android.webkit.JavascriptInterface;
 final class AppBridge {
     private final Activity activity;
     private final String host;
+    private volatile boolean gestureHeld;
 
     AppBridge(Activity a, String server) {
         activity = a;
@@ -47,5 +48,19 @@ final class AppBridge {
     public void openSettings() {
         if (!trusted()) return;
         activity.runOnUiThread(() -> activity.startActivity(new Intent(activity, SettingsActivity.class)));
+    }
+
+    /**
+     * The page is handling a drag (e.g. reordering): pull-to-refresh must not
+     * take the gesture. No host check: the worst a foreign page could do is
+     * switch pull-to-refresh off while a finger is down.
+     */
+    @JavascriptInterface
+    public void holdGesture(boolean held) {
+        gestureHeld = held;
+    }
+
+    boolean gestureHeld() {
+        return gestureHeld;
     }
 }

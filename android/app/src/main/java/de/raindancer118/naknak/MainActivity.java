@@ -175,7 +175,9 @@ public class MainActivity extends AppCompatActivity {
             }
         });
         web.setDownloadListener((url, ua, disposition, mime, length) -> download(url, disposition, mime));
-        web.addJavascriptInterface(new AppBridge(this, server), "NaknakApp");
+        AppBridge bridge = new AppBridge(this, server);
+        web.addJavascriptInterface(bridge, "NaknakApp");
+        swipe.setOnChildScrollUpCallback((parent, child) -> bridge.gestureHeld() || (child != null && child.canScrollVertically(-1)));
 
         swipe.setOnRefreshListener(() -> web.reload());
         swipe.setColorSchemeResources(R.color.cis, R.color.moodle);

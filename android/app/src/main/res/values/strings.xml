@@ -61,4 +61,19 @@
     <string name="pref_home">Startbildschirm</string>
     <string name="pref_widget">Widget hinzufügen</string>
     <string name="pref_widget_summary">Nächster Termin und Fristen auf einen Blick</string>
+    <string name="grade_widget_name">naknak · Notenschnitt</string>
+    <string name="grade_heading">Notenschnitt</string>
+    <string name="grade_toggle">Noten ein- oder ausblenden</string>
+    <string name="grade_placeholder">–,–</string>
+    <string name="grade_hidden">•••</string>
+    <string name="grade_label">Durchschnitt</string>
+    <string name="grade_locked">App-Sperre an: Noten nur in der App.</string>
+    <string name="grade_credits">%1$s Credits</string>
+    <string name="pref_grade_widget">Notenschnitt-Widget hinzufügen</string>
+    <string name="pref_grade_widget_summary">Durchschnitt, Credits und letzte Note</string>
+    <string name="preview_next_title">Softwaretechnik</string>
+    <string name="preview_next_detail">09:00–12:15 · A 101</string>
+    <string name="preview_next_row">morgen · Übungsblatt 4</string>
+    <string name="preview_grade_avg">2,1</string>
+    <string name="preview_grade_credits">126 Credits</string>
 </resources>

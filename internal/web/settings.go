@@ -52,6 +52,8 @@ func (s *Server) getSettings(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"eduvault":  ev,
 		"notify":    s.app.Settings().Notify,
+		"nav":       s.app.Settings().NavOrDefault(),
+		"nav_items": app.NavItems,
 		"account":   s.accountInfo(),
 		"read_only": s.app.ReadOnly,
 		"demo":      s.cfg.Demo,
@@ -123,4 +125,41 @@ func (s *Server) putNotify(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"saved": true})
+}
+
+// putNav stores the navigation bar: 2 to 7 known, distinct entries (a phone
+// fits seven); an empty list goes back to the default.
+func (s *Server) putNav(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Nav []string `json:"nav"`
+	}
+	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<12)).Decode(&in); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "body must be JSON"})
+		return
+	}
+	if len(in.Nav) > 0 {
+		known := map[string]bool{}
+		for _, id := range app.NavItems {
+			known[id] = true
+		}
+		seen := map[string]bool{}
+		for _, id := range in.Nav {
+			if !known[id] || seen[id] {
+				writeJSON(w, http.StatusBadRequest, map[string]any{"error": "unbekannter oder doppelter Eintrag: " + id})
+				return
+			}
+			seen[id] = true
+		}
+		if len(in.Nav) < 2 || len(in.Nav) > 7 {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "Die Leiste braucht 2 bis 7 Einträge."})
+			return
+		}
+	}
+	st := s.app.Settings()
+	st.Nav = in.Nav
+	if err := s.app.SaveSettings(st); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"saved": true, "nav": st.NavOrDefault()})
 }

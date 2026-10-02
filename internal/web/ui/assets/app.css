@@ -1118,6 +1118,10 @@ a.icon-btn { color: inherit; }
 .chip.kind-deadline { --chip: var(--due); }
 
 .settings-form.wide { max-width: 44rem; }
+.settings-form select { min-height: 48px; padding: 0 .85rem; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); font: inherit; font-size: .95rem; }
+.settings-form .pair { display: grid; grid-template-columns: 7rem 1fr; gap: .75rem; }
+.share-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr)); gap: .75rem; }
+.tile .settings-form h2.sub { margin: .5rem 0 0; }
 .settings-form label.check { display: grid; grid-template-columns: auto 1fr; gap: .75rem; align-items: start; color: var(--text); font-size: .95rem; cursor: pointer; }
 .settings-form label.check input { width: 20px; height: 20px; min-height: 0; margin-top: .15rem; accent-color: var(--cis); }
 .settings-form label.check b { display: block; font-weight: 500; color: var(--ink); }
@@ -1338,3 +1342,17 @@ html.private .toast { filter: blur(6px); }
   .row .chip { white-space: normal; }
   .lazy, .seminar .action, .exam-row .action { margin-left: 1.2rem; }
 }
+
+/* settings: navigation bar editor */
+.nav-edit { list-style: none; margin: .75rem 0 1rem; padding: 0; display: grid; gap: .35rem; }
+.nav-edit li { display: flex; align-items: center; justify-content: space-between; gap: .5rem; padding: .35rem .5rem; border-radius: 12px; background: color-mix(in oklab, var(--line) 35%, transparent); }
+.nav-edit li.off { background: none; opacity: .65; }
+.nav-edit label { display: flex; align-items: center; gap: .65rem; min-height: 44px; cursor: pointer; flex: 1; color: var(--ink); }
+.nav-edit input { width: 20px; height: 20px; accent-color: var(--cis); }
+.nav-edit svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.nav-edit li.on { transition: translate .18s var(--ease), box-shadow .18s; }
+.nav-edit li.dragging { transition: box-shadow .18s; position: relative; z-index: 2; box-shadow: 0 12px 30px -12px #0007; background: var(--tile); }
+.nav-edit .grip { display: grid; place-items: center; width: 44px; height: 44px; border: 0; background: none; color: var(--dim); cursor: grab; touch-action: none; border-radius: 10px; }
+.nav-edit .grip:active { cursor: grabbing; }
+.nav-edit .grip svg { width: 20px; height: 20px; stroke-width: 2.6; }
+@media (prefers-reduced-motion: reduce) { .nav-edit li.on { transition: none; } }

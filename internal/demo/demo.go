@@ -262,9 +262,28 @@ func read(name, desc string, run func(a *app.App, args tools.Args) (any, error))
 	return &tools.Tool{Name: name, Kind: tools.Read, Desc: desc, Run: run, Params: []tools.Param{{Name: "days", Type: "integer"}, {Name: "courseid", Type: "integer"}, {Name: "classification"}, {Name: "module_nr"}, {Name: "title"}, {Name: "query"}, {Name: "discussionid", Type: "integer"}, {Name: "conversationid", Type: "integer"}, {Name: "assignid", Type: "integer"}, {Name: "limit", Type: "integer"}, {Name: "only_open", Type: "boolean"}, {Name: "mine", Type: "boolean"}, {Name: "available_only", Type: "boolean"}, {Name: "quarter"}, {Name: "seminar_id"}, {Name: "transfer_id"}}}
 }
 
+// formChanges mimics the CIS form preview: one change per given argument.
+func formChanges(action string, args tools.Args, fields map[string][2]string) map[string]any {
+	changes := []map[string]string{}
+	for arg, f := range fields {
+		v, ok := args[arg]
+		if !ok {
+			continue
+		}
+		nv := fmt.Sprint(v)
+		if b, isBool := v.(bool); isBool {
+			nv = map[bool]string{true: "1", false: "0"}[b]
+		}
+		changes = append(changes, map[string]string{"field": f[0], "old": f[1], "new": nv})
+	}
+	return map[string]any{"action": action, "changes": changes}
+}
+
 func write(name, desc string, preview func(args tools.Args) any) *tools.Tool {
 	return &tools.Tool{Name: name, Kind: tools.Write, Desc: desc,
-		Params:  []tools.Param{{Name: "exam_id"}, {Name: "action"}, {Name: "seminar_id"}, {Name: "module_id"}, {Name: "termin_id"}, {Name: "choiceid", Type: "integer"}, {Name: "optionids", Type: "array:integer"}, {Name: "postid", Type: "integer"}, {Name: "message"}, {Name: "conversationid", Type: "integer"}, {Name: "text"}, {Name: "assignid", Type: "integer"}, {Name: "files", Type: "array:string"}, {Name: "online_text"}, {Name: "submit_for_grading", Type: "boolean"}},
+		Params: []tools.Param{{Name: "exam_id"}, {Name: "action"}, {Name: "seminar_id"}, {Name: "module_id"}, {Name: "termin_id"}, {Name: "choiceid", Type: "integer"}, {Name: "optionids", Type: "array:integer"}, {Name: "postid", Type: "integer"}, {Name: "message"}, {Name: "conversationid", Type: "integer"}, {Name: "text"}, {Name: "assignid", Type: "integer"}, {Name: "files", Type: "array:string"}, {Name: "online_text"}, {Name: "submit_for_grading", Type: "boolean"},
+			{Name: "email"}, {Name: "infopost", Type: "boolean"}, {Name: "phone"}, {Name: "mobile"}, {Name: "fax"}, {Name: "type"}, {Name: "zusatz"}, {Name: "strasse"}, {Name: "plz"}, {Name: "ort"}, {Name: "delete", Type: "boolean"},
+			{Name: "noten_betrieb", Type: "boolean"}, {Name: "anmeldungen_betrieb", Type: "boolean"}, {Name: "kommilitonen", Type: "object"}},
 		Preview: func(a *app.App, args tools.Args) (any, error) { return preview(args), nil },
 		Do: func(a *app.App, args tools.Args) (any, error) {
 			return map[string]any{"demo": "Demo – nichts gesendet. In einer echten Instanz wäre das jetzt verbindlich passiert."}, nil
@@ -471,7 +490,41 @@ func Registry() *tools.Registry {
 			return map[string]any{"all": map[string]any{"Vorname": "Max", "Nachname": "Mustermann", "Matrikelnr.": "99999", "Zenturie": "I24a", "Studiengang": "Angewandte Informatik", "Firma": "Beispiel GmbH", "Email (NAK)": "max.mustermann@nordakademie.example"}}, nil
 		}),
 		read("cis_sharing", "Demo-Freigaben", func(*app.App, tools.Args) (any, error) {
-			return map[string]any{"noten_fuer_betrieb": true, "sichtbar_fuer_kommilitonen": false}, nil
+			return map[string]any{
+				"betrieb":      map[string]any{"noten_fuer_betrieb_freigegeben": true, "pruefungsanmeldungen_fuer_betrieb_freigegeben": false},
+				"kommilitonen": map[string]any{"Name": "2 (alle Zenturien)", "Firma": "1 (nur meine Zenturie)", "Geburtsdatum": "0 (nicht anzeigen)", "Adresse": "0 (nicht anzeigen)", "Fest": "0 (nicht anzeigen)", "Mobil": "1 (nur meine Zenturie)", "Mail": "2 (alle Zenturien)"},
+				"levels":       map[string]string{"0": "nicht anzeigen", "1": "nur meine Zenturie", "2": "alle Zenturien"},
+			}, nil
+		}),
+		read("cis_contact", "Demo-Kontakt", func(*app.App, tools.Args) (any, error) {
+			return map[string]any{"email_privat": "max@example.org", "infopost": true, "telefon_festnetz": "", "telefon_mobil": "0170-0000000", "fax": ""}, nil
+		}),
+		read("cis_address", "Demo-Adresse", func(_ *app.App, args tools.Args) (any, error) {
+			types := map[string]string{"1": "Hauptadresse", "5": "Semesteradresse"}
+			if args.Str("type") == "5" {
+				return map[string]any{"type_id": "5", "type_name": "Semesteradresse", "available_types": types, "strasse": "Köllner Chaussee 11", "plz": "25337", "ort": "Elmshorn", "letter_form": "Max Mustermann, Köllner Chaussee 11, 25337 Elmshorn"}, nil
+			}
+			return map[string]any{"type_id": "1", "type_name": "Hauptadresse", "available_types": types, "strasse": "Musterweg 1", "plz": "20095", "ort": "Hamburg", "letter_form": "Max Mustermann, Musterweg 1, 20095 Hamburg"}, nil
+		}),
+		write("cis_update_contact", "Demo: Kontakt", func(args tools.Args) any {
+			return []any{formChanges("Kontaktdaten ändern", args, map[string][2]string{
+				"email": {"email.privat", "max@example.org"}, "infopost": {"email.infopost", "1"}, "phone": {"telefon.fest", ""}, "mobile": {"telefon.mobil", "0170-0000000"}, "fax": {"telefon.fax", ""}})}
+		}),
+		write("cis_update_address", "Demo: Adresse", func(args tools.Args) any {
+			if args.Bool("delete", false) {
+				return map[string]any{"action": "Adresse löschen", "changes": []map[string]string{{"field": "adresse", "old": "Köllner Chaussee 11, 25337 Elmshorn", "new": ""}}}
+			}
+			return formChanges("Adresse ändern", args, map[string][2]string{
+				"strasse": {"strasse", "Musterweg 1"}, "zusatz": {"zusatz", ""}, "plz": {"plz", "20095"}, "ort": {"ort", "Hamburg"}})
+		}),
+		write("cis_set_sharing", "Demo: Freigaben", func(args tools.Args) any {
+			out := formChanges("Freigaben ändern", args, map[string][2]string{"noten_betrieb": {"notenfreigabe", "1"}, "anmeldungen_betrieb": {"anmeldungfreigabe", "0"}})
+			if k, ok := args["kommilitonen"].(map[string]any); ok {
+				for f, v := range k {
+					out["changes"] = append(out["changes"].([]map[string]string), map[string]string{"field": f, "old": "?", "new": fmt.Sprint(v)})
+				}
+			}
+			return out
 		}),
 		read("cis_balance", "Demo-Guthaben", func(*app.App, tools.Args) (any, error) { return map[string]any{"Kopierguthaben": "7,40 €"}, nil }),
 		&tools.Tool{Name: "cis_download_cert", Kind: tools.Local, Desc: "Demo-Bescheinigung", Params: []tools.Param{{Name: "download_url"}},

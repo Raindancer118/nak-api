@@ -15,6 +15,23 @@ import (
 type Settings struct {
 	EduVault EduVaultSettings `json:"eduvault"`
 	Notify   NotifySettings   `json:"notify"`
+	// Nav is the owner's choice and order of navigation entries (ids from
+	// NavItems); empty = DefaultNav.
+	Nav []string `json:"nav,omitempty"`
+}
+
+// NavItems are the pages the navigation bar can hold; the web UI knows
+// their labels and icons.
+var NavItems = []string{"start", "woche", "kurse", "inbox", "noten", "studium", "pruefungen", "abgaben"}
+
+var DefaultNav = []string{"start", "woche", "kurse", "inbox", "noten", "studium"}
+
+// NavOrDefault is the bar as it should be shown.
+func (s Settings) NavOrDefault() []string {
+	if len(s.Nav) == 0 {
+		return DefaultNav
+	}
+	return s.Nav
 }
 
 // NotifySettings control the background watcher (new grades, Moodle news,

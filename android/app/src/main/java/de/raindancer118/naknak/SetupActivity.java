@@ -48,7 +48,7 @@ public class SetupActivity extends AppCompatActivity {
                     // another server: its notification ids and agenda are not ours
                     if (!url.equals(Prefs.server(this))) e.remove(Prefs.INBOX).remove(Prefs.WIDGET_JSON);
                     e.putString(Prefs.SERVER, url).apply();
-                    NextUpWidget.refreshAll(this);
+                    WidgetWorker.refreshAll(this);
                     App.schedule(this);
                     startActivity(new Intent(this, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK | Intent.FLAG_ACTIVITY_NEW_TASK));
                     finish();

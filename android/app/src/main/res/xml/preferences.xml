@@ -14,6 +14,7 @@
     </PreferenceCategory>
     <PreferenceCategory app:key="home_cat" app:title="@string/pref_home" app:iconSpaceReserved="false">
         <Preference app:key="widget_pin" app:title="@string/pref_widget" app:summary="@string/pref_widget_summary" app:iconSpaceReserved="false" />
+        <Preference app:key="grade_widget_pin" app:title="@string/pref_grade_widget" app:summary="@string/pref_grade_widget_summary" app:iconSpaceReserved="false" />
     </PreferenceCategory>
     <PreferenceCategory app:title="@string/pref_about" app:iconSpaceReserved="false">
         <Preference app:key="version" app:title="@string/pref_version" app:iconSpaceReserved="false" />

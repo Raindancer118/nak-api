@@ -12,6 +12,7 @@ final class Prefs {
     static final String NOTIFY_DETAILS = "notify_details";
     static final String INBOX = "inbox_state";
     static final String WIDGET_JSON = "widget_cache";
+    static final String GRADE_HIDDEN = "grade_hidden";
 
     private Prefs() {}
 
