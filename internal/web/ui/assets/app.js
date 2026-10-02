@@ -294,17 +294,35 @@ function weekStrip(agenda) {
   return [h("div", { class: "strip" }, cells), h("p", { class: "empty", text: n ? `${n} Termine in 7 Tagen` : "Diese Woche ist frei." })];
 }
 
+const num = (x) => Number(String(x ?? "").replace(",", ".")) || 0;
+const fmtNum = (x) => (Math.round(x * 10) / 10).toLocaleString("de-DE");
+
+// Credits as three parts: modules and Transferleistungen from the study plan,
+// seminars from the grades page — the CIS total (cis_credits_total) leaves
+// the seminars out, the 210 of the programme include them.
 function credits(progress, g) {
   const c = progress?.credits;
-  if (c?.total_required) return { earned: c.total_earned || 0, total: c.total_required };
-  return { earned: g?.stats?.credits_earned || 0, total: 0 };
+  const sem = num(g?.overview?.seminar_credits);
+  if (c?.total_required) {
+    const parts = [
+      { label: "Module", v: c.module_earned || 0, of: c.module_planned || 0, color: "var(--ok)" },
+      { label: "Transferleistungen", v: c.transfer_earned || 0, of: c.transfer_planned || 0, color: "var(--cis)" },
+      { label: "Seminare", v: sem, of: Math.max(0, c.total_required - (c.module_planned || 0) - (c.transfer_planned || 0)), color: "var(--moodle)" },
+    ];
+    return { earned: parts.reduce((s, p) => s + p.v, 0), total: c.total_required, parts, cis: num(c.cis_credits_total) };
+  }
+  return { earned: num(g?.stats?.credits_earned), total: 0, parts: [], cis: 0 };
 }
 
 function creditMeter(progress, g) {
-  const { earned, total } = credits(progress, g);
+  const { earned, total, parts, cis } = credits(progress, g);
+  if (!total) return h("div", { class: "meter" }, h("div", { class: "meter-label" }, h("span", { text: `${fmtNum(earned)} Credits` })));
   return h("div", { class: "meter" },
-    h("div", { class: "meter-label" }, h("span", { text: total ? `${earned} von ${total} Credits` : `${earned} Credits` }), total && h("span", { text: `${Math.round((earned / total) * 100)} %` })),
-    total && bar(earned / total, "var(--ok)"));
+    h("div", { class: "meter-label" }, h("span", { text: `${fmtNum(earned)} von ${total} Credits` }), h("span", { text: `${Math.round((earned / total) * 100)} %` })),
+    h("div", { class: "progress stacked", role: "img", "aria-label": parts.map((p) => `${p.label} ${fmtNum(p.v)}`).join(", ") },
+      parts.map((p, j) => h("i", { vars: { "--w": `${(p.v / total) * 100}%`, "--c": p.color, "--j": j }, title: `${p.label}: ${fmtNum(p.v)}${p.of ? ` von ${p.of}` : ""}` }))),
+    h("ul", { class: "legend" }, parts.map((p) => h("li", { vars: { "--c": p.color } }, `${p.label} ${fmtNum(p.v)}${p.of ? ` / ${p.of}` : ""}`))),
+    cis && Math.abs(cis - earned) > 0.01 && h("p", { class: "empty fine-note", text: `Das CIS zeigt ${fmtNum(cis)} Credits (ohne Seminare).` }));
 }
 
 function gradeSummary([g, progress]) {
@@ -450,14 +468,13 @@ async function gradesPage(root) {
   grid.append(tSum, tList);
   const data = api("cis_grades");
 
-  fill(tSum, () => data, (g) => {
+  fill(tSum, () => Promise.all([data, api("cis_progress").catch(() => null)]), ([g, progress]) => {
     const st = g.stats || {};
-    const total = parseInt(g.overview?.credits_total, 10) || 180;
     return h("div", { class: "grid" },
       h("div", { class: "tile-inner half" }, h("div", { class: "avg" }, decimal(st.weighted_average, 2), h("span", { class: "empty", text: "gewichteter Schnitt" }))),
       h("div", { class: "tile-inner half" },
-        h("div", { class: "meter-label" }, h("span", { text: `${st.credits_earned || 0} von ${total} Credits` }), h("span", { text: `${st.passed || 0} bestanden · ${st.open || 0} offen · ${st.failed || 0} nicht bestanden` })),
-        bar((st.credits_earned || 0) / total, "var(--ok)")));
+        creditMeter(progress, g),
+        h("p", { class: "empty", text: `${st.passed || 0} bestanden · ${st.open || 0} offen · ${st.failed || 0} nicht bestanden` })));
   });
 
   fill(tList, () => data, (g) => {
@@ -916,6 +933,53 @@ function norm(s) {
 }
 
 let unitsP = null;
+let historyP = null;
+
+function loadHistory() {
+  if (!historyP || fresh) historyP = fetch("/api/history", { credentials: "same-origin" }).then((r) => r.json()).catch(() => ({ exams: [], grades: {} }));
+  return historyP;
+}
+
+// unitMatch: does a CIS record (number list + title) belong to unit u?
+function unitMatch(u, nrs, title) {
+  const mine = [u.nr, ...(u.aliases || [])];
+  if (nrsIn(nrs).some((n) => mine.includes(n))) return true;
+  const a = ` ${norm(title).join(" ")} `, b = ` ${norm(u.title).join(" ")} `;
+  return b.trim() !== "" && a.trim() !== "" && (a === b || a.includes(b));
+}
+
+// lecturers from every source; course names end in "… - Brzezinski/Ullmann",
+// the CIS writes "Brzezinski, Patryk" — shown as "Patryk Brzezinski", and one
+// person from several sources counts once (matched by surname).
+function lecturersOf(u, m, hist) {
+  const now = new Date();
+  const people = new Map(); // surname → { name, current }
+  const add = (raw, current) => {
+    let name = String(raw || "").trim().replace(/\s+/g, " ");
+    if (name.length < 3 || /^(I\d|Kohorte|Tutorium|Q\d)/i.test(name)) return;
+    if (name.includes(",")) { const [last, first] = name.split(",").map((x) => x.trim()); name = first ? `${first} ${last}` : last; }
+    name = name.replace(/^(Prof\.|Dr\.|Dipl\.-\S+)\s+/g, "");
+    const key = name.split(" ").pop().toLowerCase();
+    const prev = people.get(key);
+    // the longer form wins ("Patryk Brzezinski" over "Brzezinski")
+    if (!prev) people.set(key, { name, current });
+    else { if (name.length > prev.name.length) prev.name = name; prev.current ||= current; }
+  };
+  const many = (s, current) => String(s || "").split(/\s*(?:\/|;| und )\s*/).forEach((x) => add(x, current));
+  for (const e of m?.next_sessions || []) many(e.lecturer, true);
+  for (const c of u?.courses || []) {
+    const parts = String(c.name).split(" - ");
+    const last = parts.length > 2 ? parts[parts.length - 1] : "";
+    if (last && !/\d{2}/.test(last)) many(last, c.state === "current");
+  }
+  for (const e of [...(u?.exams || []), ...(hist?.exams || []).filter((x) => unitMatch(u, x.module_nr, x.title))]) {
+    const at = parseDE(e.start);
+    for (const d of e.dozenten || []) add(d, !!at && at >= startOfDay(now));
+  }
+  for (const d of m?.distribution?.lecturers || []) add(d, false);
+  const all = [...people.values()];
+  return { cur: all.filter((p) => p.current).map((p) => p.name), past: all.filter((p) => !p.current).map((p) => p.name) };
+}
 
 function loadUnits() {
   if (unitsP && !fresh) return unitsP;
@@ -1033,7 +1097,7 @@ async function unitPage(root, nr, tab = "", courseArg = "") {
   const grid = h("div", { class: "grid" });
   body.replaceChildren(grid);
   const tGrade = tile("Note & Prüfung", { cls: "half", i: 0 });
-  const tPlan = tile("Studienplan & Klausuren", { cls: "half", i: 1 });
+  const tPlan = tile("Studienplan", { cls: "half", i: 1 });
   const tNext = tile("Nächste Termine", { cls: "half", i: 2 });
   const tMoodle = tile("Moodle", { cls: "w6", i: 3 });
   const tNews = tile("Neu in Moodle", { cls: "w6", i: 4 });
@@ -1044,9 +1108,21 @@ async function unitPage(root, nr, tab = "", courseArg = "") {
     if (err && /eingerichtet|Einstellungen/.test(err.textContent)) err.replaceWith(h("p", { class: "empty" }, "Hinterlege in den ", h("a", { href: "#/einstellungen", text: "Einstellungen" }), " deinen EduVault-Zugang, dann stehen hier die Altklausuren zu diesem Modul."));
   });
   const data = api("nak_module", { module_nr: nr });
+  const lect = h("p", { class: "lecturers" });
+  head.append(lect);
+  Promise.all([data.catch(() => ({})), loadHistory()]).then(([m, hist]) => {
+    const { cur, past } = lecturersOf(u, m, hist);
+    lect.replaceChildren(...[
+      cur.length > 0 && h("span", {}, h("b", { text: "Lehrende " }), cur.join(", ")),
+      past.length > 0 && h("span", {}, h("b", { text: cur.length ? "früher " : "Lehrende " }), past.join(", ")),
+    ].filter(Boolean));
+  });
   fill(tGrade, () => data, (m) => gradeTile(m, u));
   const examsOf = (m) => dedupeExams([...(m.exams || []), ...(u?.exams || [])]);
-  fill(tPlan, () => data, (m) => planTile({ ...m, exams: examsOf(m) }));
+  fill(tPlan, () => data, (m) => planTile({ ...m, exams: [] }));
+  const tExams = tile("Prüfungsverlauf", { cls: "w12", i: 2 });
+  grid.insertBefore(tExams, tNext.nextSibling);
+  fill(tExams, () => Promise.all([data, loadHistory()]), ([m, hist]) => examTimeline(u, m, hist, examsOf(m)));
   fill(tNext, () => data, (m) => {
     const now = new Date();
     const exams = examsOf(m).filter((e) => e.registered && parseDE(e.start) >= startOfDay(now))
@@ -1105,6 +1181,45 @@ function dedupeExams(list) {
     if (!prev || (e.registered && !prev.registered)) out.set(k, e);
   }
   return [...out.values()].sort((a, b) => (parseDE(a.start) || 0) - (parseDE(b.start) || 0));
+}
+
+// Every exam date of the module: what the CIS lists now, what naknak saw
+// earlier, and the attempts recorded on the grades page — with the result.
+function examTimeline(u, m, hist, current) {
+  const byKey = new Map();
+  const put = (x) => {
+    const at = parseDE(x.start || x.exam_date);
+    if (!at) return;
+    const k = isoDate(at);
+    const prev = byKey.get(k) || { at, registered: false, title: "", dozenten: [], result: null, attempt: 0, upcoming: at >= startOfDay(new Date()) };
+    prev.registered ||= !!x.registered;
+    prev.title ||= x.title || "";
+    if (x.start && /\d{1,2}:\d{2}/.test(x.start)) prev.at = at;
+    if (x.dozenten?.length) prev.dozenten = x.dozenten;
+    if (x.grade) { prev.result = x; prev.attempt = x.attempt || prev.attempt; }
+    byKey.set(k, prev);
+  };
+  for (const e of current) put(e);
+  for (const e of (hist?.exams || []).filter((x) => unitMatch(u, x.module_nr, x.title))) put(e);
+  const steps = [...(hist?.grades?.[u?.nr] || [])];
+  const g = m.grade || u?.grade;
+  if (g?.exam_date && !steps.some((x) => x.exam_date === g.exam_date && x.grade === g.grade)) steps.push(g);
+  for (const st of steps) put(st);
+  const rows = [...byKey.values()].sort((a, b) => b.at - a.at);
+  if (!rows.length) return emptyRow("Noch keine Prüfungstermine bekannt. naknak merkt sich ab jetzt jeden Termin, den das CIS anzeigt.");
+  return h("ol", { class: "timeline" }, rows.map((r, j) => {
+    const res = r.result;
+    const cls = res ? gradeClass(res) : "";
+    return h("li", { class: `tl-item ${r.upcoming ? "upcoming" : "past"} ${cls}`, vars: { "--j": j } },
+      h("span", { class: "tl-dot" }),
+      h("div", { class: "tl-body" },
+        h("div", { class: "tl-head" },
+          h("b", { text: `${fmtDay.format(r.at)}${/00:00/.test(fmtTime.format(r.at)) ? "" : ` · ${fmtTime.format(r.at)}`}` }),
+          r.upcoming && h("span", { class: `chip ${r.registered ? "ok" : "due"}`, text: r.registered ? (dayDiff(r.at) === 0 ? "heute · angemeldet" : `angemeldet · ${relDay(dayDiff(r.at))}`) : "nicht angemeldet" }),
+          !r.upcoming && res && h("span", { class: `chip ${cls}`, text: res.grade }),
+          !r.upcoming && !res && h("span", { class: "chip", text: r.registered ? "Ergebnis steht aus" : "vergangen" })),
+        h("span", { class: "s", text: [r.title, r.attempt ? `${r.attempt}. Versuch` : "", r.dozenten.map((d) => d.includes(",") ? d.split(",").map((x) => x.trim()).reverse().join(" ") : d).join(", ")].filter(Boolean).join(" · ") })));
+  }));
 }
 
 function planTile(m) {
@@ -1269,7 +1384,28 @@ async function settingsPage(root) {
       alertBox("Zwischenspeicher geleert.");
       e.currentTarget.disabled = false;
     } })));
-  grid.append(tEv, tAcc, tLook, tCache);
+  // calendar subscription
+  const tCal = tile("Kalender-Abo", { cls: "w12", i: 4 });
+  const calBox = h("div", { class: "cal-box" }, skeleton());
+  tCal.append(h("p", { class: "empty", text: "Vorlesungen, Klausuren, Moodle-Fristen und Anmeldeschlüsse als Abo für Apple Kalender, Google Kalender, Outlook oder Thunderbird. Klausuren und Fristen mit Erinnerung am Vortag." }), calBox);
+  const drawCal = (info) => {
+    const abs = location.origin + info.path;
+    const field = h("input", { class: "cal-url", readonly: true, value: abs, "aria-label": "Abo-Adresse", onfocus: (e) => e.currentTarget.select() });
+    calBox.replaceChildren(field, h("div", { class: "row-actions" },
+      h("button", { class: "primary", type: "button", text: "Adresse kopieren", onclick: async (e) => {
+        await navigator.clipboard?.writeText(abs).catch(() => field.select());
+        e.currentTarget.textContent = "Kopiert ✓";
+      } }),
+      h("a", { class: "ghost as-btn", href: abs.replace(/^https?:/, "webcal:"), text: "Im Kalender öffnen" }),
+      h("button", { class: "ghost", type: "button", text: "Neuen Link erzeugen", title: "Der alte Link hört sofort auf zu funktionieren", onclick: async () => {
+        const r = await fetch("/api/calendar/rotate", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: "{}" });
+        drawCal(await r.json());
+        alertBox("Neuer Abo-Link erzeugt. Der alte funktioniert nicht mehr.");
+      } })),
+      h("p", { class: "empty meter", text: "Wer diese Adresse kennt, sieht deinen Stundenplan. Teile sie nicht; im Zweifel neuen Link erzeugen." }));
+  };
+  fetch("/api/calendar", { credentials: "same-origin" }).then((r) => r.json()).then(drawCal).catch((err) => calBox.replaceChildren(errorBox(err)));
+  grid.append(tEv, tAcc, notifySettingsTile(st, 4), tLook, tCache, tCal);
 }
 
 // ── EduVault on module pages ────────────────────────────────────────────────
@@ -1320,6 +1456,128 @@ async function openEduVault(id, btn) {
   } finally {
     btn?.classList.remove("busy");
   }
+}
+
+// ── notifications ───────────────────────────────────────────────────────────
+
+const bell = { el: null, badge: null, panel: null, items: [], unread: 0, es: null };
+
+function relTime(iso) {
+  const d = new Date(iso);
+  const mins = Math.round((Date.now() - d) / 6e4);
+  if (mins < 1) return "gerade eben";
+  if (mins < 60) return `vor ${mins} min`;
+  if (mins < 24 * 60) return `vor ${Math.round(mins / 60)} h`;
+  return fmtShort.format(d);
+}
+
+const kindIcon = { grade: "Note", message: "Nachricht", news: "Moodle", moodle: "Moodle", deadline: "Frist" };
+
+function drawBell() {
+  if (!bell.el) return;
+  bell.badge.textContent = bell.unread > 9 ? "9+" : String(bell.unread);
+  bell.badge.hidden = bell.unread === 0;
+  bell.el.setAttribute("aria-label", bell.unread ? `${bell.unread} neue Benachrichtigungen` : "Benachrichtigungen");
+  if (bell.panel.hidden) return;
+  bell.panel.replaceChildren(
+    h("div", { class: "bell-head" }, h("h2", { text: "Benachrichtigungen" }),
+      bell.unread > 0 && h("button", { class: "ghost small", type: "button", text: "Alle gelesen", onclick: markAllRead })),
+    bell.items.length ? h("ul", { class: "rows bell-list" }, bell.items.slice(0, 30).map((n, j) => h("li", {}, h("a", { class: `row ${n.read ? "" : "unread"}`, href: n.url || "#/", vars: { "--j": Math.min(j, 10) }, onclick: () => { bell.panel.hidden = true; } },
+      h("span", { class: `chip kind-${n.kind}`, text: kindIcon[n.kind] || "Neu" }),
+      h("span", { class: "t" }, n.title, h("span", { class: "s", text: [n.body, relTime(n.at)].filter(Boolean).join(" · ") })),
+      !n.read && h("span", { class: "dot new" })))))
+      : h("p", { class: "empty", text: "Noch nichts. naknak meldet sich bei neuen Noten, Moodle-Inhalten, Nachrichten und dringenden Fristen." }),
+    h("a", { class: "bell-foot", href: "#/einstellungen", onclick: () => { bell.panel.hidden = true; }, text: "Einstellungen" }));
+}
+
+async function loadBell() {
+  try {
+    const r = await (await fetch("/api/notifications", { credentials: "same-origin" })).json();
+    bell.items = r.notifications || [];
+    bell.unread = r.unread || 0;
+    drawBell();
+  } catch {}
+}
+
+async function markAllRead() {
+  await fetch("/api/notifications/read", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: "{}" });
+  bell.items.forEach((n) => { n.read = true; });
+  bell.unread = 0;
+  drawBell();
+}
+
+function listenBell() {
+  if (!window.EventSource) return;
+  bell.es?.close();
+  bell.es = new EventSource("/api/events");
+  bell.es.addEventListener("notification", (e) => {
+    const n = JSON.parse(e.data);
+    bell.items.unshift(n);
+    bell.unread++;
+    drawBell();
+    bell.el.classList.remove("ring");
+    void bell.el.offsetWidth; // restart the ring animation
+    bell.el.classList.add("ring");
+    if (document.hidden && "Notification" in window && Notification.permission === "granted") {
+      const note = new Notification(n.title, { body: n.body || "", icon: "/assets/naknak.svg", tag: n.id });
+      note.onclick = () => { window.focus(); location.hash = n.url || "#/"; note.close(); };
+    } else if (!document.hidden) {
+      alertBox(n.title);
+    }
+  });
+  // EventSource reconnects by itself; a 401 after logout ends it for good
+  bell.es.onerror = () => { if (bell.es.readyState === EventSource.CLOSED) setTimeout(listenBell, 30_000); };
+}
+
+function bellButton() {
+  bell.badge = h("span", { class: "badge", hidden: true });
+  bell.el = h("button", { class: "icon-btn bell", type: "button", "aria-haspopup": "true", title: "Benachrichtigungen" },
+    svg(["M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9", "M10.3 21a1.94 1.94 0 0 0 3.4 0"]), bell.badge);
+  bell.panel = h("div", { class: "bell-panel", hidden: true, role: "dialog", "aria-label": "Benachrichtigungen" });
+  bell.el.addEventListener("click", (e) => {
+    e.stopPropagation();
+    bell.panel.hidden = !bell.panel.hidden;
+    drawBell();
+  });
+  document.addEventListener("click", (e) => { if (!bell.panel.contains(e.target)) bell.panel.hidden = true; });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") bell.panel.hidden = true; });
+  loadBell();
+  listenBell();
+  return h("div", { class: "bell-wrap" }, bell.el, bell.panel);
+}
+
+function notifySettingsTile(st, i) {
+  const n = st.notify || {};
+  const t = tile("Benachrichtigungen", { cls: "w12", i });
+  const on = h("input", { type: "checkbox", checked: !n.off });
+  const night = h("input", { type: "checkbox", checked: !!n.night });
+  const ntfy = h("input", { type: "url", value: n.ntfy_url || "", placeholder: "https://ntfy.sh/dein-geheimes-thema", spellcheck: "false" });
+  const details = h("input", { type: "checkbox", checked: !!n.ntfy_details });
+  const msg = h("div", { class: "form-msg", "aria-live": "polite" });
+  const perm = h("button", { class: "ghost", type: "button" });
+  const drawPerm = () => {
+    const p = "Notification" in window ? Notification.permission : "unsupported";
+    perm.textContent = p === "granted" ? "Browser-Benachrichtigungen: erlaubt ✓" : p === "denied" ? "Browser-Benachrichtigungen: im Browser blockiert" : p === "unsupported" ? "Browser unterstützt keine Benachrichtigungen" : "Browser-Benachrichtigungen erlauben";
+    perm.disabled = p !== "default";
+  };
+  perm.addEventListener("click", async () => { await Notification.requestPermission(); drawPerm(); });
+  drawPerm();
+  const form = h("form", { class: "settings-form wide" },
+    h("label", { class: "check" }, on, h("span", {}, h("b", { text: "Im Hintergrund nach Neuem schauen" }), h("small", { text: "Noten alle 3 h · Moodle-Inhalte und Fristen stündlich · Nachrichten alle 15 min. Was das Portal gerade geladen hat, wird wiederverwendet." }))),
+    h("label", { class: "check" }, night, h("span", {}, h("b", { text: "Auch nachts (23–7 Uhr)" }), h("small", { text: "Sonst ruht naknak nachts und CIS/Moodle werden nicht gefragt." }))),
+    h("label", {}, "ntfy-Adresse für Push aufs Handy (optional)", ntfy),
+    h("label", { class: "check" }, details, h("span", {}, h("b", { text: "Details mitschicken" }), h("small", { text: "Sonst nur „Neue Note in naknak“. ntfy.sh ist ein öffentlicher Server; Noten und Nachrichten gehören da eigentlich nicht hin." }))),
+    h("div", { class: "row-actions" }, h("button", { class: "primary", type: "submit", text: "Speichern" }), perm),
+    msg);
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const res = await fetch("/api/settings/notify", { method: "PUT", credentials: "same-origin", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ off: !on.checked, night: night.checked, ntfy_url: ntfy.value.trim(), ntfy_details: details.checked }) });
+    const body = await res.json().catch(() => ({}));
+    msg.replaceChildren(res.ok ? h("p", { class: "ok-note", text: "Gespeichert." }) : errorBox(new Error(body.error || `HTTP ${res.status}`)));
+  });
+  t.append(form);
+  return t;
 }
 
 // ── header, theme, routing ──────────────────────────────────────────────────
@@ -1391,6 +1649,7 @@ function header() {
     h("div", { class: "tools" },
       h("span", { class: "stamp", "aria-live": "polite" }),
       refresh,
+      bellButton(),
       h("a", { class: "icon-btn", href: "#/einstellungen", title: "Einstellungen", "aria-label": "Einstellungen" }, svg(icons.gear)),
       h("button", { class: "icon-btn theme-btn", type: "button", onclick: switchTheme }),
       h("form", { method: "post", action: "/logout" }, h("button", { class: "icon-btn", type: "submit", title: "Abmelden", "aria-label": "Abmelden" }, svg(["M15 4h4v16h-4", "M10 8l-4 4 4 4", "M6 12h10"]))))));

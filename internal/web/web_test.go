@@ -48,6 +48,15 @@ func fakeRegistry(c *counters) *tools.Registry {
 				os.WriteFile(p, []byte("%PDF-1.4 skript"), 0o600)
 				return map[string]any{"path": p, "bytes": 15}, nil
 			}},
+		&tools.Tool{Name: "nak_agenda", Kind: tools.Read, Desc: "Kalender.",
+			Params: []tools.Param{{Name: "days", Type: "integer"}},
+			Run: func(a *app.App, args tools.Args) (any, error) {
+				return map[string]any{"days": []map[string]any{{"date": "Fr 02.10.2026", "events": []map[string]any{
+					{"date": "Fr 02.10.2026", "start": "09:00", "end": "12:15", "kind": "Vorlesung", "module_nr": "I151", "title": "Softwaretechnik; Teil 2, Übung", "room": "A101", "lecturer": "Muster", "source": "cis_stundenplan"},
+					{"date": "Fr 02.10.2026", "start": "11:30", "end": "13:00", "kind": "Klausur", "module_nr": "A222,I222", "title": "Diskrete Mathematik 2", "source": "cis_pruefung"},
+					{"date": "Fr 02.10.2026", "start": "23:59", "end": "23:59", "kind": "Moodle-Frist", "title": "Übungsblatt 3 (I160) — eine sehr lange Beschreibung, die über die fünfundsiebzig Zeichen einer ICS-Zeile hinausgeht", "source": "moodle"},
+				}}}}, nil
+			}},
 		&tools.Tool{Name: "fake_drift", Kind: tools.Read, Desc: "Kaputt.",
 			Run: func(a *app.App, args tools.Args) (any, error) {
 				return nil, drift.New("/studium/x", "a grades table", "<html><body><main><p>x</p></main></body></html>")
@@ -203,7 +212,7 @@ func TestToolList(t *testing.T) {
 	res := h.do(t, "GET", "/api/tools", "", bearer)
 	m := decode(t, res)
 	list, _ := m["tools"].([]any)
-	if len(list) != 4 {
+	if len(list) != 5 {
 		t.Fatalf("tools %v", m)
 	}
 	kinds := map[string]string{}

@@ -14,6 +14,22 @@ import (
 // settings.json in the data dir (0600 — they hold the EduVault credential).
 type Settings struct {
 	EduVault EduVaultSettings `json:"eduvault"`
+	Notify   NotifySettings   `json:"notify"`
+}
+
+// NotifySettings control the background watcher (new grades, Moodle news,
+// messages, urgent deadlines).
+type NotifySettings struct {
+	// Off disables the watcher (zero value = on, so it works out of the box).
+	Off bool `json:"off,omitempty"`
+	// NtfyURL, if set, gets every notification as a push (https://ntfy.sh/<topic>
+	// or a self-hosted ntfy).
+	NtfyURL string `json:"ntfy_url,omitempty"`
+	// NtfyDetails sends titles like "Neue Note: Datenbanken 1,7" instead of a
+	// generic "Neue Note in naknak" — off by default, ntfy.sh is a public server.
+	NtfyDetails bool `json:"ntfy_details,omitempty"`
+	// Night lets the watcher run between 23:00 and 07:00 too.
+	Night bool `json:"night,omitempty"`
 }
 
 type EduVaultSettings struct {

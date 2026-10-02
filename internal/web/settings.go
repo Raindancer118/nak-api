@@ -51,6 +51,7 @@ func (s *Server) getSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"eduvault":  ev,
+		"notify":    s.app.Settings().Notify,
 		"account":   s.accountInfo(),
 		"read_only": s.app.ReadOnly,
 		"version":   s.cfg.Version,
@@ -101,4 +102,24 @@ func (s *Server) deleteEduVault(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) accountInfo() map[string]any {
 	return map[string]any{"user": s.app.AccountUser(), "source": s.app.AccountSource()}
+}
+
+func (s *Server) putNotify(w http.ResponseWriter, r *http.Request) {
+	var in app.NotifySettings
+	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<12)).Decode(&in); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "body must be JSON"})
+		return
+	}
+	in.NtfyURL = strings.TrimSpace(in.NtfyURL)
+	if in.NtfyURL != "" && !strings.HasPrefix(in.NtfyURL, "https://") {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "ntfy-Adresse muss mit https:// beginnen, z.B. https://ntfy.sh/mein-geheimes-thema"})
+		return
+	}
+	st := s.app.Settings()
+	st.Notify = in
+	if err := s.app.SaveSettings(st); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"saved": true})
 }

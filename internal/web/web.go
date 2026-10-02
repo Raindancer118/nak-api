@@ -65,7 +65,9 @@ type Server struct {
 	cfg Config
 	ui  fs.FS
 
-	store *store
+	store   *store
+	watch   *watcher
+	history *history
 
 	loginMu sync.Mutex
 	logins  map[string]*attempts
@@ -96,6 +98,12 @@ func New(a *app.App, reg *tools.Registry, cfg Config) *Server {
 	if cfg.UIDir == "" {
 		s.login = template.Must(template.ParseFS(ui, "login.html"))
 	}
+	histFile := ""
+	if a.ConfigDir != "" && cfg.CacheFile != "" {
+		histFile = filepath.Join(a.ConfigDir, "history.json")
+	}
+	s.history = newHistory(histFile, cfg.Now)
+	s.watch = newWatcher(s)
 	return s
 }
 
@@ -117,6 +125,14 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("POST /api/tools/{name}", s.authed(http.HandlerFunc(s.callTool)))
 	mux.Handle("GET /files/{path...}", s.authed(http.HandlerFunc(s.file)))
 	mux.Handle("GET /api/settings", s.authed(http.HandlerFunc(s.getSettings)))
+	mux.Handle("GET /api/calendar", s.authed(http.HandlerFunc(s.calendarInfo)))
+	mux.Handle("GET /api/history", s.authed(http.HandlerFunc(s.historyAPI)))
+	mux.Handle("GET /api/notifications", s.authed(http.HandlerFunc(s.notifications)))
+	mux.Handle("POST /api/notifications/read", s.authed(s.jsonOnly(s.notificationsRead)))
+	mux.Handle("GET /api/events", s.authed(http.HandlerFunc(s.events)))
+	mux.Handle("PUT /api/settings/notify", s.authed(s.jsonOnly(s.putNotify)))
+	mux.Handle("POST /api/calendar/rotate", s.authed(s.jsonOnly(s.calendarRotate)))
+	mux.HandleFunc("GET /calendar/{file}", s.calendarFeed)
 	mux.Handle("PUT /api/settings/eduvault", s.authed(s.jsonOnly(s.putEduVault)))
 	mux.Handle("DELETE /api/settings/eduvault", s.authed(s.sameOriginOnly(s.deleteEduVault)))
 	mux.Handle("POST /api/cache/clear", s.authed(s.jsonOnly(func(w http.ResponseWriter, r *http.Request) {
@@ -488,6 +504,7 @@ func (s *Server) refresh(t *tools.Tool, key string, args tools.Args) (json.RawMe
 	if err != nil {
 		return nil, at, err
 	}
+	s.history.observe(t.Name, res)
 	e := entry{Res: res, At: at}
 	if t.Kind == tools.Local {
 		e.Path = resultPath(res)
@@ -577,7 +594,11 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 // LoadOrCreateToken returns the access token stored in dir, creating a
 // random one (mode 0600) on first start.
 func LoadOrCreateToken(dir string) (tok string, created bool, err error) {
-	p := filepath.Join(dir, tokenFile)
+	return loadOrCreateSecret(dir, tokenFile)
+}
+
+func loadOrCreateSecret(dir, file string) (tok string, created bool, err error) {
+	p := filepath.Join(dir, file)
 	if b, err := os.ReadFile(p); err == nil {
 		if t := strings.TrimSpace(string(b)); t != "" {
 			return t, false, nil

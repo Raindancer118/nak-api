@@ -75,6 +75,7 @@ var serveCmd = &cobra.Command{
 
 		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 		defer stop()
+		ws.StartWatcher(ctx)
 		errc := make(chan error, 1)
 		go func() { errc <- srv.Serve(ln) }()
 		select {
