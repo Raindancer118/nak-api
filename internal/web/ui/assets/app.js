@@ -2684,7 +2684,8 @@ function thesisReviewers() {
 }
 
 // Betreuungs-Assistent: a topic → fitting reviewers, or a topic + reviewer →
-// how well they fit. Matched on the server (nak_thesis_match), no external AI.
+// how well they fit. Matched on the server (nak_thesis_match), no external AI;
+// with NAK_EMBED_URL also by meaning via a local model.
 function matchCard(m, j, { compact = false } = {}) {
   const r = m.reviewer;
   return h("li", {}, h("div", { class: "row match", vars: { "--j": j } },
@@ -2725,6 +2726,9 @@ function thesisAssistant() {
     out.replaceChildren(...skeleton());
     try {
       const r = await api("nak_thesis_match", mode === "check" ? { topic: t, reviewer: who.value } : { topic: t }, { wait: true });
+      note.textContent = r.semantic
+        ? "Das Thema bleibt auf deinem naknak-Server: abgeglichen wird mit den Fachgebieten der Gutachtenden, nach Wörtern und nach Bedeutung (lokales Sprachmodell auf dem Server, keine externe KI)."
+        : "Das Thema bleibt auf deinem naknak-Server: abgeglichen wird mit den Fachgebieten aus der Übersicht der Gutachtenden, nicht mit einer externen KI.";
       if (mode === "suggest") {
         const list = r.suggestions || [];
         out.replaceChildren(list.length ? h("ul", { class: "rows" }, list.map((m, j) => matchCard(m, j))) : emptyRow("Niemand passt erkennbar. Anders formulieren oder Fachbegriffe ergänzen."),
@@ -2741,11 +2745,11 @@ function thesisAssistant() {
       out.replaceChildren(errorBox(err));
     }
   };
+  const note = h("p", { class: "empty meter", text: "Das Thema bleibt auf deinem naknak-Server: abgeglichen wird mit den Fachgebieten aus der Übersicht der Gutachtenden, nicht mit einer externen KI." });
   go.addEventListener("click", run);
   topic.addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) run(); });
   setMode("suggest");
-  return h("div", {}, seg, h("div", { class: "settings-form wide" }, h("label", {}, "Thema", topic), whoRow, h("div", { class: "row-actions" }, go)), out,
-    h("p", { class: "empty meter", text: "Das Thema bleibt auf deinem naknak-Server: abgeglichen wird mit den Fachgebieten aus der Übersicht der Gutachtenden, nicht mit einer externen KI." }));
+  return h("div", {}, seg, h("div", { class: "settings-form wide" }, h("label", {}, "Thema", topic), whoRow, h("div", { class: "row-actions" }, go)), out, note);
 }
 
 async function thesisPage(root) {

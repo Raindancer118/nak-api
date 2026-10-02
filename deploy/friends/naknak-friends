@@ -18,7 +18,8 @@
 #   naknak-friends list      show instances and their health
 #
 # Env: NAKNAK_DIR (default: this script's directory), NAKNAK_IMAGE,
-# NAK_OPERATOR / NAK_OPERATOR_CONTACT (shown to friends: who runs it).
+# NAK_OPERATOR / NAK_OPERATOR_CONTACT (shown to friends: who runs it),
+# NAK_EMBED_URL / NAK_EMBED_MODEL (optional local embedding model, e.g. Ollama).
 set -euo pipefail
 DIR=${NAKNAK_DIR:-$(cd "$(dirname "$0")" && pwd)}
 IMG=${NAKNAK_IMAGE:-ghcr.io/raindancer118/nak-api:edge}
@@ -51,8 +52,9 @@ render() {
       [ "$port" != - ] && ports=$'\n    ports:\n      - "'"$port"':8080"'
 
       local op=${NAK_OPERATOR:-} contact=${NAK_OPERATOR_CONTACT:-}
-      # a demo belongs to nobody: no "runs this for you" notice
-      [ "$owner" = demo ] && cmd="serve --demo" op="" contact=""
+      local embed=${NAK_EMBED_URL:-} model=${NAK_EMBED_MODEL:-bge-m3}
+      # a demo belongs to nobody: no "runs this for you" notice, no model
+      [ "$owner" = demo ] && cmd="serve --demo" op="" contact="" embed=""
       cat <<YML
   naknak-$slug:
     image: $IMG
@@ -63,6 +65,8 @@ render() {
       NAK_TRUST_PROXY: "1"
       NAK_OPERATOR: "$op"
       NAK_OPERATOR_CONTACT: "$contact"
+      NAK_EMBED_URL: "$embed"
+      NAK_EMBED_MODEL: "$model"
       TZ: Europe/Berlin
     volumes:
       - naknak-$slug-data:/data

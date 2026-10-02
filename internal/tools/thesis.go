@@ -3,8 +3,11 @@ package tools
 import (
 	"fmt"
 	"html"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Raindancer118/nak-api/internal/app"
@@ -164,7 +167,7 @@ func thesisTools() []*Tool {
 				if err != nil {
 					return nil, err
 				}
-				return matchResult(topic, args.Str("reviewer"), thesis.ParseReviewers(p.Body))
+				return matchResult(topic, args.Str("reviewer"), thesis.ParseReviewers(p.Body), embedderFor(a.ConfigDir))
 			}},
 		{Name: "nak_thesis_reviewers", Kind: Read, Desc: "Gutachtende für die Bachelorthesis: Name, Fachbereich, Fachgebiete und aktuelle Auslastung (frei/mittel/voll), optional gefiltert (z.B. 'datenbank').",
 			Params: []Param{{Name: "query", Desc: "Suchwörter (alle müssen in Name, Fachbereich oder Fachgebiet vorkommen)"}},
@@ -207,27 +210,62 @@ func applyThesisDeadline(a *app.App, c *client.Client, plan *transfer.Plan) {
 	}
 }
 
-// matchResult: suggestions, or one reviewer's fit plus better alternatives
-func matchResult(topic, reviewer string, rs []thesis.Reviewer) (any, error) {
-	if strings.TrimSpace(reviewer) == "" {
-		return map[string]any{"topic": topic, "suggestions": thesis.Suggest(topic, rs, 8)}, nil
+// matchResult: suggestions, or one reviewer's fit plus better alternatives.
+// emb (optional) adds the meaning of topic and subject areas to the words.
+func matchResult(topic, reviewer string, rs []thesis.Reviewer, emb thesis.Embedder) (any, error) {
+	all := thesis.ScoreSemantic(topic, rs, emb)
+	semantic := all != nil
+	suggest := func(n int) []thesis.Match {
+		if semantic {
+			return thesis.Rank(all, n)
+		}
+		return thesis.Suggest(topic, rs, n)
 	}
-	for _, r := range rs {
+	if strings.TrimSpace(reviewer) == "" {
+		return map[string]any{"topic": topic, "suggestions": suggest(8), "semantic": semantic}, nil
+	}
+	for i, r := range rs {
 		if strings.EqualFold(strings.TrimSpace(r.Name), strings.TrimSpace(reviewer)) {
 			m := thesis.MatchAmong(topic, r, rs)
+			if semantic {
+				m = all[i]
+			}
 			var better []thesis.Match
-			for _, s := range thesis.Suggest(topic, rs, 4) {
+			for _, s := range suggest(4) {
 				if s.Reviewer.Name != r.Name && s.Percent > m.Percent {
 					better = append(better, s)
 				}
 			}
-			return map[string]any{"topic": topic, "match": m, "better": better}, nil
+			return map[string]any{"topic": topic, "match": m, "better": better, "semantic": semantic}, nil
 		}
 	}
 	return nil, fmt.Errorf("keine gutachtende Person %q in der Übersicht", reviewer)
 }
 
+var embedders sync.Map // config dir → thesis.Embedder
+
+// embedderFor: the local embedding model from NAK_EMBED_URL (Ollama) and
+// NAK_EMBED_MODEL (default bge-m3), vectors cached in the config dir; nil
+// when not configured.
+func embedderFor(dir string) thesis.Embedder {
+	url := strings.TrimSpace(os.Getenv("NAK_EMBED_URL"))
+	if url == "" {
+		return nil
+	}
+	model := strings.TrimSpace(os.Getenv("NAK_EMBED_MODEL"))
+	if model == "" {
+		model = "bge-m3"
+	}
+	k := dir + "|" + url + "|" + model
+	if e, ok := embedders.Load(k); ok {
+		return e.(thesis.Embedder)
+	}
+	file := filepath.Join(dir, "embed-"+strings.NewReplacer("/", "_", ":", "_").Replace(model)+".json")
+	e, _ := embedders.LoadOrStore(k, thesis.NewCachedEmbedder(thesis.NewOllama(url, model), file))
+	return e.(thesis.Embedder)
+}
+
 // MatchResult is matchResult for other registries (demo).
 func MatchResult(topic, reviewer string, rs []thesis.Reviewer) (any, error) {
-	return matchResult(topic, reviewer, rs)
+	return matchResult(topic, reviewer, rs, nil)
 }

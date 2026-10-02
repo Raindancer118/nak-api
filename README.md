@@ -353,6 +353,7 @@ Add it to your MCP client:
 | `NAK_WEB_UI_DIR` | embedded | serve the UI from a directory (UI development) |
 | `NAK_OWNER` | – | only this NAK username may claim a fresh instance (set it before exposing naknak) |
 | `NAK_TRUST_PROXY` | off | `1` = take the client address from `X-Forwarded-For` (behind your own reverse proxy) |
+| `NAK_EMBED_URL`, `NAK_EMBED_MODEL` | –, `bge-m3` | local [Ollama](https://ollama.com) for the thesis reviewer assistant: matches topics by meaning, not only by words (`ollama pull bge-m3`, ~1.2 GB RAM while loaded). Without it, word matching only |
 | `EDUVAULT_URL`, `EDUVAULT_TOKEN`, `EDUVAULT_MCP_SECRET` | – | EduVault credential (same variables as the EduVault MCP; the web settings win) |
 
 The CIS session lives in `~/.config/cis-api/session.json` (0600) and is renewed automatically when it expires. PDF text uses Poppler's `pdftotext` when installed, a built-in extractor otherwise.

@@ -107,3 +107,13 @@ func TestUncoveredShowsTheWordsAsWritten(t *testing.T) {
 		t.Errorf("uncovered %q", got)
 	}
 }
+
+func TestPersonnelTopicsFindHR(t *testing.T) {
+	rs := []Reviewer{
+		{Name: "Pohl", Areas: []string{"Personalmanagement, Organisation"}},
+		{Name: "Scheffer", Areas: []string{"Kundenbindung", "Marketing"}},
+	}
+	if got := Suggest("Mitarbeiterbindung von Generation Z im Mittelstand", rs, 2); top(got) != "Pohl" {
+		t.Fatalf("top %q: %+v", top(got), got)
+	}
+}
