@@ -54,6 +54,7 @@ func (s *Server) getSettings(w http.ResponseWriter, r *http.Request) {
 		"notify":    s.app.Settings().Notify,
 		"account":   s.accountInfo(),
 		"read_only": s.app.ReadOnly,
+		"demo":      s.cfg.Demo,
 		"version":   s.cfg.Version,
 		"data_dir":  s.app.ConfigDir,
 	})

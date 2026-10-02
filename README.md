@@ -5,7 +5,7 @@
   <a href="https://github.com/Raindancer118/nak-api/releases"><img alt="release" src="https://img.shields.io/github/v/release/Raindancer118/nak-api?style=for-the-badge&labelColor=07101f&color=6fb2ff&label=release"></a>
   <a href="https://github.com/Raindancer118/nak-api/actions"><img alt="ci" src="https://img.shields.io/github/actions/workflow/status/Raindancer118/nak-api/ci.yml?branch=main&style=for-the-badge&labelColor=07101f&color=7ed4a6&label=ci"></a>
   <img alt="Go" src="https://img.shields.io/github/go-mod/go-version/Raindancer118/nak-api?style=for-the-badge&labelColor=07101f&color=6fb2ff&logo=go&logoColor=6fb2ff">
-  <img alt="MCP" src="https://img.shields.io/badge/mcp-78_tools-f39a4c?style=for-the-badge&labelColor=07101f">
+  <img alt="MCP" src="https://img.shields.io/badge/mcp-83_tools-f39a4c?style=for-the-badge&labelColor=07101f">
   <a href="LICENSE"><img alt="WTFPL" src="https://img.shields.io/badge/license-WTFPL-ffc857?style=for-the-badge&labelColor=07101f"></a>
 </p>
 
@@ -19,6 +19,7 @@
   <a href="#overview">Overview</a> &nbsp;·&nbsp;
   <a href="#studies">CIS</a> &nbsp;·&nbsp;
   <a href="#moodle">Moodle</a> &nbsp;·&nbsp;
+  <a href="#portal">Web portal</a> &nbsp;·&nbsp;
   <a href="#safety">Safety</a> &nbsp;·&nbsp;
   <a href="#get-it">Install</a> &nbsp;·&nbsp;
   <a href="#under-the-hood">How it works</a>
@@ -153,6 +154,89 @@ The CIS has no API. nak reads its TYPO3 pages the way a browser does and turns t
 
 <br>
 
+<a id="portal"></a>
+<img alt="naknak, in the browser" src="docs/readme/h-portal-light.svg#gh-light-mode-only" width="100%">
+<img alt="naknak, in the browser" src="docs/readme/h-portal-dark.svg#gh-dark-mode-only" width="100%">
+
+`nak serve` turns the same tools into **naknak**, a web portal you host yourself: CIS and Moodle on one screen, so you never have to open Moodle again. One person per instance — your instance, your data, your server.
+
+<img alt="naknak overview: next lecture, deadlines, week, grades (made-up data)" src="docs/readme/portal/overview-light.webp#gh-light-mode-only" width="100%">
+<img alt="naknak overview: next lecture, deadlines, week, grades (made-up data)" src="docs/readme/portal/overview-dark.webp#gh-dark-mode-only" width="100%">
+
+<table>
+<tr>
+<td width="50%" valign="top">
+
+**One page per module.** Grade, exam history (naknak remembers exams after the CIS forgets them), study plan, dates, lecturers, every linked Moodle course with its content, forum and assignments — matched across number schemes (`A222,I222` for the module graded as `I168`), tutorials and `2`/`II` spellings.
+
+**Moodle inside.** Course content, files (opened in the browser), forums with replies, assignments with upload, messages, news.
+
+**Search and Ctrl+K.** One search for modules, courses, files and activities; a command palette for everything else.
+
+**Old exams.** With an [EduVault](https://eduvault4.de) credential in the settings, every module page lists the matching old and practice exams.
+
+</td>
+<td width="50%" valign="top">
+
+**Tells you what's new.** A watcher notices new grades, Moodle content, messages and urgent deadlines — bell, browser notification, or a push via [ntfy](https://ntfy.sh) (without details unless you want them).
+
+**Calendar subscription.** Lectures, exams and deadlines as an ICS feed for any calendar app, with reminders.
+
+**Fast without hammering the NAK.** Stale-while-revalidate cache with per-source freshness (messages 1 min … grades 2 h), shared reads, kept across restarts. Installable PWA that works offline.
+
+**Same safety.** Binding actions show a preview first and need a second, explicit click.
+
+</td>
+</tr>
+</table>
+
+<img alt="naknak module page: grade, exam history, dates, lecturers (made-up data)" src="docs/readme/portal/modul-light.webp#gh-light-mode-only" width="100%">
+<img alt="naknak module page: grade, exam history, dates, lecturers (made-up data)" src="docs/readme/portal/modul-dark.webp#gh-dark-mode-only" width="100%">
+
+<p align="center"><sub>Screenshots from <code>nak serve --demo</code> — every name, grade and date is invented.</sub></p>
+
+**Try it without an account:**
+
+```sh
+docker run --rm -p 127.0.0.1:8080:8080 ghcr.io/raindancer118/nak-api serve --demo
+# open http://localhost:8080
+```
+
+**Run your own** (Docker Compose, the file is in this repo):
+
+```sh
+curl -O https://raw.githubusercontent.com/Raindancer118/nak-api/main/docker-compose.yml
+docker compose up -d
+docker compose logs nak      # once: a login link with a fallback access key
+```
+
+Open http://localhost:8080 and sign in with your NORDAKADEMIE account. The first account that signs in owns the instance; its login is checked against the CIS and stored in the data volume (`account.json`, readable only by naknak). No `.env` needed — or set `CIS_USER`/`CIS_PASS` there if you prefer.
+
+> [!IMPORTANT]
+> The port is bound to `127.0.0.1` on purpose. To reach naknak from elsewhere, put a TLS reverse proxy in front (Caddy, nginx, Traefik …) instead of opening the port. naknak sets `Secure` cookies and HSTS as soon as the proxy sends `X-Forwarded-Proto: https`.
+
+<details>
+<summary><b>What is stored where</b></summary>
+
+Everything lives in the data directory (`/data` in the container, `NAK_DATA_DIR` otherwise), files `0600`:
+
+| File | Content |
+| --- | --- |
+| `account.json` | NAK login (needed for the CIS and Moodle logins) |
+| `session.json` | CIS session cookie |
+| `settings.json` | EduVault credential, notification settings |
+| `web-token`, `calendar-token` | fallback access key, secret of the calendar feed |
+| `web-cache.json` | cached tool results (your grades, messages …) |
+| `watch.json`, `history.json` | what the watcher has seen; exams and grade steps |
+| `writes.log` | every binding action: target and field names, never values |
+| `downloads/`, `uploads/` | opened files; uploads for submissions (removed after a day) |
+
+Signing out also clears the data the browser kept for offline use.
+
+</details>
+
+<br>
+
 <a id="safety"></a>
 <img alt="Nothing binding without your yes" src="docs/readme/h-safety-light.svg#gh-light-mode-only" width="100%">
 <img alt="Nothing binding without your yes" src="docs/readme/h-safety-dark.svg#gh-dark-mode-only" width="100%">
@@ -217,6 +301,13 @@ Add it to your MCP client:
 | `NAK_DOWNLOAD_DIR` | `~/Downloads/nak` | default download folder; files are never overwritten |
 | `NAK_TZ` | `Europe/Berlin` | time zone of all dates |
 | `MOODLE_URL`, `CIS_BASE_URL` | moodle2 / cis.nordakademie.de | other hosts (tests) |
+| `NAK_DATA_DIR` | `~/.config/cis-api` | session, settings, cache and downloads in one place |
+| `NAK_CLIENT_CACHE_TTL` | `90s` | identical CIS/Moodle reads are shared this long (`0` = off) |
+| `NAK_WEB_ADDR` | `127.0.0.1:8080` | `nak serve` listen address (`0.0.0.0:8080` in the image) |
+| `NAK_WEB_TOKEN` | generated | fallback access key for the web UI and API (`Authorization: Bearer …`) |
+| `NAK_WEB_CACHE_TTL` | per tool | one freshness for all tools instead of the built-in per-tool values |
+| `NAK_WEB_UI_DIR` | embedded | serve the UI from a directory (UI development) |
+| `EDUVAULT_URL`, `EDUVAULT_TOKEN`, `EDUVAULT_MCP_SECRET` | – | EduVault credential (same variables as the EduVault MCP; the web settings win) |
 
 The CIS session lives in `~/.config/cis-api/session.json` (0600) and is renewed automatically when it expires. PDF text uses Poppler's `pdftotext` when installed, a built-in extractor otherwise.
 
@@ -231,6 +322,8 @@ nak tools [filter] [--params]    list tools (WRITE = binding)
 nak tool <name> key=value …      run a tool, JSON out; values may be JSON
 nak login | logout               CIS session
 nak selfcheck [--report] [--json]   is the CIS still as expected? file issues for changes
+nak serve [--addr] [--demo]      naknak web portal (--demo: invented data, no account)
+nak healthcheck [--url]          exit 0 if the web portal answers (container health check)
 ```
 
 ```sh

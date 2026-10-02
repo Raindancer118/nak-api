@@ -128,3 +128,56 @@ func TestBinaryServesWebUI(t *testing.T) {
 		}
 	}
 }
+
+// TestDemoNeedsNoAccount: `serve --demo` answers every UI tool with invented
+// data and needs neither a login nor the CIS.
+func TestDemoNeedsNoAccount(t *testing.T) {
+	bin := buildBinary(t)
+	cmd := exec.Command(bin, "serve", "--demo", "--addr", "127.0.0.1:0")
+	cmd.Env = append(os.Environ(), "HOME="+t.TempDir(), "CIS_USER=", "CIS_PASS=", "CIS_BASE_URL=http://127.0.0.1:1")
+	stderr, _ := cmd.StderrPipe()
+	if err := cmd.Start(); err != nil {
+		t.Fatal(err)
+	}
+	defer cmd.Process.Kill()
+	re := regexp.MustCompile(`web UI on (http://127\.0\.0\.1:\d+)`)
+	found := make(chan string, 1)
+	go func() {
+		sc := bufio.NewScanner(stderr)
+		for sc.Scan() {
+			if m := re.FindStringSubmatch(sc.Text()); m != nil {
+				found <- m[1]
+			}
+		}
+	}()
+	var base string
+	select {
+	case base = <-found:
+	case <-time.After(15 * time.Second):
+		t.Fatal("demo did not start")
+	}
+	for _, tool := range []string{"nak_dashboard", "nak_agenda", "nak_deadlines", "cis_grades", "cis_progress", "cis_list_klausuren", "moodle_courses", "moodle_whoami", "moodle_whats_new", "moodle_conversations", "moodle_assignments", "eduvault_module_exams"} {
+		res, err := http.Post(base+"/api/tools/"+tool, "application/json", strings.NewReader(`{"title":"Datenbanksysteme"}`))
+		if err != nil {
+			t.Fatal(err)
+		}
+		res.Body.Close()
+		if res.StatusCode != 200 {
+			t.Errorf("%s: %d", tool, res.StatusCode)
+		}
+	}
+	// a binding action only ever answers "demo"
+	req, _ := http.NewRequest("POST", base+"/api/tools/cis_klausur_action", strings.NewReader(`{"exam_id":"9002","action":"register","confirm":true}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Nak-Confirm", "JA")
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var m map[string]any
+	json.NewDecoder(res.Body).Decode(&m)
+	res.Body.Close()
+	if b, _ := json.Marshal(m); !strings.Contains(string(b), "Demo") {
+		t.Fatalf("demo write: %s", b)
+	}
+}

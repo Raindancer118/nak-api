@@ -1,0 +1,435 @@
+// Package demo is a complete, made-up student for `nak serve --demo`: every
+// tool the web UI uses answers with invented data relative to today, so
+// naknak can be tried (and screenshotted) without a NAK account. Nothing in
+// here talks to the CIS, Moodle or EduVault.
+package demo
+
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
+
+	"github.com/Raindancer118/nak-api/internal/app"
+	"github.com/Raindancer118/nak-api/internal/tools"
+)
+
+type module struct {
+	nr, title, grade, status, examDate, lecturer string
+	value                                        float64
+	attempt, credits, courseID                   int
+}
+
+var modules = []module{
+	{"I151", "Softwaretechnik", "", "offen", "", "Dr. Ada Lindqvist", 0, 0, 6, 2101},
+	{"I160", "Datenbanksysteme", "", "offen", "", "Prof. Jonas Brandt", 0, 0, 6, 2102},
+	{"I168", "Diskrete Mathematik 2", "4,0 (2.Versuch)", "bestanden", "11.02.2026", "Prof. Mira Okafor", 4.0, 2, 5, 2103},
+	{"I145", "Diskrete Mathematik 1", "2,3", "bestanden", "14.07.2025", "Prof. Mira Okafor", 2.3, 1, 5, 2004},
+	{"I201", "Einführung in die objektorientierte Programmierung", "1,3", "bestanden", "03.02.2025", "Felix Sorensen", 1.3, 1, 6, 2005},
+	{"I154", "Rechnernetze", "1,7", "bestanden", "22.07.2025", "Dr. Ilse Varga", 1.7, 1, 5, 2006},
+	{"W110", "Allgemeine Volkswirtschaftslehre", "2,0", "bestanden", "10.12.2025", "Prof. Tomas Reyes", 2.0, 1, 5, 2007},
+	{"I180", "Wissenschaftliches Arbeiten", "bestanden", "bestanden", "01.06.2025", "Hanna Weiss", 0, 1, 3, 2008},
+	{"I172", "Betriebssysteme", "2,7", "bestanden", "18.02.2026", "Dr. Paul Engel", 2.7, 1, 6, 2009},
+}
+
+func lectureDays(now time.Time) []time.Time {
+	day := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	var out []time.Time
+	for i := 0; len(out) < 10; i++ {
+		d := day.AddDate(0, 0, i)
+		if d.Weekday() != time.Saturday && d.Weekday() != time.Sunday {
+			out = append(out, d)
+		}
+	}
+	return out
+}
+
+var wd = []string{"So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"}
+
+func label(t time.Time) string { return wd[t.Weekday()] + " " + t.Format("02.01.2006") }
+
+// weekday moves a date off the weekend (demo exams are on weekdays).
+func weekday(t time.Time) time.Time {
+	for t.Weekday() == time.Saturday || t.Weekday() == time.Sunday {
+		t = t.AddDate(0, 0, 1)
+	}
+	return t
+}
+
+func ev(t time.Time, start, end, kind, nr, title, room, lecturer, source string) map[string]any {
+	return map[string]any{"date": label(t), "start": start, "end": end, "kind": kind, "module_nr": nr, "title": title, "room": room, "lecturer": lecturer, "source": source}
+}
+
+// agenda: lectures on weekdays, one exam, two Moodle deadlines.
+func agenda(a *app.App, days int) map[string]any {
+	now := a.Now().In(a.Zone)
+	byDay := map[string][]map[string]any{}
+	var order []string
+	add := func(t time.Time, e map[string]any) {
+		k := label(t)
+		if _, ok := byDay[k]; !ok {
+			order = append(order, k)
+		}
+		byDay[k] = append(byDay[k], e)
+	}
+	limit := now.AddDate(0, 0, days)
+	for i, d := range lectureDays(now) {
+		if d.After(limit) {
+			break
+		}
+		switch i % 3 {
+		case 0:
+			add(d, ev(d, "09:00", "12:15", "Vorlesung", "I151", "Softwaretechnik", "A 101", "Dr. Ada Lindqvist", "cis_stundenplan"))
+			add(d, ev(d, "13:00", "16:15", "Vorlesung", "I160", "Datenbanksysteme", "B 204", "Prof. Jonas Brandt", "cis_stundenplan"))
+		case 1:
+			add(d, ev(d, "09:00", "12:15", "Übung", "I160", "Datenbanksysteme", "PC-Pool 2", "Prof. Jonas Brandt", "cis_stundenplan"))
+		case 2:
+			add(d, ev(d, "10:00", "13:15", "Vorlesung", "I151", "Softwaretechnik", "A 101", "Dr. Ada Lindqvist", "cis_stundenplan"))
+		}
+	}
+	exam := weekday(now.AddDate(0, 0, 9))
+	add(exam, ev(exam, "09:00", "11:00", "Klausur", "I160", "Datenbanksysteme", "Audimax", "", "cis_pruefung"))
+	d1, d2 := now.AddDate(0, 0, 1), now.AddDate(0, 0, 4)
+	add(d1, ev(d1, "23:59", "23:59", "Moodle-Frist", "", "Übungsblatt 4 (I160_I24)", "", "", "moodle"))
+	add(d2, ev(d2, "12:00", "12:00", "Moodle-Frist", "", "Projektabgabe Sprint 2 (I151_I24)", "", "", "moodle"))
+	var out []map[string]any
+	for _, k := range order {
+		out = append(out, map[string]any{"date": k, "events": byDay[k]})
+	}
+	return map[string]any{"from": now.Format("2006-01-02"), "to": limit.Format("2006-01-02"), "days": out, "notes": []string{}}
+}
+
+func deadlines(a *app.App) []map[string]any {
+	now := a.Now().In(a.Zone)
+	dl := func(t time.Time, what, kind, src string) map[string]any {
+		days := int(time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, a.Zone).Sub(time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, a.Zone)).Hours() / 24)
+		return map[string]any{"when": label(t) + " " + t.Format("15:04"), "in_days": days, "what": what, "kind": kind, "source": src, "urgent": days <= 2}
+	}
+	at := func(d int, hh, mm int) time.Time {
+		t := now.AddDate(0, 0, d)
+		return time.Date(t.Year(), t.Month(), t.Day(), hh, mm, 0, 0, a.Zone)
+	}
+	return []map[string]any{
+		dl(at(1, 23, 59), "Übungsblatt 4", "moodle_assign", "moodle"),
+		dl(at(4, 12, 0), "Projektabgabe Sprint 2", "moodle_assign", "moodle"),
+		dl(weekday(at(9, 9, 0)), "Klausur I160 Datenbanksysteme", "exam", "cis"),
+		dl(at(12, 23, 59), "Anmeldeschluss WP Data Science Basics", "exam_registration", "cis"),
+		dl(at(20, 23, 59), "Abgabe Transferleistung 6: Datenqualität im Betrieb", "transfer", "cis"),
+	}
+}
+
+func courses(classification string) []map[string]any {
+	type c struct {
+		id                    int
+		short, name, state, p string
+	}
+	all := []c{
+		{2101, "I151_I24", "I151 - Softwaretechnik - I24a - Lindqvist", "current", "35%"},
+		{2102, "I160_I24", "I160 - Datenbanksysteme - I24a/b - Brandt", "current", "52%"},
+		{2110, "TuI160_I24", "Tutorium Datenbanksysteme - I24", "current", ""},
+		{2111, "Transfer", "Transferleistungen Theorie / Praxis", "current", ""},
+		{2103, "I168_I23", "I168 - Diskrete Mathematik 2 - I23 - Okafor", "past", "88%"},
+		{2004, "I145_I23", "I145 - Diskrete Mathematik 1 - I23 - Okafor", "past", "100%"},
+		{2005, "I201_I23", "I201 - Einführung in die objektorientierte Programmierung - I23 - Sorensen", "past", "100%"},
+		{2006, "I154_I23", "I154 - Rechnernetze - I23 - Varga", "past", "90%"},
+	}
+	var out []map[string]any
+	for _, x := range all {
+		if classification == "current" && x.state != "current" || classification == "past" && x.state != "past" {
+			continue
+		}
+		out = append(out, map[string]any{"id": x.id, "shortname": x.short, "name": x.name, "state": x.state, "progress": x.p, "last_access": "2026-09-30 18:12", "url": fmt.Sprintf("https://moodle.example/course/view.php?id=%d", x.id)})
+	}
+	return out
+}
+
+func grades() map[string]any {
+	var mods []map[string]any
+	passed, open, earned := 0, 0, 0
+	sum, weight := 0.0, 0.0
+	for _, m := range modules {
+		row := map[string]any{"module_nr": m.nr, "title": m.title, "grade": m.grade, "status": m.status, "exam_date": m.examDate, "entry_date": m.examDate, "credits": fmt.Sprint(m.credits), "attempt": m.attempt}
+		if m.value > 0 {
+			row["grade_value"] = m.value
+			sum += m.value * float64(m.credits)
+			weight += float64(m.credits)
+		}
+		if m.status == "bestanden" {
+			passed++
+			earned += m.credits
+		} else {
+			open++
+		}
+		mods = append(mods, row)
+	}
+	return map[string]any{
+		"overview": map[string]any{"student": "Max Mustermann", "modules": mods, "average": fmt.Sprintf("%.1f", sum/weight), "credits_total": fmt.Sprint(earned + 25), "seminar_credits": "4,5", "transfer_credits": "25"},
+		"stats":    map[string]any{"passed": passed, "failed": 0, "open": open, "credits_earned": earned + 25, "weighted_average": sum / weight},
+	}
+}
+
+func progress() map[string]any {
+	g := grades()
+	earned := g["stats"].(map[string]any)["credits_earned"].(int)
+	var sem []map[string]any
+	var mods []map[string]any
+	for _, m := range modules {
+		mods = append(mods, map[string]any{"module_nr": m.nr, "title": m.title, "status": m.status, "grade": m.grade, "credits": m.credits})
+	}
+	sem = append(sem, map[string]any{"semester": 1, "passed": 7, "open": 2, "failed": 0, "modules": mods})
+	return map[string]any{"credits": map[string]any{"module_earned": earned - 25, "module_planned": 173, "transfer_earned": 25, "transfer_planned": 30, "total_earned": earned, "total_required": 210, "cis_credits_total": fmt.Sprint(earned)}, "semesters": sem}
+}
+
+func exams(a *app.App) []map[string]any {
+	now := a.Now().In(a.Zone)
+	d := func(n int, clock string) string {
+		return weekday(now.AddDate(0, 0, n)).Format("02.01.2006") + " " + clock
+	}
+	return []map[string]any{
+		{"exam_id": "9001", "module_nr": "I160", "title": "Datenbanksysteme", "start": d(9, "09:00"), "ende": d(9, "11:00"), "registered": true, "zenturien": []string{"I24a"}, "dozenten": []string{"Brandt, Jonas"},
+			"action": "deregister", "action_label": "Abmelden", "deadlines": map[string]any{"register_closes": d(-5, "23:59"), "deregister_until": d(2, "23:59")}},
+		{"exam_id": "9002", "module_nr": "I151", "title": "Softwaretechnik", "start": d(23, "09:00"), "ende": d(23, "11:00"), "registered": false, "zenturien": []string{"I24a"}, "dozenten": []string{"Lindqvist, Ada"},
+			"action": "register", "action_label": "Anmelden", "deadlines": map[string]any{"register_closes": d(8, "23:59"), "deregister_until": d(16, "23:59")}},
+		{"exam_id": "9003", "module_nr": "WP", "title": "WP Data Science Basics", "start": d(30, "08:00"), "registered": false, "dozenten": []string{"Rahimi, Leyla"},
+			"action": "register", "action_label": "Anmelden", "deadlines": map[string]any{"register_closes": d(12, "23:59")}},
+	}
+}
+
+func contents(id int) []map[string]any {
+	file := func(name, size string) map[string]any {
+		return map[string]any{"name": name, "size": size, "mimetype": "application/pdf", "modified": "2026-09-28 10:15", "fileurl": "https://moodle.example/pluginfile.php/" + fmt.Sprint(id) + "/" + name}
+	}
+	return []map[string]any{
+		{"section": 0, "name": "Allgemeines", "summary": "Willkommen! Hier findet ihr Folien, Übungen und alles zur Klausur.", "modules": []map[string]any{
+			{"cmid": id*10 + 1, "name": "Ankündigungen", "type": "forum", "url": "https://moodle.example/mod/forum/view.php?id=1"},
+			{"cmid": id*10 + 2, "name": "Modulhandbuch", "type": "resource", "files": []map[string]any{file("modulhandbuch.pdf", "184.2 KB")}},
+		}},
+		{"section": 1, "name": "Woche 1 · Grundlagen", "modules": []map[string]any{
+			{"cmid": id*10 + 3, "name": "Folien Kapitel 1", "type": "resource", "files": []map[string]any{file("kapitel-1.pdf", "2.4 MB")}},
+			{"cmid": id*10 + 4, "name": "Übungsblatt 4", "type": "assign", "dates": map[string]any{"Fällig": "morgen 23:59"}, "text": "Bearbeitet die Aufgaben 1–3 in Zweiergruppen und ladet eine PDF hoch."},
+			{"cmid": id*10 + 5, "name": "Vorlesungsaufzeichnung", "type": "url", "links": []string{"https://video.example/aufzeichnung-1"}},
+		}},
+		{"section": 2, "name": "Woche 2 · Vertiefung", "modules": []map[string]any{
+			{"cmid": id*10 + 6, "name": "Folien Kapitel 2", "type": "resource", "files": []map[string]any{file("kapitel-2.pdf", "3.1 MB")}},
+			{"cmid": id*10 + 7, "name": "Hinweis", "type": "label", "text": "Die Übung am Donnerstag findet im PC-Pool statt."},
+			{"cmid": id*10 + 8, "name": "Selbsttest Kapitel 2", "type": "quiz", "url": "https://moodle.example/mod/quiz/view.php?id=8"},
+		}},
+	}
+}
+
+// pdf writes a tiny valid PDF so "open file" works in the demo.
+func pdf(a *app.App, name, title string) (map[string]any, error) {
+	dir := filepath.Join(a.DownloadDir, "demo")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return nil, err
+	}
+	text := strings.NewReplacer("(", "", ")", "", "\\", "").Replace(title)
+	body := "BT /F1 24 Tf 72 720 Td (" + text + ") Tj 0 -36 Td /F1 12 Tf (naknak Demo - erfundene Inhalte) Tj ET"
+	objs := []string{
+		"<< /Type /Catalog /Pages 2 0 R >>",
+		"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+		"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>",
+		fmt.Sprintf("<< /Length %d >>\nstream\n%s\nendstream", len(body), body),
+		"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+	}
+	var b strings.Builder
+	b.WriteString("%PDF-1.4\n")
+	offs := []int{}
+	for i, o := range objs {
+		offs = append(offs, b.Len())
+		fmt.Fprintf(&b, "%d 0 obj\n%s\nendobj\n", i+1, o)
+	}
+	xref := b.Len()
+	fmt.Fprintf(&b, "xref\n0 %d\n0000000000 65535 f \n", len(objs)+1)
+	for _, o := range offs {
+		fmt.Fprintf(&b, "%010d 00000 n \n", o)
+	}
+	fmt.Fprintf(&b, "trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n", len(objs)+1, xref)
+	p := filepath.Join(dir, filepath.Base(name))
+	if err := os.WriteFile(p, []byte(b.String()), 0o644); err != nil {
+		return nil, err
+	}
+	return map[string]any{"path": p, "bytes": b.Len()}, nil
+}
+
+func read(name, desc string, run func(a *app.App, args tools.Args) (any, error)) *tools.Tool {
+	return &tools.Tool{Name: name, Kind: tools.Read, Desc: desc, Run: run, Params: []tools.Param{{Name: "days", Type: "integer"}, {Name: "courseid", Type: "integer"}, {Name: "classification"}, {Name: "module_nr"}, {Name: "title"}, {Name: "query"}, {Name: "discussionid", Type: "integer"}, {Name: "conversationid", Type: "integer"}, {Name: "assignid", Type: "integer"}, {Name: "limit", Type: "integer"}, {Name: "only_open", Type: "boolean"}}}
+}
+
+func write(name, desc string, preview func(args tools.Args) any) *tools.Tool {
+	return &tools.Tool{Name: name, Kind: tools.Write, Desc: desc,
+		Params:  []tools.Param{{Name: "exam_id"}, {Name: "action"}, {Name: "postid", Type: "integer"}, {Name: "message"}, {Name: "conversationid", Type: "integer"}, {Name: "text"}, {Name: "assignid", Type: "integer"}, {Name: "files", Type: "array:string"}, {Name: "online_text"}, {Name: "submit_for_grading", Type: "boolean"}},
+		Preview: func(a *app.App, args tools.Args) (any, error) { return preview(args), nil },
+		Do: func(a *app.App, args tools.Args) (any, error) {
+			return map[string]any{"demo": "Demo – nichts gesendet. In einer echten Instanz wäre das jetzt verbindlich passiert."}, nil
+		}}
+}
+
+// Registry is the demo tool set.
+func Registry() *tools.Registry {
+	r := tools.NewRegistry()
+	r.Add(
+		read("moodle_whoami", "Demo-Nutzer", func(*app.App, tools.Args) (any, error) {
+			return map[string]any{"user": "Max Mustermann", "username": "demo", "site": "Moodle (Demo)"}, nil
+		}),
+		read("nak_agenda", "Demo-Kalender", func(a *app.App, args tools.Args) (any, error) {
+			d, _ := args.Int("days", 7)
+			return agenda(a, int(d)), nil
+		}),
+		read("nak_deadlines", "Demo-Fristen", func(a *app.App, args tools.Args) (any, error) {
+			return map[string]any{"deadlines": deadlines(a), "generated": a.Now().Format("2006-01-02 15:04")}, nil
+		}),
+		read("nak_dashboard", "Demo-Überblick", func(a *app.App, _ tools.Args) (any, error) {
+			now := a.Now().In(a.Zone)
+			return map[string]any{"now": label(now) + " " + now.Format("15:04"),
+				"registered_exams": []map[string]any{{"module": "I160 Datenbanksysteme", "start": weekday(now.AddDate(0, 0, 9)).Format("02.01.2006") + " 09:00", "exam_id": "9001"}},
+				"moodle_unread":    map[string]any{"notifications": 2, "conversations": 1},
+				"quarter":          map[string]any{"current": map[string]any{"name": "IV/26", "from": "05.10.2026", "to": "20.12.2026"}},
+				"balance":          map[string]any{"Kopierguthaben": "7,40 €"}}, nil
+		}),
+		read("cis_grades", "Demo-Noten", func(*app.App, tools.Args) (any, error) { return grades(), nil }),
+		read("cis_progress", "Demo-Studienfortschritt", func(*app.App, tools.Args) (any, error) { return progress(), nil }),
+		read("cis_list_klausuren", "Demo-Prüfungen", func(a *app.App, _ tools.Args) (any, error) { return exams(a), nil }),
+		read("moodle_courses", "Demo-Kurse", func(_ *app.App, args tools.Args) (any, error) { return courses(args.Str("classification")), nil }),
+		read("moodle_course_contents", "Demo-Kursinhalt", func(_ *app.App, args tools.Args) (any, error) {
+			id, _ := args.Int("courseid", 0)
+			return contents(int(id)), nil
+		}),
+		read("moodle_course_info", "Demo-Kursinfo", func(_ *app.App, args tools.Args) (any, error) {
+			return map[string]any{"category": "Bachelor Informatik", "startdate": "2026-07-27", "summary": "Ein erfundener Kurs für die naknak-Demo."}, nil
+		}),
+		read("nak_module", "Demo-Modul", func(a *app.App, args tools.Args) (any, error) {
+			nr := strings.ToUpper(args.Str("module_nr"))
+			out := map[string]any{"module_nr": nr}
+			for _, m := range modules {
+				if m.nr == nr {
+					out["title"] = m.title
+					if m.grade != "" {
+						out["grade"] = map[string]any{"module_nr": m.nr, "title": m.title, "grade": m.grade, "grade_value": m.value, "status": m.status, "exam_date": m.examDate, "attempt": m.attempt}
+						out["distribution"] = map[string]any{"average": 2.6, "count": 84, "lecturers": []string{m.lecturer}, "buckets": []map[string]any{{"grade": "1,0", "count": 6}, {"grade": "1,3", "count": 9}, {"grade": "1,7", "count": 12}, {"grade": "2,0", "count": 14}, {"grade": "2,3", "count": 11}, {"grade": "2,7", "count": 10}, {"grade": "3,0", "count": 8}, {"grade": "3,3", "count": 5}, {"grade": "3,7", "count": 4}, {"grade": "4,0", "count": 3}, {"grade": "5,0", "count": 2}}, "percentile": 22}
+					}
+					out["studienplan"] = map[string]any{"credits": m.credits, "exam_form_name": "Klausur (90 Minuten)", "exam_semester": 3}
+				}
+			}
+			ag := agenda(a, 21)
+			var next []map[string]any
+			for _, d := range ag["days"].([]map[string]any) {
+				for _, e := range d["events"].([]map[string]any) {
+					if e["module_nr"] == nr && e["kind"] != "Klausur" {
+						next = append(next, e)
+					}
+				}
+			}
+			out["next_sessions"] = next
+			return out, nil
+		}),
+		read("moodle_whats_new", "Demo-Neuigkeiten", func(*app.App, tools.Args) (any, error) {
+			return []map[string]any{
+				{"course": "I160_I24", "courseid": 2102, "cmid": 21026, "activity": "Folien Kapitel 2", "type": "resource", "changes": []string{"1 neue/geänderte Datei(en)"}},
+				{"course": "I151_I24", "courseid": 2101, "cmid": 21011, "activity": "Ankündigungen", "type": "forum", "changes": []string{"2 neue Beiträge"}},
+				{"course": "I160_I24", "courseid": 2102, "cmid": 21024, "activity": "Übungsblatt 4", "type": "assign", "changes": []string{"Beschreibung geändert"}},
+			}, nil
+		}),
+		read("moodle_notifications", "Demo-Benachrichtigungen", func(*app.App, tools.Args) (any, error) {
+			return []map[string]any{
+				{"id": 501, "subject": "Neue Bewertung: Übungsblatt 3", "time": "2026-10-01 16:40", "unread": true},
+				{"id": 502, "subject": "Neuer Beitrag in Ankündigungen: Raumänderung Donnerstag", "time": "2026-10-01 09:12", "unread": true},
+				{"id": 503, "subject": "Erinnerung: Projektabgabe Sprint 2", "time": "2026-09-29 08:00", "unread": false},
+			}, nil
+		}),
+		read("moodle_conversations", "Demo-Nachrichten", func(*app.App, tools.Args) (any, error) {
+			return []map[string]any{
+				{"conversationid": 71, "name": "Dr. Ada Lindqvist", "members": 2, "last_message": "Gern, schicken Sie mir den Entwurf bis Freitag.", "last_time": "2026-10-01 17:05"},
+				{"conversationid": 72, "name": "Lerngruppe Datenbanken", "members": 4, "last_message": "Treffen wir uns Mittwoch in der Bibliothek?", "last_time": "2026-09-30 20:41"},
+			}, nil
+		}),
+		read("moodle_conversation_messages", "Demo-Unterhaltung", func(_ *app.App, args tools.Args) (any, error) {
+			return []map[string]any{
+				{"from": "Max Mustermann", "time": "2026-10-01 16:20", "text": "Guten Tag, darf ich für das Projekt eine eigene Datenbank aufsetzen?", "mine": true},
+				{"from": "Dr. Ada Lindqvist", "time": "2026-10-01 17:05", "text": "Gern, schicken Sie mir den Entwurf bis Freitag."},
+			}, nil
+		}),
+		read("moodle_assignments", "Demo-Aufgaben", func(a *app.App, args tools.Args) (any, error) {
+			now := a.Now()
+			all := []map[string]any{
+				{"assignid": 801, "cmid": 21024, "course": "I160_I24", "courseid": 2102, "name": "Übungsblatt 4", "due": now.AddDate(0, 0, 1).Format("2006-01-02") + " 23:59", "due_unix": now.AddDate(0, 0, 1).Unix()},
+				{"assignid": 802, "cmid": 21014, "course": "I151_I24", "courseid": 2101, "name": "Projektabgabe Sprint 2", "due": now.AddDate(0, 0, 4).Format("2006-01-02") + " 12:00", "due_unix": now.AddDate(0, 0, 4).Unix()},
+			}
+			if id, _ := args.Int("courseid", 0); id != 0 {
+				var f []map[string]any
+				for _, x := range all {
+					if x["courseid"] == int(id) {
+						f = append(f, x)
+					}
+				}
+				return f, nil
+			}
+			return all, nil
+		}),
+		read("moodle_assignment", "Demo-Aufgabe", func(a *app.App, args tools.Args) (any, error) {
+			return map[string]any{"assignid": 801, "course": "I160_I24", "name": "Übungsblatt 4", "due": a.Now().AddDate(0, 0, 1).Format("2006-01-02") + " 23:59", "max_grade": 100,
+				"intro":       "Modelliert die Datenbank für den Bibliotheksverleih (ER-Diagramm + Relationenschema) und ladet eine PDF hoch.",
+				"attachments": []map[string]any{{"name": "uebungsblatt-4.pdf", "size": "96.0 KB", "fileurl": "https://moodle.example/pluginfile.php/801/uebungsblatt-4.pdf"}},
+				"submission":  map[string]any{"status": "new", "gradingstatus": "notgraded"}}, nil
+		}),
+		read("moodle_quizzes", "Demo-Tests", func(*app.App, tools.Args) (any, error) {
+			return []map[string]any{{"quizid": 901, "name": "Selbsttest Kapitel 2", "course": "I160_I24", "courseid": 2102, "opens": "2026-09-28 08:00", "closes": "2026-10-12 23:59", "attempts_allowed": "unbegrenzt", "url": "https://moodle.example/mod/quiz/view.php?id=8"}}, nil
+		}),
+		read("moodle_forum_discussions", "Demo-Forum", func(*app.App, tools.Args) (any, error) {
+			return []map[string]any{{"forum": "Ankündigungen", "forumid": 61, "discussionid": 611, "subject": "Raumänderung Donnerstag", "author": "Dr. Ada Lindqvist", "created": "2026-10-01 09:12", "last_activity": "2026-10-01 10:30", "replies": 1, "preview": "Die Übung findet diese Woche im PC-Pool 2 statt."}}, nil
+		}),
+		read("moodle_forum_posts", "Demo-Beiträge", func(*app.App, tools.Args) (any, error) {
+			return []map[string]any{
+				{"postid": 6111, "subject": "Raumänderung Donnerstag", "author": "Dr. Ada Lindqvist", "time": "2026-10-01 09:12", "message": "Die Übung findet diese Woche im PC-Pool 2 statt. Bringt eure Laptops trotzdem mit."},
+				{"postid": 6112, "subject": "Re: Raumänderung Donnerstag", "author": "Lena Kaya", "time": "2026-10-01 10:30", "message": "Danke für die Info!"},
+			}, nil
+		}),
+		read("moodle_find", "Demo-Suche", func(_ *app.App, args tools.Args) (any, error) {
+			q := strings.ToLower(args.Str("query"))
+			var out []map[string]any
+			for _, c := range []int{2101, 2102} {
+				for _, s := range contents(c) {
+					for _, m := range s["modules"].([]map[string]any) {
+						if strings.Contains(strings.ToLower(fmt.Sprint(m["name"])), q) {
+							out = append(out, map[string]any{"courseid": c, "course": fmt.Sprintf("Kurs %d", c), "module": m["name"], "type": m["type"], "files": m["files"]})
+						}
+					}
+				}
+			}
+			return out, nil
+		}),
+		&tools.Tool{Name: "moodle_download", Kind: tools.Local, Desc: "Demo-Datei", Params: []tools.Param{{Name: "fileurl", Required: true}},
+			Run: func(a *app.App, args tools.Args) (any, error) {
+				name := filepath.Base(args.Str("fileurl"))
+				return pdf(a, name, strings.TrimSuffix(name, ".pdf"))
+			}},
+		read("eduvault_module_exams", "Demo-Altklausuren", func(_ *app.App, args tools.Args) (any, error) {
+			title := args.Str("title")
+			var docs []map[string]any
+			for i, y := range []string{"2025", "2024", "2023", "2021"} {
+				docs = append(docs, map[string]any{"id": fmt.Sprintf("00000000-0000-0000-0000-00000000000%d", i), "modul": title, "type": "exam", "jahr": y, "dozenten": "Demo", "has_solutions": i%2 == 0, "rating": 4.2 - float64(i)*0.3, "download_count": 40 - i*7})
+			}
+			docs = append(docs, map[string]any{"id": "00000000-0000-0000-0000-000000000009", "modul": title, "type": "probeklausur", "jahr": "2025", "has_solutions": true})
+			return map[string]any{"module": title, "spellings": []string{title}, "count": len(docs), "documents": docs}, nil
+		}),
+		&tools.Tool{Name: "eduvault_download", Kind: tools.Local, Desc: "Demo-Altklausur", Params: []tools.Param{{Name: "exam_id", Required: true}},
+			Run: func(a *app.App, args tools.Args) (any, error) {
+				return pdf(a, "altklausur-"+args.Str("exam_id")[30:]+".pdf", "Altklausur (Demo)")
+			}},
+		write("cis_klausur_action", "Demo: Prüfungsanmeldung", func(args tools.Args) any {
+			return map[string]any{"action": map[string]string{"register": "Prüfungsanmeldung", "deregister": "Prüfungsabmeldung"}[args.Str("action")], "exam": "Demo-Prüfung " + args.Str("exam_id")}
+		}),
+		write("moodle_forum_reply", "Demo: Forenantwort", func(args tools.Args) any {
+			return map[string]any{"would": "Antwort posten", "message": args.Str("message")}
+		}),
+		write("moodle_send_message", "Demo: Nachricht", func(args tools.Args) any {
+			return map[string]any{"would": "Nachricht senden", "text": args.Str("text")}
+		}),
+		write("moodle_assignment_submit", "Demo: Abgabe", func(args tools.Args) any {
+			return map[string]any{"would": "Abgabe hochladen", "files": args.Strs("files"), "submit_for_grading": args.Bool("submit_for_grading", false)}
+		}),
+		write("moodle_mark_notifications_read", "Demo: gelesen", func(tools.Args) any { return map[string]any{"would": "Alle Benachrichtigungen als gelesen markieren"} }),
+	)
+	return r
+}

@@ -1169,3 +1169,4 @@ a.icon-btn { color: inherit; }
 .exam-row .t a { color: inherit; text-decoration: none; }
 .exam-row .t a:hover { color: var(--cis); }
 .exam-row .action { margin: 0 0 .6rem 1.6rem; }
+html.still *, html.still *::before, html.still *::after { animation: none !important; transition: none !important; }

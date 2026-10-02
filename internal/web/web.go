@@ -54,6 +54,8 @@ type Config struct {
 	UIDir string
 	// CacheFile keeps tool results across restarts ("" = memory only).
 	CacheFile string
+	// Demo needs no login (invented data only) and never asks the CIS.
+	Demo bool
 }
 
 // SaveCache writes pending cache changes to CacheFile (call on shutdown).
@@ -186,6 +188,9 @@ func (s *Server) sessionValue() string {
 func eq(a, b string) bool { return subtle.ConstantTimeCompare([]byte(a), []byte(b)) == 1 }
 
 func (s *Server) isAuthed(r *http.Request) bool {
+	if s.cfg.Demo {
+		return true
+	}
 	if b, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer "); ok {
 		return eq(strings.TrimSpace(b), s.cfg.Token)
 	}
@@ -317,6 +322,10 @@ func (s *Server) loggedIn(w http.ResponseWriter, r *http.Request, ip string) {
 // browser history and proxy logs); the log link carries it as #fragment and
 // login.js posts it.
 func (s *Server) loginPage(w http.ResponseWriter, r *http.Request) {
+	if s.cfg.Demo {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
 	s.renderLogin(w, r, http.StatusOK, "")
 }
 

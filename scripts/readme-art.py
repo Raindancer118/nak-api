@@ -248,6 +248,7 @@ SECTIONS = [
     ("overview", "Everything in one call", "nak_* · both systems"),
     ("study", "Your studies, read properly", "CIS"),
     ("moodle", "Moodle, without the clicking", "moodle_*"),
+    ("portal", "naknak, in the browser", "Web portal · self-hosted"),
     ("safety", "Nothing binding without your yes", "Safety"),
     ("install", "Get it", "One binary"),
     ("inside", "Under the hood", "How it works"),

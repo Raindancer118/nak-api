@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/Raindancer118/nak-api/internal/app"
+	"github.com/Raindancer118/nak-api/internal/demo"
 	"github.com/Raindancer118/nak-api/internal/tools"
 	"github.com/Raindancer118/nak-api/internal/web"
 	"github.com/spf13/cobra"
@@ -34,7 +35,20 @@ var serveCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		addr, _ := cmd.Flags().GetString("addr")
 		ttl, _ := cmd.Flags().GetDuration("cache-ttl")
+		isDemo, _ := cmd.Flags().GetBool("demo")
 		a := app.FromEnv()
+		reg := tools.All()
+		if isDemo {
+			// made-up data, nothing leaves the machine; keep it apart from real data
+			reg = demo.Registry()
+			dir, err := os.MkdirTemp("", "naknak-demo-")
+			if err != nil {
+				return err
+			}
+			a.ConfigDir, a.DownloadDir = dir, filepath.Join(dir, "downloads")
+			defer os.RemoveAll(dir)
+			log.Printf("DEMO mode: invented data, no NAK account, nothing is sent anywhere")
+		}
 
 		token := strings.TrimSpace(os.Getenv("NAK_WEB_TOKEN"))
 		fromFile := token == ""
@@ -50,8 +64,8 @@ var serveCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		ws := web.New(a, tools.All(), web.Config{Token: token, CacheTTL: ttl, Version: Version,
-			UIDir: os.Getenv("NAK_WEB_UI_DIR"), CacheFile: filepath.Join(a.ConfigDir, "web-cache.json")})
+		ws := web.New(a, reg, web.Config{Token: token, CacheTTL: ttl, Version: Version,
+			UIDir: os.Getenv("NAK_WEB_UI_DIR"), CacheFile: filepath.Join(a.ConfigDir, "web-cache.json"), Demo: isDemo})
 		srv := &http.Server{
 			Handler:           ws.Handler(),
 			ReadHeaderTimeout: 10 * time.Second,
@@ -150,6 +164,7 @@ func init() {
 	}
 	serveCmd.Flags().String("addr", envOrDefault("NAK_WEB_ADDR", "127.0.0.1:8080"), "listen address")
 	serveCmd.Flags().Duration("cache-ttl", ttl, "reuse read results for this long")
+	serveCmd.Flags().Bool("demo", false, "run with invented data (try naknak without a NAK account)")
 	healthcheckCmd.Flags().String("url", "", "health URL (default from NAK_WEB_ADDR)")
 	rootCmd.AddCommand(serveCmd, healthcheckCmd)
 }

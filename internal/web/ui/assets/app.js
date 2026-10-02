@@ -3,7 +3,7 @@
 // set through the CSSOM instead.
 
 const $ = (sel, root = document) => root.querySelector(sel);
-const reduced = matchMedia("(prefers-reduced-motion: reduce)");
+const reduced = document.documentElement.classList.contains("still") ? { matches: true } : matchMedia("(prefers-reduced-motion: reduce)");
 
 // ── DOM helper ──────────────────────────────────────────────────────────────
 
@@ -1185,8 +1185,8 @@ async function unitPage(root, nr, tab = "", courseArg = "") {
     if (!evs.length) return emptyRow("Keine Termine in den nächsten 60 Tagen.");
     return h("ul", { class: "rows" }, evs.map((e, j) => h("li", {}, h("div", { class: "row", vars: { "--j": j } },
       h("span", { class: "dot", "data-src": "cis" }),
-      h("span", { class: "t" }, `${e.date} · ${e.start}–${e.end}`, h("span", { class: "s", text: [e.room, e.lecturer].filter(Boolean).join(" · ") })),
-      h("span", { class: "chip cis", text: e.kind || "CIS" })))));
+      h("span", { class: "t" }, `${e.at ? fmtShort.format(e.at) : e.date} · ${e.start}${e.end && e.end !== e.start ? `–${e.end}` : ""}`, h("span", { class: "s", text: [e.room, e.lecturer].filter(Boolean).join(" · ") })),
+      h("span", { class: `chip ${e.kind === "Klausur" ? "due" : "cis"}`, text: e.kind || "CIS" })))));
   });
   fill(tMoodle, () => Promise.all([data, courses.length ? api("moodle_assignments", { only_open: true }) : []]), ([m, open]) => {
     if (!courses.length) return emptyRow("Kein Moodle-Kurs zu diesem Modul.");
@@ -1983,7 +1983,7 @@ function boot() {
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
   const app = $("#app");
   app.replaceWith(header(), h("main", { id: "main" }));
-  applyTheme(localStorage.getItem("nak-theme") || "system");
+  applyTheme(new URLSearchParams(location.search).get("theme") || localStorage.getItem("nak-theme") || "system");
   addEventListener("hashchange", render);
   render();
 }
