@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -27,7 +28,9 @@ var serveCmd = &cobra.Command{
   --addr / NAK_WEB_ADDR          listen address (default 127.0.0.1:8080)
   NAK_WEB_TOKEN                  access token; otherwise one is generated and
                                  kept in the data dir (file web-token)
-  --cache-ttl / NAK_WEB_CACHE_TTL how long read results are reused (default 5m)`,
+  --cache-ttl / NAK_WEB_CACHE_TTL one freshness for all tools (default: per tool,
+                                 1 min for messages up to 2 h for grades)
+  NAK_WEB_UI_DIR                 serve the UI from this directory (UI development)`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		addr, _ := cmd.Flags().GetString("addr")
 		ttl, _ := cmd.Flags().GetDuration("cache-ttl")
@@ -47,8 +50,10 @@ var serveCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+		ws := web.New(a, tools.All(), web.Config{Token: token, CacheTTL: ttl, Version: Version,
+			UIDir: os.Getenv("NAK_WEB_UI_DIR"), CacheFile: filepath.Join(a.ConfigDir, "web-cache.json")})
 		srv := &http.Server{
-			Handler:           web.New(a, tools.All(), web.Config{Token: token, CacheTTL: ttl, Version: Version}).Handler(),
+			Handler:           ws.Handler(),
 			ReadHeaderTimeout: 10 * time.Second,
 			// tool calls (nak_dashboard, downloads) can take a while
 			WriteTimeout: 5 * time.Minute,
@@ -80,7 +85,11 @@ var serveCmd = &cobra.Command{
 		log.Printf("shutting down")
 		sctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 		defer cancel()
-		if err := srv.Shutdown(sctx); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		err = srv.Shutdown(sctx)
+		if serr := ws.SaveCache(); serr != nil {
+			log.Printf("saving cache: %v", serr)
+		}
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
 			return err
 		}
 		return nil
@@ -132,7 +141,7 @@ func envOrDefault(k, d string) string {
 }
 
 func init() {
-	ttl := 5 * time.Minute
+	var ttl time.Duration
 	if v := os.Getenv("NAK_WEB_CACHE_TTL"); v != "" {
 		if d, err := time.ParseDuration(v); err == nil {
 			ttl = d

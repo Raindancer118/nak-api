@@ -1,13 +1,22 @@
 <!doctype html>
 <html lang="de">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>nak — Anmelden</title><link rel="stylesheet" href="/assets/app.css"></head>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>nak · Anmelden</title>
+<link rel="preload" href="/assets/fonts/space-grotesk.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/assets/app.css">
+<script src="/assets/theme.js"></script>
+</head>
 <body class="login">
-<form method="post" action="/login">
-  <h1>nak</h1>
+<form class="login-card" method="post" action="/login">
+  <span class="mark"><i></i>nak</span>
   <label for="token">Zugangsschlüssel</label>
   <input id="token" name="token" type="password" autocomplete="current-password" required autofocus>
-  {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
-  <button type="submit">Anmelden</button>
+  {{if .Error}}<p class="err" role="alert">{{.Error}}</p>{{end}}
+  <button class="primary" type="submit">Anmelden</button>
+  <p class="hint">Der Schlüssel steht beim ersten Start im Log und danach in <code>web-token</code> im Datenverzeichnis.</p>
 </form>
 <script src="/assets/login.js"></script>
 </body>

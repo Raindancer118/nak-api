@@ -19,6 +19,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Raindancer118/nak-api/internal/audit"
@@ -47,9 +48,26 @@ type Client struct {
 	ReadOnly bool
 	// Relogin, if set, is called once when a read hits an expired session.
 	Relogin func(*Client) error
+	// CacheTTL > 0 shares identical reads for that long, so tools that need
+	// the same page (dashboard, deadlines, module view) fetch it once. Any
+	// write clears it.
+	CacheTTL time.Duration
+	Now      func() time.Time
 
 	jar        *cookiejar.Jar
 	sessionDir string
+
+	cacheMu sync.Mutex
+	cache   map[string]cachedPage
+	// loginMu + loginGen let parallel reads that all hit an expired session
+	// share one relogin.
+	loginMu  sync.Mutex
+	loginGen int
+}
+
+type cachedPage struct {
+	p  *Page
+	at time.Time
 }
 
 type Options struct {
@@ -143,22 +161,62 @@ func (c *Client) Abs(pathOrURL string) (string, error) {
 
 // Page GETs a page (read-only). An expired session triggers one Relogin.
 func (c *Client) Page(pathOrURL string) (*Page, error) {
-	return c.read(func() (*http.Request, error) { return c.newReq(http.MethodGet, pathOrURL, nil, "") })
+	return c.cachedRead("GET "+pathOrURL, func() (*Page, error) {
+		return c.read(func() (*http.Request, error) { return c.newReq(http.MethodGet, pathOrURL, nil, "") })
+	})
 }
 
 // PostRead submits a form that only displays data (e.g. a detail view or a
 // filter select). Never use it for anything that changes state.
 func (c *Client) PostRead(pathOrURL string, data url.Values) (*Page, error) {
 	enc := data.Encode()
-	return c.read(func() (*http.Request, error) {
-		return c.newReq(http.MethodPost, pathOrURL, strings.NewReader(enc), "application/x-www-form-urlencoded")
+	return c.cachedRead("POST "+pathOrURL+"\n"+enc, func() (*Page, error) {
+		return c.read(func() (*http.Request, error) {
+			return c.newReq(http.MethodPost, pathOrURL, strings.NewReader(enc), "application/x-www-form-urlencoded")
+		})
 	})
+}
+
+func (c *Client) now() time.Time {
+	if c.Now != nil {
+		return c.Now()
+	}
+	return time.Now()
+}
+
+func (c *Client) cachedRead(key string, fetch func() (*Page, error)) (*Page, error) {
+	if c.CacheTTL <= 0 {
+		return fetch()
+	}
+	c.cacheMu.Lock()
+	e, ok := c.cache[key]
+	c.cacheMu.Unlock()
+	if ok && c.now().Sub(e.at) < c.CacheTTL {
+		return e.p, nil
+	}
+	p, err := fetch()
+	if err == nil && p.Status < 400 {
+		c.cacheMu.Lock()
+		if c.cache == nil {
+			c.cache = map[string]cachedPage{}
+		}
+		c.cache[key] = cachedPage{p, c.now()}
+		c.cacheMu.Unlock()
+	}
+	return p, err
+}
+
+// Invalidate drops all shared reads (after writes and session changes).
+func (c *Client) Invalidate() {
+	c.cacheMu.Lock()
+	c.cache = nil
+	c.cacheMu.Unlock()
 }
 
 // Download fetches a file (read-only) and returns its bytes, content type and
 // the server-suggested filename (may be empty).
 func (c *Client) Download(pathOrURL string) ([]byte, string, string, error) {
-	p, err := c.Page(pathOrURL)
+	p, err := c.read(func() (*http.Request, error) { return c.newReq(http.MethodGet, pathOrURL, nil, "") })
 	if err != nil {
 		return nil, "", "", err
 	}
@@ -170,6 +228,9 @@ func (c *Client) Download(pathOrURL string) ([]byte, string, string, error) {
 
 func (c *Client) read(build func() (*http.Request, error)) (*Page, error) {
 	for attempt := 0; ; attempt++ {
+		c.loginMu.Lock()
+		gen := c.loginGen
+		c.loginMu.Unlock()
 		req, err := build()
 		if err != nil {
 			return nil, err
@@ -184,10 +245,25 @@ func (c *Client) read(build func() (*http.Request, error)) (*Page, error) {
 		if attempt > 0 || c.Relogin == nil {
 			return nil, ErrNotLoggedIn
 		}
-		if err := c.Relogin(c); err != nil {
+		if err := c.relogin(gen); err != nil {
 			return nil, fmt.Errorf("%w (re-login failed: %v)", ErrNotLoggedIn, err)
 		}
 	}
+}
+
+// relogin logs in unless another request already did since gen was read.
+func (c *Client) relogin(gen int) error {
+	c.loginMu.Lock()
+	defer c.loginMu.Unlock()
+	if c.loginGen != gen {
+		return nil
+	}
+	if err := c.Relogin(c); err != nil {
+		return err
+	}
+	c.loginGen++
+	c.Invalidate()
+	return nil
 }
 
 // WriteGet follows a state-changing link (TYPO3 often uses GET for actions
@@ -275,6 +351,7 @@ func EncodeMultipart(fields []KV, files []FilePart) ([]byte, string, error) {
 func escapeQuotes(s string) string { return strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(s) }
 
 func (c *Client) guard(method, target string, fieldNames []string) error {
+	c.Invalidate()
 	if c.ReadOnly {
 		return ErrReadOnly
 	}
@@ -444,6 +521,7 @@ func (c *Client) loadSession() error {
 
 // ClearSession drops cookies in memory and on disk.
 func (c *Client) ClearSession() {
+	c.Invalidate()
 	if c.sessionDir != "" {
 		os.Remove(c.sessionFile())
 	}

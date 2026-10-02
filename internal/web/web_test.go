@@ -22,7 +22,7 @@ import (
 
 const token = "test-token-0123456789"
 
-type counters struct{ reads, previews, dos atomic.Int32 }
+type counters struct{ reads, previews, dos, downloads atomic.Int32 }
 
 func fakeRegistry(c *counters) *tools.Registry {
 	r := tools.NewRegistry()
@@ -42,6 +42,7 @@ func fakeRegistry(c *counters) *tools.Registry {
 				if args.Has("out") {
 					return nil, errors.New("out must not reach the tool from the web")
 				}
+				c.downloads.Add(1)
 				p := filepath.Join(a.DownloadDir, "sub", "Skript 1.pdf")
 				os.MkdirAll(filepath.Dir(p), 0o755)
 				os.WriteFile(p, []byte("%PDF-1.4 skript"), 0o600)
@@ -56,23 +57,55 @@ func fakeRegistry(c *counters) *tools.Registry {
 }
 
 type harness struct {
+	web *Server
 	srv *httptest.Server
 	c   *counters
 	app *app.App
 	now *time.Time
 }
 
-func newHarness(t *testing.T) *harness {
+func newHarness(t *testing.T) *harness { return newHarnessWith(t, "") }
+
+func newHarnessWith(t *testing.T, cacheFile string) *harness {
 	t.Helper()
 	c := &counters{}
 	a := app.FromEnv()
 	a.DownloadDir = t.TempDir()
 	now := time.Date(2026, 10, 2, 12, 0, 0, 0, time.UTC)
 	h := &harness{c: c, app: a, now: &now}
-	s := New(a, fakeRegistry(c), Config{Token: token, CacheTTL: 5 * time.Minute, Version: "9.9.9", Now: func() time.Time { return *h.now }})
+	s := New(a, fakeRegistry(c), Config{Token: token, CacheTTL: 5 * time.Minute, Version: "9.9.9", Now: func() time.Time { return *h.now }, CacheFile: cacheFile})
+	h.web = s
 	h.srv = httptest.NewServer(s.Handler())
 	t.Cleanup(h.srv.Close)
 	return h
+}
+
+func TestCacheSurvivesRestart(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "web-cache.json")
+	h1 := newHarnessWith(t, file)
+	h1.do(t, "POST", "/api/tools/fake_read", `{"q":"x"}`, bearer)
+	if err := h1.web.SaveCache(); err != nil {
+		t.Fatal(err)
+	}
+	st, err := os.Stat(file)
+	if err != nil || st.Mode().Perm() != 0o600 {
+		t.Fatalf("cache file %v %v", st, err)
+	}
+	h2 := newHarnessWith(t, file)
+	m := decode(t, h2.do(t, "POST", "/api/tools/fake_read", `{"q":"x"}`, bearer))
+	if m["cached"] != true || h2.c.reads.Load() != 0 {
+		t.Fatalf("after restart: %v reads=%d", m, h2.c.reads.Load())
+	}
+}
+
+func TestConfirmedWriteDropsCache(t *testing.T) {
+	h := newHarness(t)
+	h.do(t, "POST", "/api/tools/fake_read", `{}`, bearer)
+	h.do(t, "POST", "/api/tools/fake_write", `{"confirm":true}`, with(map[string]string{confirmHeader: "JA"}))
+	m := decode(t, h.do(t, "POST", "/api/tools/fake_read", `{}`, bearer))
+	if m["cached"] != false || h.c.reads.Load() != 2 {
+		t.Fatalf("read after write: %v reads=%d", m, h.c.reads.Load())
+	}
 }
 
 func (h *harness) do(t *testing.T, method, path, body string, hdr map[string]string) *http.Response {
@@ -272,10 +305,16 @@ func TestReadToolIsCached(t *testing.T) {
 	if h.c.reads.Load() != 3 {
 		t.Fatalf("reads=%d", h.c.reads.Load())
 	}
+	// Stale data is answered at once and refreshed in the background;
+	// ?wait=1 returns the refreshed result.
 	*h.now = h.now.Add(6 * time.Minute)
-	call("/api/tools/fake_read", `{"q":"x"}`)
-	if h.c.reads.Load() != 4 {
-		t.Fatalf("expired entry not refetched: %d", h.c.reads.Load())
+	st := call("/api/tools/fake_read", `{"q":"x"}`)
+	if st["stale"] != true || st["cached"] != true {
+		t.Fatalf("stale answer: %v", st)
+	}
+	fr := call("/api/tools/fake_read?wait=1", `{"q":"x"}`)
+	if fr["stale"] == true || h.c.reads.Load() != 4 {
+		t.Fatalf("revalidated answer: %v reads=%d", fr, h.c.reads.Load())
 	}
 	if r := call("/api/tools/fake_read", `{"q":"x"}`)["result"].(map[string]any); r["q"] != "x" {
 		t.Fatalf("result %v", r)
@@ -323,6 +362,33 @@ func TestCSRFProtection(t *testing.T) {
 	}
 }
 
+// A browser form post from the login page itself must pass the CSRF check.
+func TestBrowserLoginPostIsSameOrigin(t *testing.T) {
+	h := newHarness(t)
+	post := func(hdr map[string]string) int {
+		req, _ := http.NewRequest("POST", h.srv.URL+"/login", strings.NewReader(url.Values{"token": {token}}.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		for k, v := range hdr {
+			req.Header.Set(k, v)
+		}
+		res, err := noRedirect().Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		res.Body.Close()
+		return res.StatusCode
+	}
+	if c := post(map[string]string{"Origin": "null", "Sec-Fetch-Site": "same-origin"}); c != http.StatusSeeOther { // what Chrome sends
+		t.Fatalf("same-origin form post: %d", c)
+	}
+	if c := post(map[string]string{"Origin": "null", "Sec-Fetch-Site": "cross-site"}); c != http.StatusForbidden {
+		t.Fatalf("cross-site form post: %d", c)
+	}
+	if c := post(map[string]string{"Origin": "https://evil.example"}); c != http.StatusForbidden {
+		t.Fatalf("foreign origin without fetch metadata: %d", c)
+	}
+}
+
 func TestErrors(t *testing.T) {
 	h := newHarness(t)
 	if res := h.do(t, "POST", "/api/tools/nope", `{}`, bearer); res.StatusCode != 404 {
@@ -365,6 +431,40 @@ func TestDownloadedFilesAreServed(t *testing.T) {
 	}
 }
 
+func TestFilesInlineOnlyForSafeTypes(t *testing.T) {
+	h := newHarness(t)
+	os.WriteFile(filepath.Join(h.app.DownloadDir, "a.pdf"), []byte("%PDF-1.4"), 0o600)
+	os.WriteFile(filepath.Join(h.app.DownloadDir, "evil.html"), []byte("<script>alert(1)</script>"), 0o600)
+	res := h.do(t, "GET", "/files/a.pdf?inline=1", "", bearer)
+	if d := res.Header.Get("Content-Disposition"); !strings.HasPrefix(d, "inline") {
+		t.Fatalf("pdf inline: %q", d)
+	}
+	os.WriteFile(filepath.Join(h.app.DownloadDir, "b.png"), []byte("png"), 0o600)
+	res = h.do(t, "GET", "/files/b.png?inline=1", "", bearer)
+	if !strings.HasPrefix(res.Header.Get("Content-Disposition"), "inline") || !strings.Contains(res.Header.Get("Content-Security-Policy"), "sandbox") {
+		t.Fatalf("image inline without sandbox: %q %q", res.Header.Get("Content-Disposition"), res.Header.Get("Content-Security-Policy"))
+	}
+	res = h.do(t, "GET", "/files/evil.html?inline=1", "", bearer)
+	if d := res.Header.Get("Content-Disposition"); !strings.HasPrefix(d, "attachment") {
+		t.Fatalf("html must never be inline: %q", d)
+	}
+}
+
+func TestSameDownloadIsReused(t *testing.T) {
+	h := newHarness(t)
+	a := decode(t, h.do(t, "POST", "/api/tools/fake_download", `{}`, bearer))
+	b := decode(t, h.do(t, "POST", "/api/tools/fake_download", `{}`, bearer))
+	if h.c.downloads.Load() != 1 || a["download_url"] != b["download_url"] {
+		t.Fatalf("downloads=%d a=%v b=%v", h.c.downloads.Load(), a["download_url"], b["download_url"])
+	}
+	// a file deleted from disk is fetched again
+	os.RemoveAll(filepath.Join(h.app.DownloadDir, "sub"))
+	h.do(t, "POST", "/api/tools/fake_download", `{}`, bearer)
+	if h.c.downloads.Load() != 2 {
+		t.Fatalf("missing file not refetched: %d", h.c.downloads.Load())
+	}
+}
+
 func TestSecurityHeaders(t *testing.T) {
 	h := newHarness(t)
 	res := h.do(t, "GET", "/healthz", "", nil)
@@ -372,7 +472,7 @@ func TestSecurityHeaders(t *testing.T) {
 		"Content-Security-Policy": "default-src 'self'",
 		"X-Content-Type-Options":  "nosniff",
 		"X-Frame-Options":         "DENY",
-		"Referrer-Policy":         "no-referrer",
+		"Referrer-Policy":         "same-origin",
 	} {
 		if !strings.Contains(res.Header.Get(k), want) {
 			t.Errorf("%s = %q", k, res.Header.Get(k))
@@ -389,6 +489,9 @@ func TestSecurityHeaders(t *testing.T) {
 
 func TestUIIsServed(t *testing.T) {
 	h := newHarness(t)
+	if res := h.do(t, "GET", "/assets/app.css", "", nil); res.StatusCode != 200 || res.Header.Get("Cache-Control") != "no-cache" {
+		t.Fatalf("asset: %d %q", res.StatusCode, res.Header.Get("Cache-Control"))
+	}
 	res := h.do(t, "GET", "/", "", bearer)
 	b, _ := io.ReadAll(res.Body)
 	if res.StatusCode != 200 || !strings.Contains(string(b), "<html") {

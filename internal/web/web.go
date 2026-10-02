@@ -49,7 +49,15 @@ type Config struct {
 	CacheTTL time.Duration
 	Version  string
 	Now      func() time.Time
+	// UIDir serves the UI from disk instead of the embedded copy (UI work
+	// without rebuilding).
+	UIDir string
+	// CacheFile keeps tool results across restarts ("" = memory only).
+	CacheFile string
 }
+
+// SaveCache writes pending cache changes to CacheFile (call on shutdown).
+func (s *Server) SaveCache() error { return s.store.save() }
 
 type Server struct {
 	app *app.App
@@ -57,21 +65,11 @@ type Server struct {
 	cfg Config
 	ui  fs.FS
 
-	// The CIS client keeps one cookie session and relogs in on expiry;
-	// concurrent tool calls would race on that, so calls run one at a time.
-	callMu sync.Mutex
-
-	cacheMu sync.Mutex
-	cache   map[string]cached
+	store *store
 
 	loginMu sync.Mutex
 	logins  map[string]*attempts
 	login   *template.Template
-}
-
-type cached struct {
-	res any
-	at  time.Time
 }
 
 type attempts struct {
@@ -87,12 +85,26 @@ func New(a *app.App, reg *tools.Registry, cfg Config) *Server {
 	if err != nil {
 		panic(err)
 	}
-	return &Server{
-		app: a, reg: reg, cfg: cfg, ui: ui,
-		cache:  map[string]cached{},
-		logins: map[string]*attempts{},
-		login:  template.Must(template.ParseFS(ui, "login.html")),
+	if cfg.UIDir != "" {
+		ui = os.DirFS(cfg.UIDir)
 	}
+	s := &Server{
+		app: a, reg: reg, cfg: cfg, ui: ui,
+		store:  newStore(cfg.CacheFile),
+		logins: map[string]*attempts{},
+	}
+	if cfg.UIDir == "" {
+		s.login = template.Must(template.ParseFS(ui, "login.html"))
+	}
+	return s
+}
+
+// loginTemplate re-reads login.html on every request when serving from disk.
+func (s *Server) loginTemplate() (*template.Template, error) {
+	if s.login != nil {
+		return s.login, nil
+	}
+	return template.ParseFS(s.ui, "login.html")
 }
 
 func (s *Server) Handler() http.Handler {
@@ -104,7 +116,13 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("GET /api/tools", s.authed(http.HandlerFunc(s.listTools)))
 	mux.Handle("POST /api/tools/{name}", s.authed(http.HandlerFunc(s.callTool)))
 	mux.Handle("GET /files/{path...}", s.authed(http.HandlerFunc(s.file)))
-	mux.Handle("GET /assets/", http.FileServerFS(s.ui))
+	assets := http.FileServerFS(s.ui)
+	mux.Handle("GET /assets/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// revalidate on every load (cheap: Last-Modified), so an update or a
+		// UI edit shows up at once
+		w.Header().Set("Cache-Control", "no-cache")
+		assets.ServeHTTP(w, r)
+	}))
 	mux.HandleFunc("GET /{$}", s.index)
 	return s.headers(mux)
 }
@@ -121,7 +139,8 @@ func (s *Server) headers(next http.Handler) http.Handler {
 		h.Set("Content-Security-Policy", "default-src 'self'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'; object-src 'none'")
 		h.Set("X-Content-Type-Options", "nosniff")
 		h.Set("X-Frame-Options", "DENY")
-		h.Set("Referrer-Policy", "no-referrer")
+		// "no-referrer" would make browsers send Origin: null on our own form posts
+		h.Set("Referrer-Policy", "same-origin")
 		h.Set("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()")
 		h.Set("Cross-Origin-Opener-Policy", "same-origin")
 		if secure(r) {
@@ -160,7 +179,10 @@ func (s *Server) authed(next http.Handler) http.Handler {
 // sameOrigin rejects cross-site requests. The session cookie is SameSite=Strict
 // already; this also covers browsers that send Origin but no Sec-Fetch-Site.
 func sameOrigin(r *http.Request) bool {
-	if r.Header.Get("Sec-Fetch-Site") == "cross-site" {
+	switch r.Header.Get("Sec-Fetch-Site") {
+	case "same-origin", "none":
+		return true
+	case "cross-site", "same-site":
 		return false
 	}
 	o := r.Header.Get("Origin")
@@ -265,7 +287,12 @@ func (s *Server) loginPost(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) renderLogin(w http.ResponseWriter, status int, msg string) {
 	var buf bytes.Buffer
-	if err := s.login.Execute(&buf, map[string]string{"Error": msg, "Version": s.cfg.Version}); err != nil {
+	tmpl, err := s.loginTemplate()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if err := tmpl.Execute(&buf, map[string]string{"Error": msg, "Version": s.cfg.Version}); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -332,6 +359,7 @@ func (s *Server) callTool(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	args := tools.Args{}
+	var err error
 	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxBody))
 	if err == nil && len(bytes.TrimSpace(body)) > 0 {
 		err = json.Unmarshal(body, &args)
@@ -356,31 +384,49 @@ func (s *Server) callTool(w http.ResponseWriter, r *http.Request) {
 	}
 
 	key := ""
-	if t.Kind == tools.Read && !t.MayWrite {
+	if (t.Kind == tools.Read && !t.MayWrite) || reusableDownload(t) {
 		k, _ := json.Marshal(args) // map keys are sorted
 		key = t.Name + " " + string(k)
 	}
-	fresh := r.URL.Query().Get("fresh") == "1"
+	q := r.URL.Query()
+	fresh, wait := q.Get("fresh") == "1", q.Get("wait") == "1"
+
 	if key != "" && !fresh {
-		if c, ok := s.fromCache(key); ok {
-			s.respond(w, t, c.res, c.at, true)
-			return
+		if e, ok := s.store.get(key); ok && usable(e) {
+			age := s.cfg.Now().Sub(e.At)
+			switch {
+			case t.Kind == tools.Local || age < s.freshFor(t.Name):
+				s.respond(w, t, e.Res, e.At, true, false, "")
+				return
+			case age < maxStale && !wait:
+				// stale-while-revalidate: answer now, refresh behind it
+				go s.refresh(t, key, args)
+				s.respond(w, t, e.Res, e.At, true, true, "")
+				return
+			case age < maxStale:
+				res, at, err := s.refresh(t, key, args)
+				if err != nil {
+					s.respond(w, t, e.Res, e.At, true, true, err.Error())
+					return
+				}
+				s.respond(w, t, res, at, false, false, "")
+				return
+			}
 		}
 	}
 
-	s.callMu.Lock()
-	if key != "" && !fresh {
-		// another request may have fetched it while this one waited
-		if c, ok := s.fromCache(key); ok {
-			s.callMu.Unlock()
-			s.respond(w, t, c.res, c.at, true)
-			return
+	var res json.RawMessage
+	var at time.Time
+	if key != "" {
+		res, at, err = s.refresh(t, key, args)
+	} else {
+		var out any
+		out, err = s.reg.Call(s.app, t.Name, args)
+		at = s.cfg.Now()
+		if err == nil {
+			res, err = json.Marshal(out)
 		}
 	}
-	res, err := s.reg.Call(s.app, t.Name, args)
-	at := s.cfg.Now()
-	s.callMu.Unlock()
-
 	if err != nil {
 		out := map[string]any{"error": err.Error(), "tool": t.Name}
 		var d *drift.Error
@@ -391,38 +437,67 @@ func (s *Server) callTool(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadGateway, out)
 		return
 	}
-	if key != "" {
-		s.cacheMu.Lock()
-		s.cache[key] = cached{res, at}
-		s.cacheMu.Unlock()
-	} else if t.Kind == tools.Write && args.Bool("confirm", false) {
-		// anything read before a binding change may be stale now
-		s.cacheMu.Lock()
-		s.cache = map[string]cached{}
-		s.cacheMu.Unlock()
+	if t.Kind == tools.Write && args.Bool("confirm", false) {
+		// anything read before a binding change may be outdated now
+		s.store.clear()
 	}
-	s.respond(w, t, res, at, false)
+	s.respond(w, t, res, at, false, false, "")
 }
 
-func (s *Server) fromCache(key string) (cached, bool) {
-	s.cacheMu.Lock()
-	defer s.cacheMu.Unlock()
-	c, ok := s.cache[key]
-	if !ok || s.cfg.Now().Sub(c.at) >= s.cfg.CacheTTL {
-		return cached{}, false
+func (s *Server) freshFor(tool string) time.Duration {
+	if s.cfg.CacheTTL > 0 {
+		return s.cfg.CacheTTL
 	}
-	return c, true
+	return freshness(tool)
 }
 
-func (s *Server) respond(w http.ResponseWriter, t *tools.Tool, res any, at time.Time, hit bool) {
-	out := map[string]any{"tool": t.Name, "result": res, "cached": hit, "fetched_at": at.Format(time.RFC3339)}
+// reusableDownload: downloads are kept and handed out again while the file
+// exists, so opening the same Moodle file twice fetches it once.
+func reusableDownload(t *tools.Tool) bool {
+	return t.Kind == tools.Local && t.Name != "cis_login" && t.Name != "cis_logout"
+}
+
+func usable(e entry) bool {
+	if e.Path == "" {
+		return true
+	}
+	st, err := os.Stat(e.Path)
+	return err == nil && !st.IsDir()
+}
+
+// refresh fetches a tool result (one flight per key) and stores it.
+func (s *Server) refresh(t *tools.Tool, key string, args tools.Args) (json.RawMessage, time.Time, error) {
+	res, at, err := s.store.fetch(key, s.cfg.Now, func() (any, error) { return s.reg.Call(s.app, t.Name, args) })
+	if err != nil {
+		return nil, at, err
+	}
+	e := entry{Res: res, At: at}
 	if t.Kind == tools.Local {
-		if m, ok := res.(map[string]any); ok {
-			if p, ok := m["path"].(string); ok {
-				if u := s.downloadURL(p); u != "" {
-					out["download_url"] = u
-				}
-			}
+		e.Path = resultPath(res)
+	}
+	s.store.put(key, e)
+	return res, at, nil
+}
+
+func resultPath(res json.RawMessage) string {
+	var m struct {
+		Path string `json:"path"`
+	}
+	json.Unmarshal(res, &m)
+	return m.Path
+}
+
+func (s *Server) respond(w http.ResponseWriter, t *tools.Tool, res json.RawMessage, at time.Time, hit, stale bool, refreshErr string) {
+	out := map[string]any{"tool": t.Name, "result": res, "cached": hit, "fetched_at": at.Format(time.RFC3339)}
+	if stale {
+		out["stale"] = true
+	}
+	if refreshErr != "" {
+		out["refresh_error"] = refreshErr
+	}
+	if t.Kind == tools.Local {
+		if u := s.downloadURL(resultPath(res)); u != "" {
+			out["download_url"] = u
 		}
 	}
 	writeJSON(w, http.StatusOK, out)
@@ -453,10 +528,25 @@ func (s *Server) file(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	w.Header().Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": st.Name()}))
+	disp := "attachment"
+	if r.URL.Query().Get("inline") == "1" {
+		if kind, ok := inlineTypes[strings.ToLower(filepath.Ext(st.Name()))]; ok {
+			disp = "inline"
+			if kind != "pdf" {
+				// images/text open in a sandbox: no script runs on our origin
+				w.Header().Set("Content-Security-Policy", "sandbox; default-src 'none'; img-src 'self'; style-src 'unsafe-inline'")
+			}
+		}
+	}
+	w.Header().Set("Content-Disposition", mime.FormatMediaType(disp, map[string]string{"filename": st.Name()}))
 	w.Header().Set("Cache-Control", "private, no-store")
 	http.ServeContent(w, r, st.Name(), st.ModTime(), f)
 }
+
+// inlineTypes may open in the browser; everything else (HTML, SVG, Office
+// files) is always a download. PDFs render in the browser's own viewer,
+// which a sandbox CSP would block.
+var inlineTypes = map[string]string{".pdf": "pdf", ".png": "img", ".jpg": "img", ".jpeg": "img", ".gif": "img", ".webp": "img", ".txt": "text"}
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")

@@ -45,9 +45,19 @@ type Client struct {
 	AuditDir string
 	HTTP     *http.Client
 
+	// CacheTTL > 0 shares identical read calls for that long; writes clear it.
+	CacheTTL time.Duration
+	Now      func() time.Time
+
 	user, pass string
 	mu         sync.Mutex
 	token      string
+	cache      map[string]cachedCall
+}
+
+type cachedCall struct {
+	r  J
+	at time.Time
 }
 
 func NewClient(baseURL, user, pass string) *Client {
@@ -60,11 +70,53 @@ func NewClient(baseURL, user, pass string) *Client {
 
 // Call runs a read-only web service function.
 func (c *Client) Call(wsfunction string, params map[string]any) (J, error) {
-	return c.call(wsfunction, params)
+	if c.CacheTTL <= 0 {
+		return c.call(wsfunction, params)
+	}
+	flat := Flatten(params)
+	keys := make([]string, 0, len(flat))
+	for k := range flat {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	var b strings.Builder
+	b.WriteString(wsfunction)
+	for _, k := range keys {
+		b.WriteString("\n" + k + "=" + flat[k])
+	}
+	key := b.String()
+	now := time.Now
+	if c.Now != nil {
+		now = c.Now
+	}
+	c.mu.Lock()
+	e, ok := c.cache[key]
+	c.mu.Unlock()
+	if ok && now().Sub(e.at) < c.CacheTTL {
+		return e.r, nil
+	}
+	r, err := c.call(wsfunction, params)
+	if err == nil {
+		c.mu.Lock()
+		if c.cache == nil {
+			c.cache = map[string]cachedCall{}
+		}
+		c.cache[key] = cachedCall{r, now()}
+		c.mu.Unlock()
+	}
+	return r, err
+}
+
+// Invalidate drops all shared reads.
+func (c *Client) Invalidate() {
+	c.mu.Lock()
+	c.cache = nil
+	c.mu.Unlock()
 }
 
 // CallWrite runs a state-changing function through the write guard.
 func (c *Client) CallWrite(wsfunction string, params map[string]any) (J, error) {
+	c.Invalidate()
 	if c.ReadOnly {
 		return J{}, ErrReadOnly
 	}

@@ -22,6 +22,8 @@ type App struct {
 	DownloadDir string
 	ConfigDir   string
 	ReadOnly    bool
+	// ClientCache shares identical CIS/Moodle reads for this long.
+	ClientCache time.Duration
 
 	cisUser, cisPass       string
 	moodleUser, moodlePass string
@@ -60,6 +62,10 @@ func FromEnv() *App {
 		moodlePass:  envOr("MOODLE_PASS", os.Getenv("CIS_PASS")),
 		moodleURL:   envOr("MOODLE_URL", moodle.DefaultURL),
 		cisBase:     os.Getenv("CIS_BASE_URL"),
+		ClientCache: 90 * time.Second,
+	}
+	if d, err := time.ParseDuration(strings.TrimSpace(os.Getenv("NAK_CLIENT_CACHE_TTL"))); err == nil {
+		a.ClientCache = d
 	}
 	return a
 }
@@ -103,6 +109,7 @@ func (a *App) CIS() (*client.Client, error) {
 			return nil, err
 		}
 		c.ReadOnly = a.ReadOnly
+		c.CacheTTL, c.Now = a.ClientCache, a.Now
 		if a.cisUser != "" && a.cisPass != "" {
 			u, p := a.cisUser, a.cisPass
 			c.Relogin = func(c *client.Client) error { return auth.Login(c, u, p) }
@@ -130,6 +137,7 @@ func (a *App) CISClient() (*client.Client, error) {
 			return nil, err
 		}
 		c.ReadOnly = a.ReadOnly
+		c.CacheTTL, c.Now = a.ClientCache, a.Now
 		a.cis = c
 	}
 	return a.cis, nil
@@ -145,6 +153,7 @@ func (a *App) Moodle() (*moodle.Service, error) {
 		mc := moodle.NewClient(a.moodleURL, a.moodleUser, a.moodlePass)
 		mc.ReadOnly = a.ReadOnly
 		mc.AuditDir = a.ConfigDir
+		mc.CacheTTL, mc.Now = a.ClientCache, a.Now
 		s := moodle.NewService(mc, a.Zone)
 		s.Now = a.Now
 		a.moodle = s
