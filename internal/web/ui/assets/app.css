@@ -1204,3 +1204,8 @@ h2.sub { margin: 1rem 0 .4rem; }
 .choice:last-child { border-bottom: 0; }
 .choice-opts { list-style: none; margin: 0; padding: 0; display: grid; gap: .35rem; }
 .choice-opts .s { color: var(--dim); font-size: .8rem; margin-left: .4rem; }
+.ghost.danger { color: var(--bad); border-color: color-mix(in oklab, var(--bad) 40%, transparent); }
+.ghost.danger:disabled { opacity: .45; cursor: not-allowed; }
+.danger-row { align-items: center; }
+.danger-row .cal-url { max-width: 14rem; }
+a.primary.as-btn { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }

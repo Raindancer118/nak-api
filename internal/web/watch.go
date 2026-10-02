@@ -430,3 +430,12 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 }
+
+func (w *watcher) reset() {
+	w.mu.Lock()
+	w.state = watchState{Seen: map[string]string{}, Last: map[string]time.Time{}, Baselined: map[string]bool{}}
+	w.mu.Unlock()
+	if w.file != "" {
+		os.Remove(w.file)
+	}
+}

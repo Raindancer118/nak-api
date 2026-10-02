@@ -118,3 +118,21 @@ func (a *App) EduVault() (*eduvault.Client, error) {
 
 // ErrEduVault reports whether err means EduVault is simply not set up.
 func ErrEduVault(err error) bool { return errors.Is(err, eduvault.ErrNotConfigured) }
+
+// ClearAccount forgets the stored NAK login (instance reset). An account
+// from CIS_USER/CIS_PASS cannot be removed here.
+func (a *App) ClearAccount() {
+	os.Remove(filepath.Join(a.ConfigDir, "account.json"))
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.accountSource == "file" {
+		a.cisUser, a.cisPass, a.accountSource = "", "", ""
+		if os.Getenv("MOODLE_USER") == "" {
+			a.moodleUser, a.moodlePass = "", ""
+		}
+	}
+	if a.cis != nil {
+		a.cis.ClearSession()
+	}
+	a.cis, a.moodle, a.eduvault, a.settings = nil, nil, nil, nil
+}

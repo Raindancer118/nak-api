@@ -1522,7 +1522,27 @@ async function settingsPage(root) {
       h("p", { class: "empty meter", text: "Wer diese Adresse kennt, sieht deinen Stundenplan. Teile sie nicht; im Zweifel neuen Link erzeugen." }));
   };
   fetch("/api/calendar", { credentials: "same-origin" }).then((r) => r.json()).then(drawCal).catch((err) => calBox.replaceChildren(errorBox(err)));
-  grid.append(tEv, tAcc, notifySettingsTile(st, 4), tLook, tCache, tCal);
+  // your data: export (data access) and instance reset (deletion)
+  const word = h("input", { class: "cal-url", placeholder: "LÖSCHEN", "aria-label": "Zum Bestätigen LÖSCHEN eintippen", autocomplete: "off" });
+  const wipe = h("button", { class: "ghost danger", type: "button", text: "Instanz zurücksetzen", disabled: true });
+  word.addEventListener("input", () => { wipe.disabled = word.value !== "LÖSCHEN"; });
+  wipe.addEventListener("click", async () => {
+    wipe.disabled = true;
+    const res = await fetch("/api/reset", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ confirm: word.value }) });
+    if (res.ok) {
+      navigator.serviceWorker?.controller?.postMessage("clear");
+      location.href = "/login";
+    } else alertBox("Zurücksetzen fehlgeschlagen.");
+  });
+  const tData = tile("Deine Daten", { cls: "w12", i: 6 },
+    h("p", { class: "empty", text: "Alles, was diese Instanz über dich gespeichert hat, als ZIP: Konto, Einstellungen, zwischengespeicherte Daten, Prüfungsverlauf, Benachrichtigungen, Protokoll verbindlicher Aktionen. Passwort und Schlüssel sind nicht enthalten." }),
+    h("div", { class: "row-actions" }, h("a", { class: "primary as-btn", href: "/api/export", text: "Daten exportieren" })),
+    h("h2", { class: "sub", text: "Instanz zurücksetzen" }),
+    h("p", { class: "empty", text: st.account?.source === "env"
+      ? "Löscht Einstellungen, Zwischenspeicher, Verlauf, Downloads und die CIS-Sitzung. Das Konto selbst kommt aus Umgebungsvariablen und bleibt bestehen."
+      : "Löscht dein Konto in naknak und alle Daten dieser Instanz (Einstellungen, Zwischenspeicher, Verlauf, Downloads, CIS-Sitzung) und meldet alle Geräte ab. Danach kann sich wieder jemand als Erstes anmelden. In CIS und Moodle selbst wird nichts gelöscht." }),
+    h("div", { class: "row-actions danger-row" }, word, wipe));
+  grid.append(tEv, tAcc, notifySettingsTile(st, 4), tLook, tCache, tCal, tData);
 }
 
 // ── EduVault on module pages ────────────────────────────────────────────────

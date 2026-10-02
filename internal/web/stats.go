@@ -87,3 +87,9 @@ func (s *Server) metrics(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
 	w.Write([]byte(b.String()))
 }
+
+func (st *stats) reset(now time.Time) {
+	st.mu.Lock()
+	st.since, st.tools = now, map[string]*toolStats{}
+	st.mu.Unlock()
+}

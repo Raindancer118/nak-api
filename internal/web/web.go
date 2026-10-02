@@ -68,6 +68,7 @@ type Server struct {
 	ui  fs.FS
 
 	store   *store
+	tokenMu sync.RWMutex // the access key rotates on an instance reset
 	watch   *watcher
 	history *history
 	stats   *stats
@@ -132,6 +133,8 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("GET /api/calendar", s.authed(http.HandlerFunc(s.calendarInfo)))
 	mux.Handle("GET /api/history", s.authed(http.HandlerFunc(s.historyAPI)))
 	mux.Handle("GET /api/stats", s.authed(http.HandlerFunc(s.statsAPI)))
+	mux.Handle("GET /api/export", s.authed(http.HandlerFunc(s.export)))
+	mux.Handle("POST /api/reset", s.authed(s.jsonOnly(s.reset)))
 	mux.Handle("GET /metrics", s.authed(http.HandlerFunc(s.metrics)))
 	mux.Handle("POST /api/upload", s.authed(s.sameOriginOnly(s.upload)))
 	mux.Handle("GET /api/notifications", s.authed(http.HandlerFunc(s.notifications)))
@@ -183,8 +186,14 @@ func (s *Server) headers(next http.Handler) http.Handler {
 	})
 }
 
+func (s *Server) token() string {
+	s.tokenMu.RLock()
+	defer s.tokenMu.RUnlock()
+	return s.cfg.Token
+}
+
 func (s *Server) sessionValue() string {
-	m := hmac.New(sha256.New, []byte(s.cfg.Token))
+	m := hmac.New(sha256.New, []byte(s.token()))
 	m.Write([]byte("nak-web-session-v1"))
 	return hex.EncodeToString(m.Sum(nil))
 }
@@ -196,7 +205,7 @@ func (s *Server) isAuthed(r *http.Request) bool {
 		return true
 	}
 	if b, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer "); ok {
-		return eq(strings.TrimSpace(b), s.cfg.Token)
+		return eq(strings.TrimSpace(b), s.token())
 	}
 	c, err := r.Cookie(cookieName)
 	return err == nil && eq(c.Value, s.sessionValue())
@@ -303,7 +312,7 @@ func (s *Server) tryLogin(w http.ResponseWriter, r *http.Request, tok string) {
 		s.renderLogin(w, r, http.StatusTooManyRequests, "Zu viele Fehlversuche. Bitte in ein paar Minuten erneut versuchen.")
 		return
 	}
-	if !eq(strings.TrimSpace(tok), s.cfg.Token) {
+	if !eq(strings.TrimSpace(tok), s.token()) {
 		s.failed(ip)
 		s.renderLogin(w, r, http.StatusUnauthorized, "Der Zugangsschlüssel stimmt nicht.")
 		return

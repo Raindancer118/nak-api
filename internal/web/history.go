@@ -173,3 +173,12 @@ func (h *history) snapshot() historySnapshot {
 func (s *Server) historyAPI(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, s.history.snapshot())
 }
+
+func (h *history) reset() {
+	h.mu.Lock()
+	h.data = historyData{Exams: map[string]examRecord{}, Grades: map[string][]gradeRecord{}}
+	h.mu.Unlock()
+	if h.file != "" {
+		os.Remove(h.file)
+	}
+}
