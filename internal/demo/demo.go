@@ -259,7 +259,7 @@ func read(name, desc string, run func(a *app.App, args tools.Args) (any, error))
 
 func write(name, desc string, preview func(args tools.Args) any) *tools.Tool {
 	return &tools.Tool{Name: name, Kind: tools.Write, Desc: desc,
-		Params:  []tools.Param{{Name: "exam_id"}, {Name: "action"}, {Name: "seminar_id"}, {Name: "module_id"}, {Name: "termin_id"}, {Name: "postid", Type: "integer"}, {Name: "message"}, {Name: "conversationid", Type: "integer"}, {Name: "text"}, {Name: "assignid", Type: "integer"}, {Name: "files", Type: "array:string"}, {Name: "online_text"}, {Name: "submit_for_grading", Type: "boolean"}},
+		Params:  []tools.Param{{Name: "exam_id"}, {Name: "action"}, {Name: "seminar_id"}, {Name: "module_id"}, {Name: "termin_id"}, {Name: "choiceid", Type: "integer"}, {Name: "optionids", Type: "array:integer"}, {Name: "postid", Type: "integer"}, {Name: "message"}, {Name: "conversationid", Type: "integer"}, {Name: "text"}, {Name: "assignid", Type: "integer"}, {Name: "files", Type: "array:string"}, {Name: "online_text"}, {Name: "submit_for_grading", Type: "boolean"}},
 		Preview: func(a *app.App, args tools.Args) (any, error) { return preview(args), nil },
 		Do: func(a *app.App, args tools.Args) (any, error) {
 			return map[string]any{"demo": "Demo – nichts gesendet. In einer echten Instanz wäre das jetzt verbindlich passiert."}, nil
@@ -375,6 +375,13 @@ func Registry() *tools.Registry {
 		}),
 		read("moodle_quizzes", "Demo-Tests", func(*app.App, tools.Args) (any, error) {
 			return []map[string]any{{"quizid": 901, "name": "Selbsttest Kapitel 2", "course": "I160_I24", "courseid": 2102, "opens": "2026-09-28 08:00", "closes": "2026-10-12 23:59", "attempts_allowed": "unbegrenzt", "url": "https://moodle.example/mod/quiz/view.php?id=8"}}, nil
+		}),
+		read("moodle_choices", "Demo-Abstimmungen", func(*app.App, tools.Args) (any, error) {
+			return []map[string]any{{"kind": "choice", "choiceid": 401, "cmid": 21029, "name": "Projektgruppen Sprint 3", "intro": "Tragt euch in eine Gruppe ein (max. 4 Personen).", "open": true, "closes": "2026-10-09 23:59", "multiple": false, "can_change_answer": true,
+				"options": []map[string]any{{"optionid": 1, "text": "Gruppe A · Bibliothek", "taken": 3}, {"optionid": 2, "text": "Gruppe B · Mensa-App", "taken": 4, "disabled": true}, {"optionid": 3, "text": "Gruppe C · Raumbuchung", "taken": 1}}}}, nil
+		}),
+		write("moodle_choice_submit", "Demo: Abstimmung", func(args tools.Args) any {
+			return map[string]any{"would": "Stimme abgeben", "choice": args.Str("choiceid")}
 		}),
 		read("moodle_forum_discussions", "Demo-Forum", func(*app.App, tools.Args) (any, error) {
 			return []map[string]any{{"forum": "Ankündigungen", "forumid": 61, "discussionid": 611, "subject": "Raumänderung Donnerstag", "author": "Dr. Ada Lindqvist", "created": "2026-10-01 09:12", "last_activity": "2026-10-01 10:30", "replies": 1, "preview": "Die Übung findet diese Woche im PC-Pool 2 statt."}}, nil

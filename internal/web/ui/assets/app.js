@@ -734,6 +734,24 @@ function assignmentRows(as) {
   }));
 }
 
+// A Moodle choice (vote or group sign-up): options with seats, your answer,
+// and voting through the confirm gate.
+function choiceView(c) {
+  const opts = c.options || [];
+  const picked = new Set(opts.filter((o) => o.selected).map((o) => o.optionid));
+  const inputs = opts.map((o) => h("input", { type: c.multiple ? "checkbox" : "radio", name: `choice-${c.choiceid}`, value: o.optionid, checked: o.selected, disabled: o.disabled || (!c.open) || (picked.size > 0 && !c.can_change_answer) }));
+  const list = h("ul", { class: "choice-opts" }, opts.map((o, i) => h("li", {}, h("label", { class: "inline-check" }, inputs[i],
+    h("span", { text: o.text }), o.taken != null && h("span", { class: "s", text: `${o.taken} gewählt` })))));
+  const canVote = c.open && (picked.size === 0 || c.can_change_answer);
+  return h("div", { class: "choice" },
+    h("div", { class: "tl-head" }, h("b", { text: c.name }), h("span", { class: `chip ${c.open ? "ok" : ""}`, text: c.open ? "offen" : "geschlossen" }),
+      c.closes && h("span", { class: "s", text: `bis ${c.closes}` })),
+    textBlock(c.intro),
+    list,
+    canVote && confirmFlow({ tool: "moodle_choice_submit", label: picked.size ? "Wahl ändern" : "Abstimmen", confirm: "Stimme verbindlich abgeben", cls: "primary",
+      args: () => { const ids = inputs.filter((x) => x.checked).map((x) => Number(x.value)); return ids.length ? { choiceid: c.choiceid, optionids: ids } : null; }, done: refreshPage }));
+}
+
 function quizRows(qs) {
   if (!qs.length) return emptyRow("Keine Tests.");
   return h("ul", { class: "rows" }, qs.map((q, j) => h("li", {}, h("a", { class: "row", href: q.url, target: "_blank", rel: "noopener", title: "Tests laufen in Moodle selbst", vars: { "--j": j } },
@@ -1355,10 +1373,12 @@ async function courseTab(body, cid, tab) {
         h("span", { class: "t" }, d.subject, h("span", { class: "s", text: [d.forum, d.author, d.last_activity].filter(Boolean).join(" · ") }), d.preview && h("span", { class: "s preview", text: d.preview })),
         h("span", { class: "chip", text: `${d.replies || 0} Antw.` })))))));
     } else if (tab === "abgaben") {
-      const [as, qs] = await Promise.all([api("moodle_assignments", { courseid: cid, only_open: false }), api("moodle_quizzes", { courseid: cid, only_open: false }).catch(() => [])]);
+      const [as, qs, cs] = await Promise.all([api("moodle_assignments", { courseid: cid, only_open: false }), api("moodle_quizzes", { courseid: cid, only_open: false }).catch(() => []), api("moodle_choices", { courseid: cid }).catch(() => [])]);
+      const choices = Array.isArray(cs) ? cs : cs?.choices || [];
       body.replaceChildren(h("div", { class: "grid" },
         tile("Abgaben", { cls: "w6" }, assignmentRows(as || [])),
-        tile("Tests", { cls: "w6", i: 1 }, quizRows(qs || []))));
+        tile("Tests", { cls: "w6", i: 1 }, quizRows(qs || [])),
+        choices.length > 0 && tile("Abstimmungen & Gruppenwahlen", { cls: "w12", i: 2 }, choices.map(choiceView))));
     } else {
       const info = await api("moodle_course_info", { courseid: cid });
       body.replaceChildren(tile("Kurs", { cls: "w12" },
