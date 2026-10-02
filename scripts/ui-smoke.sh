@@ -43,8 +43,8 @@ check "#/einstellungen"       "EduVault" "Kalender-Abo" "Benachrichtigungen" "De
 check "#/abgabe/801"          "Übungsblatt 4" "Abgeben"
 check "#/studium/seminare"    "Moderation und Präsentation" "Agiles Projektmanagement" "zum Seminar anmelden"
 check "#/studium/wahlpflicht" "WP Data Engineering"
-check "#/bachelorthesis"      "Bachelorthesis" "Anmeldung noch nicht möglich" "Dein Fahrplan" "Späteste Anmeldung" "Rechner" "Abschluss März 2028" "Betreuungs-Assistent" "Vorschlag finden" "Passt das?" "Gutachtende finden" "PO § 7"
-check "#/transferleistungen"   "Transfermodule" "von 30 ECTS" "Bachelorthesis" "1,9" "Kriterienmittel 1,98" "Praxisphase" "PVO § 18"
+check "#/bachelorthesis"      "Bachelorthesis" "Anmeldung noch nicht möglich" "Dein Fahrplan" "Späteste Anmeldung" "Rechner" "Abschluss März 2028" "Betreuungs-Assistent" "Vorschlag finden" "Passt das?" "Gutachtende finden"
+check "#/transferleistungen"   "Transfermodule" "von 30 ECTS" "Bachelorthesis" "1,9" "Kriterienmittel 1,98" "Praxisphase"
 check "#/studium/bescheinigungen" "Studienbescheinigung WS 2026" "Deutsch"
 check "#/studium/profil"      "Mustermann" "Kopierguthaben" "Kontakt ändern" "Adresse ändern" "Freigaben ändern"
 exit $fail

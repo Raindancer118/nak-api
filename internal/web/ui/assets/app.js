@@ -635,7 +635,7 @@ function gradeCalculator(g, p) {
   });
   update();
   return [h("div", { class: "avg calc-head" }, result, delta), h("ul", { class: "rows calc" }, rows),
-    h("p", { class: "empty fine-note", text: "Gewichtet mit Credits wie im CIS; Seminare und Transferleistungen zählen nicht in den Schnitt. Nur eine Hochrechnung." })];
+    h("p", { class: "empty fine-note", text: "Hochrechnung, gewichtet nach Credits." })];
 }
 
 function gradeClass(m) {
@@ -1228,8 +1228,7 @@ function pendingRows(p, keep = () => true) {
           ? `geschrieben ${x.written.split(" ")[0]} · Note spätestens ${x.due}`
           : `geschrieben ${x.written.split(" ")[0]} · ${x.note || "Frist noch nicht berechenbar"}` })),
         chip));
-    })),
-    h("p", { class: "empty meter", text: "Vier Vorlesungswochen nach der Prüfung (PVO § 17 Abs. 3); Praxisphasen zählen nicht." })];
+    }))];
 }
 
 function loadHistory() {
@@ -1776,7 +1775,7 @@ async function settingsPage(root) {
     h("label", {}, "Adresse", url),
     h("label", {}, "Token", token),
     h("label", {}, "TOTP-Secret", secret),
-    h("p", { class: "empty", text: "Beides bekommst du in EduVault unter Profil → MCP / KI-Zugang → Zugangsdaten erstellen. naknak prüft die Daten mit einer Anmeldung, bevor es sie speichert; sie verlassen diesen Server danach nur Richtung EduVault." }),
+    h("p", { class: "empty", text: "In EduVault unter Profil → MCP / KI-Zugang → Zugangsdaten erstellen." }),
     h("div", { class: "row-actions" }, save,
       ev.configured && ev.source === "settings" && h("button", { class: "ghost", type: "button", text: "Entfernen", onclick: async () => {
         await fetch("/api/settings/eduvault", { method: "DELETE", credentials: "same-origin" });
@@ -1810,7 +1809,7 @@ async function settingsPage(root) {
 
   // account & instance
   const acc = st.account || {};
-  if (st.demo) grid.prepend(tile("Demo", { cls: "w12", i: 0 }, h("p", { class: "empty", text: "Das ist die Demo mit erfundenen Daten: Einstellungen werden hier nicht gespeichert, und naknak spricht mit keinem anderen Server. In deiner eigenen Instanz geht alles." })));
+  if (st.demo) grid.prepend(tile("Demo", { cls: "w12", i: 0 }, h("p", { class: "empty", text: "Demo mit erfundenen Daten: Einstellungen werden nicht gespeichert." })));
   if (st.operator?.name) {
     grid.append(tile("Betrieb", { cls: "w12", i: 1 }, h("p", { class: "empty", text:
       `Diese Instanz betreibt ${st.operator.name} für dich. Gespeichert sind dein NORDAKADEMIE-Login (für die Abfragen bei CIS und Moodle) und was naknak daraus zwischenspeichert; als Betreiber hat ${st.operator.name} technisch Zugriff darauf. Weiter unten kannst du alles exportieren oder die Instanz zurücksetzen (löscht alles)${st.operator.contact ? `; Fragen an ${st.operator.contact}` : ""}.` })));
@@ -1838,11 +1837,11 @@ async function settingsPage(root) {
       for (const b of seg.children) b.setAttribute("aria-pressed", b === e.currentTarget ? "true" : "false");
       applyTheme(t);
     } })));
-  tLook.append(seg, h("p", { class: "empty meter", text: "Bewegungen richten sich nach „Bewegung reduzieren“ im Betriebssystem." }));
+  tLook.append(seg);
 
   // cache
   const tCache = tile("Zwischenspeicher", { cls: "w8", i: 3 },
-    h("p", { class: "empty", text: "naknak merkt sich Antworten von CIS und Moodle und zeigt sie sofort an; veraltete Daten werden im Hintergrund erneuert (Nachrichten nach 1 Minute, Fristen nach 5, Stundenplan nach 30, Noten nach 2 Stunden)." }),
+    h("p", { class: "empty", text: "Zeigt Gespeichertes sofort und lädt im Hintergrund nach." }),
     h("div", { class: "row-actions" }, h("button", { class: "ghost", type: "button", text: "Zwischenspeicher leeren", onclick: async (e) => {
       e.currentTarget.disabled = true;
       await fetch("/api/cache/clear", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: "{}" });
@@ -1872,7 +1871,7 @@ async function settingsPage(root) {
   // calendar subscription
   const tCal = tile("Kalender-Abo", { cls: "w12", i: 4 });
   const calBox = h("div", { class: "cal-box" }, skeleton());
-  tCal.append(h("p", { class: "empty", text: "Vorlesungen, Klausuren, Moodle-Fristen und Anmeldeschlüsse als Abo für Apple Kalender, Google Kalender, Outlook oder Thunderbird. Klausuren und Fristen mit Erinnerung am Vortag." }), calBox);
+  tCal.append(h("p", { class: "empty", text: "Vorlesungen, Klausuren und Fristen als Kalender-Abo." }), calBox);
   const drawCal = (info) => {
     const abs = location.origin + info.path;
     const field = h("input", { class: "cal-url", readonly: true, value: abs, "aria-label": "Abo-Adresse", onfocus: (e) => e.currentTarget.select() });
@@ -1887,7 +1886,7 @@ async function settingsPage(root) {
         drawCal(await r.json());
         alertBox("Neuer Abo-Link erzeugt. Der alte funktioniert nicht mehr.");
       } })),
-      h("p", { class: "empty meter", text: "Wer diese Adresse kennt, sieht deinen Stundenplan. Teile sie nicht; im Zweifel neuen Link erzeugen." }));
+      h("p", { class: "empty meter", text: "Wer den Link kennt, sieht deinen Stundenplan." }));
   };
   fetch("/api/calendar", { credentials: "same-origin" }).then((r) => r.json()).then(drawCal).catch((err) => calBox.replaceChildren(errorBox(err)));
   // your data: export (data access) and instance reset (deletion)
@@ -1903,7 +1902,7 @@ async function settingsPage(root) {
     } else alertBox("Zurücksetzen fehlgeschlagen.");
   });
   const tData = tile("Deine Daten", { cls: "w12", i: 6 },
-    h("p", { class: "empty", text: "Alles, was diese Instanz über dich gespeichert hat, als ZIP: Konto, Einstellungen, zwischengespeicherte Daten, Prüfungsverlauf, Benachrichtigungen, Protokoll verbindlicher Aktionen. Passwort und Schlüssel sind nicht enthalten." }),
+    h("p", { class: "empty", text: "Alles, was über dich gespeichert ist, als ZIP (ohne Passwort)." }),
     h("div", { class: "row-actions" }, h("a", { class: "primary as-btn", href: "/api/export", text: "Daten exportieren" }),
       h("button", { class: "ghost", type: "button", text: "Alle Geräte abmelden", title: "Neuer Zugangsschlüssel: jede Sitzung endet, auch diese", onclick: async () => {
         await fetch("/api/sessions/revoke", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: "{}" });
@@ -1996,7 +1995,7 @@ function drawBell() {
       h("span", { class: `chip kind-${n.kind}`, text: kindIcon[n.kind] || "Neu" }),
       h("span", { class: `t ${n.kind === "grade" || n.kind === "message" ? "sens" : ""}` }, n.title, h("span", { class: "s", text: [n.body, relTime(n.at)].filter(Boolean).join(" · ") })),
       !n.read && h("span", { class: "dot new" })))))
-      : h("p", { class: "empty", text: "Noch nichts. naknak meldet sich bei neuen Noten, Moodle-Inhalten, Nachrichten und dringenden Fristen." }),
+      : h("p", { class: "empty", text: "Noch nichts." }),
     h("a", { class: "bell-foot", href: "#/einstellungen", onclick: () => { bell.panel.hidden = true; }, text: "Einstellungen" }));
 }
 
@@ -2081,11 +2080,11 @@ function notifySettingsTile(st, i) {
   perm.addEventListener("click", async () => { await Notification.requestPermission(); drawPerm(); });
   drawPerm();
   const form = h("form", { class: "settings-form wide" },
-    h("label", { class: "check" }, on, h("span", {}, h("b", { text: "Im Hintergrund nach Neuem schauen" }), h("small", { text: "Noten alle 3 h (mit dem Schalter unten alle 10 min, solange eine aussteht) · Moodle-Inhalte und Fristen stündlich · Nachrichten alle 15 min. Was das Portal gerade geladen hat, wird wiederverwendet." }))),
+    h("label", { class: "check" }, on, h("span", {}, h("b", { text: "Im Hintergrund nach Neuem schauen" }), h("small", { text: "Noten alle 3 h · Moodle stündlich · Nachrichten alle 15 min" }))),
     h("label", { class: "check" }, night, h("span", {}, h("b", { text: "Auch nachts (23–7 Uhr)" }), h("small", { text: "Sonst ruht naknak nachts und CIS/Moodle werden nicht gefragt." }))),
-    h("label", { class: "check" }, fast, h("span", {}, h("b", { text: "Neue Noten schneller melden" }), h("small", { text: "Liest zusätzlich alle 10 min die Notenübersicht (PDF): Sie kennt neue Noten oft vor der Leistungsübersicht. Nur solange für eine geschriebene Prüfung noch keine Note da ist." }))),
+    h("label", { class: "check" }, fast, h("span", {}, h("b", { text: "Neue Noten schneller melden" }), h("small", { text: "Prüft alle 10 min die Notenübersicht (PDF), solange eine Note aussteht." }))),
     h("label", {}, "ntfy-Adresse für Push aufs Handy (optional)", ntfy),
-    h("label", { class: "check" }, details, h("span", {}, h("b", { text: "Details mitschicken" }), h("small", { text: "Sonst nur „Neue Note in naknak“. ntfy.sh ist ein öffentlicher Server; Noten und Nachrichten gehören da eigentlich nicht hin." }))),
+    h("label", { class: "check" }, details, h("span", {}, h("b", { text: "Details mitschicken" }), h("small", { text: "Sonst nur „Neue Note in naknak“. ntfy.sh ist öffentlich." }))),
     h("div", { class: "row-actions" }, h("button", { class: "primary", type: "submit", text: "Speichern" }), perm),
     msg);
   form.addEventListener("submit", async (e) => {
@@ -2496,7 +2495,7 @@ function tlRow(slot, j, { details = false } = {}) {
     x ? h("span", { class: "t" }, x.topic || "Thema offen", h("span", { class: "s" },
       nr ? h("a", { href: `#/modul/${nr}`, text: x.module }) : (x.module || ""),
       [x.abgabedatum && ` · Abgabe bis ${x.abgabedatum}`, x.versuch && ` · ${x.versuch}. Versuch (max. 3)`, ps && ` · ${tlPhase(ps)}`].filter(Boolean).join("")))
-      : h("span", { class: "t" }, `Transfermodul Theorie/Praxis ${slot.no}`, h("span", { class: "s", text: [ps ? tlPhase(ps) : "noch offen", slot.no === TL_SLOTS && "kann die Vorstudie zur Bachelorthesis sein"].filter(Boolean).join(" · ") + when })),
+      : h("span", { class: "t" }, `Transfermodul Theorie/Praxis ${slot.no}`, h("span", { class: "s", text: [ps ? tlPhase(ps) : "noch offen"].filter(Boolean).join(" · ") + when })),
     chip);
   if (!x || !details) return h("li", { vars: { "--j": j } }, head);
   return h("li", { class: "seminar", vars: { "--j": j } }, head,
@@ -2555,8 +2554,7 @@ function transferGradeSummary(g, limit = Infinity) {
     h("ul", { class: "rows" }, items.map((x, j) => h("li", {}, h("div", { class: "row", vars: { "--j": j } },
       h("span", { class: "ext tl", text: `T${x.no}` }),
       h("span", { class: "t" }, x.topic, h("span", { class: "s" }, x.module_nr ? h("a", { href: `#/modul/${x.module_nr}`, text: x.module }) : x.module, h("span", { class: "sens", text: ` · Kriterienwert ${x.grade}` }))),
-      h("span", { class: `chip sens ${x.must_pass_ok ? "" : "bad"}`, text: x.final || x.grade }))))),
-    h("p", { class: "empty meter", text: "Rechnerisch, nicht vom CIS; geht nicht in die Gesamtnote ein." })];
+      h("span", { class: `chip sens ${x.must_pass_ok ? "" : "bad"}`, text: x.final || x.grade })))))];
 }
 
 async function transferPage(root) {
@@ -2565,17 +2563,10 @@ async function transferPage(root) {
   root.append(grid);
   const tSlots = tile("Transfermodule", { cls: "w8", i: 0 });
   const tValues = tile("Noten · rechnerisch", { i: 1 });
-  const tRules = tile("Was gilt", { cls: "w12", i: 2 });
-  grid.append(tSlots, tValues, tRules);
+  grid.append(tSlots, tValues);
   fill(tSlots, () => Promise.all([api("cis_list_transfer"), api("nak_transfer_plan").catch(() => null)]), ([list, plan]) => transferOverview(list, plan, { details: true }));
   fill(tValues, () => api("nak_transfer_grades"), (g) => [...[transferGradeSummary(g)].flat(),
-    ...(g.items || []).filter((x) => !x.must_pass_ok).map((x) => h("p", { class: "err", text: `T${x.no}: ein Kriterium, das bestanden werden muss, ist schlechter als 4,0.` }))]);
-  tRules.append(h("ul", { class: "rules" },
-    h("li", { text: "Sechs Transferleistungen zwischen dem 2. und 7. Semester, je 5 ECTS. Das Thema muss einem Modul des Pflichtcurriculums zugeordnet sein (PO § 5 Abs. 3)." }),
-    h("li", { text: "Studienleistung: nur „bestanden“ oder „nicht bestanden“, keine Note, nicht in der Gesamtnote; zweimal wiederholbar (PVO § 18)." }),
-    h("li", { text: "Das Thema der Bachelorthesis gibt es erst mit den 25 ECTS aus T1–T5 (PO § 7 Abs. 1). T6 kann eine Vorstudie zur Thesis sein." }),
-    h("li", { text: "Je Transferleistung eine Praxisphase, etwa 9 Wochen von der Auftragsklärung bis zur Bewertung (Studienverlaufsplan der NORDAKADEMIE im Moodle-Kurs Transferleistungen)." }),
-    h("li", { text: "Die Note hier ist rechnerisch: gewichteter Mittelwert der Bewertungskriterien, wie eine zusammengesetzte Note auf eine Nachkommastelle abgerundet (PVO § 17 Abs. 4). Offiziell gibt es keine." })));
+    ...(g.items || []).filter((x) => !x.must_pass_ok).map((x) => h("p", { class: "err", text: `T${x.no}: Muss-Kriterium schlechter als 4,0` }))]);
 }
 
 // ── Bachelorthesis ──────────────────────────────────────────────────────────
@@ -2640,9 +2631,9 @@ function thesisCalc(t) {
       if (r.buffer_days != null && r.graduation && r.buffer_days < 7) warn.push(`Nur ${r.buffer_days} Tage Puffer bis zu den letzten Noten; das Prüfungsamt rät zu mehr (Krankheit).`);
       out.replaceChildren(h("dl", { class: "kv" },
         h("dt", { text: "Beginn" }), h("dd", { text: r.start }),
-        h("dt", { text: "Abgabe" }), h("dd", {}, h("b", { text: r.submission }), " bis 23:59 (Poststempel zählt)"),
-        h("dt", { text: "Mit voller Verlängerung" }), h("dd", { text: `${r.with_extension} (5 Wochen, nur auf Antrag aus nicht selbst zu vertretenden Gründen)` }),
-        h("dt", { text: "Gutachten bis" }), h("dd", { text: `${r.review_until} (4 Vorlesungswochen)` }),
+        h("dt", { text: "Abgabe" }), h("dd", {}, h("b", { text: r.submission }), " bis 23:59"),
+        h("dt", { text: "Mit voller Verlängerung" }), h("dd", { text: r.with_extension }),
+        h("dt", { text: "Gutachten bis" }), h("dd", { text: r.review_until }),
         h("dt", { text: "Abschluss" }), h("dd", { text: r.graduation ? `${r.graduation.name}: letzte Noten ${r.graduation.last_grades}, Prüfungsausschuss ${r.graduation.board}${r.graduation.ceremony ? " · " + r.graduation.ceremony : ""}` : "kein Abschlusstermin bekannt" }),
         r.graduation && h("dt", { text: "Puffer" }), r.graduation && h("dd", { text: `${r.buffer_days} Tage bis zu den letzten Noten` }),
         r.graduation_with_extension && r.graduation_with_extension.name !== r.graduation?.name && h("dt", { text: "Mit Verlängerung" }),
@@ -2726,30 +2717,25 @@ function thesisAssistant() {
     out.replaceChildren(...skeleton());
     try {
       const r = await api("nak_thesis_match", mode === "check" ? { topic: t, reviewer: who.value } : { topic: t }, { wait: true });
-      note.textContent = r.semantic
-        ? "Das Thema bleibt auf deinem naknak-Server: abgeglichen wird mit den Fachgebieten der Gutachtenden, nach Wörtern und nach Bedeutung (lokales Sprachmodell auf dem Server, keine externe KI)."
-        : "Das Thema bleibt auf deinem naknak-Server: abgeglichen wird mit den Fachgebieten aus der Übersicht der Gutachtenden, nicht mit einer externen KI.";
       if (mode === "suggest") {
         const list = r.suggestions || [];
-        out.replaceChildren(list.length ? h("ul", { class: "rows" }, list.map((m, j) => matchCard(m, j))) : emptyRow("Niemand passt erkennbar. Anders formulieren oder Fachbegriffe ergänzen."),
-          h("p", { class: "empty meter", text: "Sortiert nach Passung; wer voll ausgelastet ist, rutscht etwas nach unten. Bestellt werden Gutachtende vom Prüfungsausschuss; vorher mit der Person abstimmen." }));
+        out.replaceChildren(list.length ? h("ul", { class: "rows" }, list.map((m, j) => matchCard(m, j))) : emptyRow("Niemand passt erkennbar. Anders formulieren oder Fachbegriffe ergänzen."));
       } else {
         const m = r.match;
         out.replaceChildren(h("ul", { class: "rows" }, matchCard(m, 0)),
-          m.percent >= 60 ? h("p", { class: "tl-alert ok" }, h("b", { text: "Passt gut." }), " Die Fachgebiete decken das Thema weitgehend ab.")
-            : m.percent >= 35 ? h("p", { class: "tl-alert" }, h("b", { text: "Passt teilweise." }), " Einzelne Aspekte liegen außerhalb der Fachgebiete.")
-            : h("p", { class: "tl-alert bad" }, h("b", { text: "Passt kaum." }), " Die Fachgebiete treffen das Thema nur am Rand."),
+          m.percent >= 60 ? h("p", { class: "tl-alert ok" }, h("b", { text: "Passt gut." }))
+            : m.percent >= 35 ? h("p", { class: "tl-alert" }, h("b", { text: "Passt teilweise." }))
+            : h("p", { class: "tl-alert bad" }, h("b", { text: "Passt kaum." })),
           ...((r.better || []).length ? [h("h2", { class: "sub", text: "Würde besser passen" }), h("ul", { class: "rows" }, r.better.map((x, j) => matchCard(x, j, { compact: true })))] : []));
       }
     } catch (err) {
       out.replaceChildren(errorBox(err));
     }
   };
-  const note = h("p", { class: "empty meter", text: "Das Thema bleibt auf deinem naknak-Server: abgeglichen wird mit den Fachgebieten aus der Übersicht der Gutachtenden, nicht mit einer externen KI." });
   go.addEventListener("click", run);
   topic.addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) run(); });
   setMode("suggest");
-  return h("div", {}, seg, h("div", { class: "settings-form wide" }, h("label", {}, "Thema", topic), whoRow, h("div", { class: "row-actions" }, go)), out, note);
+  return h("div", {}, seg, h("div", { class: "settings-form wide" }, h("label", {}, "Thema", topic), whoRow, h("div", { class: "row-actions" }, go)), out);
 }
 
 async function thesisPage(root) {
@@ -2762,8 +2748,7 @@ async function thesisPage(root) {
   const tDates = tile("Abschlusstermine", { cls: "w6", i: 3 });
   const tAssist = tile("Betreuungs-Assistent", { cls: "w12", i: 4 });
   const tRev = tile("Gutachtende finden", { cls: "w12", i: 4 });
-  const tRules = tile("Was gilt", { cls: "w12", i: 5 });
-  grid.append(tStatus, tPlan, tCalc, tDates, tAssist, tRev, tRules);
+  grid.append(tStatus, tPlan, tCalc, tDates, tAssist, tRev);
   const data = api("nak_thesis");
   fill(tStatus, () => Promise.all([data, api("cis_progress").catch(() => null)]), ([t, p]) => {
     const e = t.eligibility || {};
@@ -2772,15 +2757,14 @@ async function thesisPage(root) {
   });
   fill(tPlan, () => data, (t) => {
     const a = t.planning_aid || {};
-    if (!a.found) return emptyRow("Für deinen Jahrgang hat das CIS noch keine Planungshilfe; der Rechner und die Abschlusstermine gelten trotzdem.");
+    if (!a.found) return emptyRow("Noch keine Planungshilfe für deinen Jahrgang.");
     const today = startOfDay(new Date());
     const steps = thesisSteps(a);
     const next = steps.find((x) => x.at && x.at >= today);
     return [h("p", { class: "empty", text: `Planungshilfe Jahrgang ${a.cohort} aus dem CIS` }),
       h("ul", { class: "rows" }, steps.map((x, j) => h("li", {}, h("div", { class: `row ${x.at && x.at < today ? "past" : ""}`, vars: { "--j": j } },
         h("span", { class: "dot", "data-src": "cis" }), h("span", { class: "t" }, x.label, h("span", { class: "s", text: x.date })),
-        x === next ? h("span", { class: "chip due", text: relDay(dayDiff(x.at)) }) : x.at && x.at < today ? h("span", { class: "chip", text: "vorbei" }) : null)))),
-      h("p", { class: "empty meter", text: "Das Prüfungsamt rät davon ab, erst in der letzten Anmeldewoche anzumelden: Puffer für Krankheit einplanen." })];
+        x === next ? h("span", { class: "chip due", text: relDay(dayDiff(x.at)) }) : x.at && x.at < today ? h("span", { class: "chip", text: "vorbei" }) : null))))];
   });
   fill(tCalc, () => data, thesisCalc);
   fill(tDates, () => data, (t) => {
@@ -2790,18 +2774,11 @@ async function thesisPage(root) {
     return h("ul", { class: "rows" }, list.map(({ latest: l, reachable }, j) => h("li", {}, h("div", { class: `row ${reachable ? "" : "past"}`, vars: { "--j": j } },
       h("span", { class: "t" }, `Abschluss ${l.graduation.name}`, h("span", { class: "s", text: reachable
         ? `spätestens anmelden in KW ${l.kw} (${l.register_week_from} – ${l.register_week_to}) · Start ${l.start} · Abgabe ${l.submission} · letzte TL beginnen bis ${l.tl_start_by}`
-        : "nicht erreichbar: die Anmeldung läge vor der frühesten Anmeldung deines Jahrgangs" })),
+        : "nicht erreichbar" })),
       h("span", { class: `chip ${reachable ? "" : "bad"}`, text: l.graduation.ceremony ? l.graduation.ceremony.replace("Bachelor-Graduierung: ", "Feier ") : `Ende ${l.graduation.board}` })))));
   });
   tAssist.append(thesisAssistant());
   tRev.append(thesisReviewers());
-  tRules.append(h("ul", { class: "rules" },
-    h("li", { text: "Anmeldung erst nach dem Ende der Vorlesungszeit des 6. Semesters und mit allen Modulprüfungen bis einschließlich 4. Semester sowie den 25 ECTS aus Transferleistung 1–5 (PO § 7 Abs. 1)." }),
-    h("li", { text: "Ablauf: Thema mit betrieblicher Betreuung und gutachtender Person abstimmen → Antrag auf Zulassung im CIS → Bescheid des Prüfungsamts mit Abgabetermin → Bearbeitung → Abgabe → betriebliche Stellungnahme → Gutachten mit Notenvorschlag → Note durch den Prüfungsausschuss." }),
-    h("li", { text: "Bearbeitungszeit 2 Monate ab der Zulassung (PO § 7 Abs. 2, PVO § 22 Abs. 2); höchstens 5 Wochen Verlängerung, nur auf Antrag vor Fristende und aus Gründen, die du nicht zu vertreten hast. Thema einmal zurückgeben: nur in den ersten 3 Wochen, aus triftigem Grund (PVO § 22 Abs. 5)." }),
-    h("li", { text: "Abgabe spätestens am letzten Tag bis 23:59: 2 gedruckte Exemplare und 2 Datenträger, persönlich an der Information, Briefkasten am Haupteingang oder per Post (Poststempel zählt); mit unterschriebener eidesstattlicher Erklärung. Transferleistung 6 spätestens gleichzeitig hochladen; die betriebliche Betreuung bekommt ein Exemplar direkt von dir." }),
-    h("li", { text: "Gutachten in 4 Vorlesungswochen (PVO § 17 Abs. 3); vorlesungsfreie Wochen zählen nicht. Die Note braucht es bis zum Termin „letzte Noten“ des Abschlusses." }),
-    h("li", { text: "Der Rechner bildet das Muster der Planungshilfe nach (Beginn am Montag zwei Wochen nach der Anmeldewoche, Fristende am Wochenende → Montag); verbindlich ist der Bescheid des Prüfungsamts." })));
 }
 
 function certsTab(grid) {
