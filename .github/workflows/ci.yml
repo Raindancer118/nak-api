@@ -1,0 +1,91 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+    tags: ['*.*.*']
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Install pdftotext (PDF extraction path)
+        run: sudo apt-get update -q && sudo apt-get install -y -q poppler-utils
+      - name: gofmt
+        run: test -z "$(gofmt -l . | tee /dev/stderr)"
+      - run: go vet ./...
+      - run: go test -race -count=1 ./...
+      - name: Fixtures contain no personal data
+        run: |
+          # Fixtures are anonymised; fail if real-looking personal markers sneak in.
+          ! grep -rIl -E '@(gmail|gmx|web|yahoo|outlook|hotmail)\.|DE[0-9]{20}' internal/*/testdata/
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: test
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ github.ref_name }}
+      GROUP_PATH: de/raindancer118/nak-api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Build binaries
+        run: |
+          mkdir -p dist
+          for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64; do
+            os=${target%/*}; arch=${target#*/}; ext=""; [ "$os" = windows ] && ext=".exe"
+            CGO_ENABLED=0 GOOS=$os GOARCH=$arch go build -trimpath \
+              -ldflags "-s -w -X github.com/Raindancer118/nak-api/cmd.Version=$VERSION" \
+              -o "dist/nak-api-$VERSION-$os-$arch$ext" .
+          done
+          (cd dist && sha256sum nak-api-* > SHA256SUMS)
+      - name: GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
+      - name: Publish to packages.tstieh.de
+        env:
+          REPO_USER: ${{ secrets.REPOSILITE_USER }}
+          REPO_TOKEN: ${{ secrets.REPOSILITE_TOKEN }}
+        run: |
+          base="https://packages.tstieh.de/releases/$GROUP_PATH/$VERSION"
+          cat > "dist/nak-api-$VERSION.pom" <<POM
+          <?xml version="1.0" encoding="UTF-8"?>
+          <project xmlns="http://maven.apache.org/POM/4.0.0">
+            <modelVersion>4.0.0</modelVersion>
+            <groupId>de.raindancer118</groupId>
+            <artifactId>nak-api</artifactId>
+            <version>$VERSION</version>
+            <packaging>pom</packaging>
+            <name>nak-api</name>
+            <description>NORDAKADEMIE CIS + Moodle MCP server and CLI (Go binaries as classified artifacts: os-arch)</description>
+            <url>https://github.com/Raindancer118/nak-api</url>
+          </project>
+          POM
+          put() {
+            code=$(curl -sS -o /tmp/resp -w '%{http_code}' -u "$REPO_USER:$REPO_TOKEN" -X PUT --upload-file "$1" "$base/$2")
+            case "$code" in
+              200|201|204) echo "uploaded $2" ;;
+              409) echo "::warning::$2 already exists (releases are immutable)" ;;
+              *) echo "::error::upload $2 failed: HTTP $code $(cat /tmp/resp)"; exit 1 ;;
+            esac
+          }
+          put "dist/nak-api-$VERSION.pom" "nak-api-$VERSION.pom"
+          for f in dist/nak-api-$VERSION-*; do
+            name=$(basename "$f")
+            put "$f" "$name"
+            sha1sum "$f" | cut -d' ' -f1 > "$f.sha1"; put "$f.sha1" "$name.sha1"
+          done
+          put dist/SHA256SUMS "nak-api-$VERSION-SHA256SUMS.txt"

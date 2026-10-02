@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="de-DE"><head><meta charset="utf-8"><title>CIS fixture</title></head><body>
+<main>
+                <div class="na-bg-transparent na-no-padding na-no-padding-top"><section class="container"><div class="na-pagetitle"><h1>Meine Daten verwalten</h1></div></section></div>
+
+                <div class="na-bg-white na-no-padding"><div class="container"><div class="row"><ol class="col-md-12 hidden-xs breadcrumb" itemscope itemtype="http://schema.org/BreadcrumbList"><li itemprop="itemListElement" itemscope="" itemtype="http://schema.org/ListItem"><a href="/" title="CIS Startseite" itemprop="item"><span itemprop="name">CIS Startseite</span></a><meta itemprop="position" content="1" /></li><li itemprop="itemListElement" itemscope="" itemtype="http://schema.org/ListItem"><a href="/mein-profil" title="Mein Profil" itemprop="item"><span itemprop="name">Mein Profil</span></a><meta itemprop="position" content="2" /></li><li itemprop="itemListElement" itemscope="" itemtype="http://schema.org/ListItem"><a href="/mein-profil/meine-profildaten" title="Meine Profildaten" itemprop="item"><span itemprop="name">Meine Profildaten</span></a><meta itemprop="position" content="3" /></li><li itemprop="itemListElement" itemscope="" itemtype="http://schema.org/ListItem"><span itemprop="name">Meine Daten verwalten</span><meta itemprop="position" content="4" /></li></ol></div></div></div>
+    <!--TYPO3SEARCH_begin-->
+                <section class="container">
+    
+
+            <div id="c4115" class="frame frame-default frame-type-list frame-layout-0">
+                
+                
+                    
+
+
+
+                
+                
+                    
+
+    
+
+
+
+                
+                
+
+    
+        <div class="tx-na-studentdata">
+	
+  
+  <h3>
+    Bild verwalten
+  </h3>
+
+  <div class="row">
+    <div class="col-sm-2">
+      
+          <img src="/typo3conf/ext/na_studentdata/Resources/Public/Icons/emptyPerson.png" class="img-responsive"
+               alt="Kein Bild"/>
+        
+    </div>
+    <div class="col-sm-10">
+      <p><span style="font-size: medium"><br/>
+                Das hier hochgeladene Bild wird im CIS unter &#039;Meine Kommilitonen&#039; angezeigt. Wenn Sie kein Bild im CIS anzeigen lassen möchten, dann klicken Sie bitte auf den Button &#039;Bild löschen&#039;. Die maximale Dateigröße beträgt 200 KB.</span></p>
+    </div>
+  </div>
+  <form enctype="multipart/form-data" method="post" action="/mein-profil/meine-daten?tx_nastudentdata_nastudentdata%5Baction%5D=uploadPicture&amp;tx_nastudentdata_nastudentdata%5Bcontroller%5D=Studentdata&amp;cHash=00000000000000000000000000000000">
+<div>
+<input type="hidden" name="tx_nastudentdata_nastudentdata[__referrer][@extension]" value="NaStudentdata" />
+<input type="hidden" name="tx_nastudentdata_nastudentdata[__referrer][@controller]" value="Studentdata" />
+<input type="hidden" name="tx_nastudentdata_nastudentdata[__referrer][@action]" value="list" />
+<input type="hidden" name="tx_nastudentdata_nastudentdata[__referrer][arguments]" value="YTowOnt00000000000000000000000000000000000000000" />
+<input type="hidden" name="tx_nastudentdata_nastudentdata[__referrer][@request]" value="{&quot;@extension&quot;:&quot;NaStudentdata&quot;,&quot;@controller&quot;:&quot;Studentdata&quot;,&quot;@action&quot;:&quot;list&quot;}0000000000000000000000000000000000000000" />
+<input type="hidden" name="tx_nastudentdata_nastudentdata[__trustedProperties]" value="{&quot;picture&quot;:{&quot;name&quot;:1,&quot;type&quot;:1,&quot;tmp_name&quot;:1,&quot;error&quot;:1,&quot;size&quot;:1}}0000000000000000000000000000000000000000" />
+</div>
+
+    <div class="form-group">
+      <label for="uploadFile" class="col-md-2 col-sm-4 control-label">
+        <input class="btn btn-default btn-file" id="uploadFile" style="display:none;" type="file" name="tx_nastudentdata_nastudentdata[picture]" />
+        <span class="btn btn-default"><span class="glyphicon glyphicon-upload" aria-hidden="true"></span> Bild auswählen</span>
+      </label>
+      <div class="col-md-10 col-sm-8 col">
+        <input class="btn btn-default" type="submit" value="Bild hochladen" />
+      </div>
+    </div>
+  </form>
+  <form method="post" action="/mein-profil/meine-daten?tx_nastudentdata_nastudentdata%5Baction%5D=deletePicture&amp;tx_nastudentdata_nastudentdata%5Bcontroller%5D=Studentdata&amp;cHash=00000000000000000000000000000000">
+<div>
+<input type="hidden" name="tx_nastudentdata_nastudentdata[__referrer][@extension]" value="NaStudentdata" />
+<input type="hidden" name="tx_nastudentdata_nastudentdata[__referrer][@controller]" value="Studentdata" />
+<input type="hidden" name="tx_nastudentdata_nastudentdata[__referrer][@action]" value="list" />
+<input type="hidden" name="tx_nastudentdata_nastudentdata[__referrer][arguments]" value="YTowOnt00000000000000000000000000000000000000000" />
+<input type="hidden" name="tx_nastudentdata_nastudentdata[__referrer][@request]" value="{&quot;@extension&quot;:&quot;NaStudentdata&quot;,&quot;@controller&quot;:&quot;Studentdata&quot;,&quot;@action&quot;:&quot;list&quot;}0000000000000000000000000000000000000000" />
+<input type="hidden" name="tx_nastudentdata_nastudentdata[__trustedProperties]" value="{&quot;delpic&quot;:1}0000000000000000000000000000000000000000" />
+</div>
+
+    <input type="hidden" name="tx_nastudentdata_nastudentdata[delpic]" value="1" />
+    <div class="form-group">
+      <div class="col-md-offset-2 col-md-10 col-sm-offset-4 col-sm-8">
+        <input class="btn btn-default" type="submit" value="Bild löschen" />
+      </div>
+    </div>
+  </form>
+  <div class="col-md-offset-2 col-md-10 col-sm-offset-4 col-sm-8">&nbsp;</div>
+  <h3>
+    Personendaten ansehen
+  </h3>
+  <div class="form-group">
+    <span class="col-md-2 col-sm-4">Vorname:</span>
+    <div class="col-md-10 col-sm-8 col">
+      <span class="form-control form-readonly">Max</span>
+    </div>
+  </div>
+  <div class="form-group">
+    <span class="col-md-2 col-sm-4">Nachname:</span>
+    <div class="col-md-10 col-sm-8 col">
+      <span class="form-control form-readonly">Mustermann</span>
+    </div>
+  </div>
+  <div class="form-group">
+    <span class="col-md-2 col-sm-4">Login:</span>
+    <div class="col-md-10 col-sm-8 col">
+      <span class="form-control form-readonly">10000</span>
+    </div>
+  </div>
+  <div class="form-group">
+    <span class="col-md-2 col-sm-4">Matrikelnr.:</span>
+    <div class="col-md-10 col-sm-8 col">
+      <span class="form-control form-readonly">99999</span>
+    </div>
+  </div>
+  <div class="form-group">
+    <span class="col-md-2 col-sm-4">Zenturie:</span>
+    <div class="col-md-10 col-sm-8 col">
+      <span class="form-control form-readonly">I23a</span>
+    </div>
+  </div>
+  <div class="form-group">
+    <span class="col-md-2 col-sm-4">Studiengang:</span>
+    <div class="col-md-10 col-sm-8 col">
+      <span class="form-control form-readonly">Wirtschaftsinformatik</span>
+    </div>
+  </div>
+  <div class="col-md-offset-2 col-md-10 col-sm-offset-4 col-sm-8">&nbsp;</div>
+  <div class="form-group">
+    <span class="col-md-2 col-sm-4">Firma:</span>
+    <div class="col-md-10 col-sm-8 col">
+      <span class="form-control form-readonly">Beispiel GmbH</span>
+    </div>
+  </div>
+  <div class="col-md-offset-2 col-md-10 col-sm-offset-4 col-sm-8">&nbsp;</div>
+  <div class="form-group">
+    <span class="col-md-2 col-sm-4">Geburtsdatum:</span>
+    <div class="col-md-10 col-sm-8 col">
+      <span class="form-control form-readonly">01.01.2000</span>
+    </div>
+  </div>
+  <div class="col-md-offset-2 col-md-10 col-sm-offset-4 col-sm-8">&nbsp;</div>
+  <div class="form-group">
+    <span class="col-md-2 col-sm-4">Straße:</span>
+    <div class="col-md-10 col-sm-8 col">
+      <span class="form-control form-readonly">Musterweg 1</span>
+    </div>
+  </div>
+  <div class="form-group">
+    <span class="col-md-2 col-sm-4">Ort:</span>
+    <div class="col-md-10 col-sm-8 col">
+      <span class="form-control form-readonly">12345 Musterstadt</span>
+    </div>
+  </div>
+  <div class="col-md-offset-2 col-md-10 col-sm-offset-4 col-sm-8">&nbsp;</div>
+  
+    <div class="form-group">
+      <span class="col-md-2 col-sm-4">Telefon (Festnetz):</span>
+      <div class="col-md-10 col-sm-8 col">
+        <span class="form-control form-readonly">0123-4567890</span>
+      </div>
+    </div>
+  
+  
+    <div class="form-group">
+      <span class="col-md-2 col-sm-4">Telefon (Mobil):</span>
+      <div class="col-md-10 col-sm-8 col">
+        <span class="form-control form-readonly">0123-4567890</span>
+      </div>
+    </div>
+  
+  
+  <div class="col-md-offset-2 col-md-10 col-sm-offset-4 col-sm-8">&nbsp;</div>
+  <div class="form-group">
+    <span class="col-md-2 col-sm-4">Email (NAK):</span>
+    <div class="col-md-10 col-sm-8 col">
+      <span class="form-control form-readonly">max.mustermann@nordakademie.de</span>
+    </div>
+  </div>
+  <div class="form-group">
+    <span class="col-md-2 col-sm-4">Private E-Mail:</span>
+    <div class="col-md-10 col-sm-8 col">
+      <span class="form-control form-readonly">max@example.org</span>
+    </div>
+  </div>
+  <div class="form-group">
+    <span class="col-md-2 col-sm-4">Infopost:</span>
+    <div class="col-md-10 col-sm-8 col">
+            <span class="form-control form-readonly">
+                
+                         Sie erhalten nach dem Studium weiterhin den NORDAKADEMIE-Newsletter, Einladungen zu Veranstaltungen und das campusforum.
+                    
+            </span>
+    </div>
+  </div>
+  <div class="form-group">
+    <span class="col-md-2 col-sm-4">Lebenslange E-Mail:</span>
+    <div class="col-md-10 col-sm-8 col">
+            <span class="form-control form-readonly">
+                
+                        
+                                max.mustermann.i23x@nordakademie.org
+                            
+                    
+            </span>
+    </div>
+  </div>
+<!--  <div class="corona-ggg-block">-->
+<!--    <div class="row">-->
+<!--      <div class="col-md-2 col-sm-4">-->
+<!--        <h3>-->
+<!--          Corona-Status (GGG)-->
+<!--        </h3>-->
+<!--      </div>-->
+<!--      <div class="col-md-10 col-sm-8 col-md-offset-2 col-sm-offset-4">-->
+<!--        <div>-->
+<!--          <p>-->
+<!--            
+					Sie können nur an Präsenzveranstaltungen teilnehmen, wenn Sie Ihren 3 G Status hier angeben.
+					Es werden stichprobenartige Kontrollen auf dem Campus durchgeführt.
+				-->
+<!--          </p>-->
+<!--          <p>-->
+<!--            
+					Ihre hier getätigten Angaben zu Ihrem persönlichen 3 G Status können nur persönlich von Ihnen eingesehen
+					und verändert werden. Mitarbeitenden der Hochschule ist ausschließlich ersichtlich, dass Sie eine Angabe
+					getätigt haben, nicht aber welche. Dennoch weisen wir darauf hin, dass Sie sich mit der Angabe verpflichten,
+					den aktuell auf Sie zutreffenden Status einzutragen. Die Daten werden ausschließlich anonymisiert zu Auswertungszwecken
+					herangezogen. Wir verweisen auf unsere
+				-->
+<!--            <a target="_blank" href="/datenschutz">-->
+<!--              Datenschutzrichtlinie.-->
+<!--            </a>-->
+<!--          </p>-->
+<!--        </div>-->
+<!--      </div>-->
+<!--    </div>-->
+
+<!--    <form method="post" action="/mein-profil/meine-daten?tx_nastudentdata_nastudentdata%5Baction%5D=updateCoronaStatus&amp;tx_nastudentdata_nastudentdata%5Bcontroller%5D=Studentdata&amp;cHash=00000000000000000000000000000000">
+<div>
+<input type="hidden" name="tx_nastudentdata_nastudentdata[__referrer][@extension]" value="NaStudentdata" />
+<input type="hidden" name="tx_nastudentdata_nastudentdata[__referrer][@controller]" value="Studentdata" />
+<input type="hidden" name="tx_nastudentdata_nastudentdata[__referrer][@action]" value="list" />
+<input type="hidden" name="tx_nastudentdata_nastudentdata[__referrer][arguments]" value="YTowOnt00000000000000000000000000000000000000000" />
+<input type="hidden" name="tx_nastudentdata_nastudentdata[__referrer][@request]" value="{&quot;@extension&quot;:&quot;NaStudentdata&quot;,&quot;@controller&quot;:&quot;Studentdata&quot;,&quot;@action&quot;:&quot;list&quot;}0000000000000000000000000000000000000000" />
+<input type="hidden" name="tx_nastudentdata_nastudentdata[__trustedProperties]" value="[]0000000000000000000000000000000000000000" />
+</div>
+-->
+<!--      <div class="row">-->
+<!--        <span class="col-md-2 col-sm-4">-->
+<!--          Status auswählen-->
+<!--        </span>-->
+<!--        <div class="col-md-10 col-sm-8">-->
+<!--          <f:form.select name="corona_status_id"-->
+<!--                         options="Array"-->
+<!--                         value="0"-->
+<!--                         class="form-control corona-status-select"/>-->
+<!--        </div>-->
+<!--      </div>-->
+<!--      <div class="row corona-info-box">-->
+<!--        <div class="col-md-10 col-sm-8 col col-md-offset-2 col-sm-offset-4">-->
+<!--          <div class="alert alert-info ">-->
+<!--            <span>-->
+<!--                <span class="glyphicon glyphicon-info-sign"></span>-->
+<!--                <span class="corona-info-box-text corona-info-box-status-0 hidden">-->
+<!--                  
+					Sie möchten keine Angaben zu Ihrem GGG-Status tätigen. Wir gehen davon aus, dass Sie dennoch ein G erfüllen.
+					Ansonsten können Sie nicht an Präsenzveranstaltungen teilnehmen und unseren Campus nicht betreten. Bitte halten Sie entweder
+					Ihr Impfzertifikat/Impfausweis, Ihren Nachweis für den Status Genesen oder einen aktuellen Corona-Test
+					(nicht älter als 3 Tage) bereit.
+				-->
+<!--                </span>-->
+
+<!--                <span class="corona-info-box-text corona-info-box-status-1 hidden">-->
+<!--                  
+					Sie haben vollständigen Impfschutz und es sind mindestens zwei Wochen seit Ihrer finalen Impfung vergangen.
+					Bitte haben Sie stets Ihr Impfzertifikat (Digital / QR-Code) oder Ihren Impfausweis dabei.
+				-->
+<!--                </span>-->
+
+<!--                <span class="corona-info-box-text corona-info-box-status-2 hidden">-->
+<!--                  
+Nach einer Erkrankung mit Covid-19 sind Sie für 6 Monate resistent. Sie benötigen ein
+ärztliches Attest / PCR-Befund, aus dem deutlich Ihr Name und das Testdatum hervorgehen.
+Bitte haben diese Dokumente stets dabei.
+				-->
+<!--                </span>-->
+
+<!--                <span class="corona-info-box-text corona-info-box-status-3 hidden">-->
+<!--                  
+Ein Corona-Test ist ab Testdatum für drei Tage gültig. Bitte sorgen Sie dafür, dass Sie
+stets ein gültiges Testergebnis dabei haben.
+				-->
+<!--                </span>-->
+<!--                <span class="corona-info-text"></span>-->
+<!--            </span>-->
+<!--          </div>-->
+<!--        </div>-->
+<!--      </div>-->
+
+<!--      <div class="row">-->
+<!--        <div class="col-md-10 col-sm-8 col col-md-offset-2 col-sm-offset-4">-->
+<!--          <input class="btn btn-default" type="submit" value="Status speichern" />-->
+<!--        </div>-->
+<!--      </div>-->
+<!--    </form>-->
+<!--  </div>-->
+
+</div>
+    
+
+
+                
+                    
+
+
+
+                
+                
+                    
+
+
+
+                
+            </div>
+
+        
+
+</section>
+    <!-- TYPO3SEARCH_end-->
+            </main>
+<a href="/login/?logintype=logout">Logout</a></body></html>

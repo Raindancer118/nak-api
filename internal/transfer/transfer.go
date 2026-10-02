@@ -8,17 +8,17 @@
 //   - performance -> grading detail of one report (FetchBewertung)
 //   - document    -> download an attached file (Download)
 //
-// Write action (registering a new report) lives in submit.go.
+// Write action (registering a new report) lives in register.go.
 package transfer
 
 import (
 	"fmt"
-	"io"
 	"net/url"
 	"strconv"
 	"strings"
 
-	"github.com/Raindancer118/cis-api/internal/client"
+	"github.com/Raindancer118/nak-api/internal/client"
+	"github.com/Raindancer118/nak-api/internal/htmlx"
 	"golang.org/x/net/html"
 )
 
@@ -27,25 +27,33 @@ const PagePath = "/studium/bachelor/transferleistungen-praxisberichte"
 
 // Report is one entry in the Transferleistungen overview (list view).
 type Report struct {
-	ID              string `json:"id"`               // transferTermPaperId (from the action link)
-	No              string `json:"no"`               // Nr.
-	Abgabedatum     string `json:"abgabedatum"`      // spät. Abgabedatum
-	Korrekturfrist  string `json:"korrekturfrist"`   // Korrekturfristende
-	Topic           string `json:"topic"`            // Thema
-	Module          string `json:"module"`           // Modul (with code)
-	Wertung         string `json:"wertung"`          // e.g. "bestanden"
-	Versuch         string `json:"versuch"`          // attempt number
-	Status          string `json:"status"`           // e.g. "bewertet"
-	Action          string `json:"action"`           // "performance", "upload", "new", …
-	ActionURL       string `json:"action_url"`       // cHash-signed link from the page
+	ID             string      `json:"id"`             // transferTermPaperId (from the action link)
+	No             string      `json:"no"`             // Nr.
+	Abgabedatum    string      `json:"abgabedatum"`    // spät. Abgabedatum
+	Korrekturfrist string      `json:"korrekturfrist"` // Korrekturfristende
+	Topic          string      `json:"topic"`          // Thema
+	Module         string      `json:"module"`         // Modul (with code)
+	Wertung        string      `json:"wertung"`        // e.g. "bestanden"
+	Versuch        string      `json:"versuch"`        // attempt number
+	Status         string      `json:"status"`         // e.g. "bewertet"
+	Action         string      `json:"action"`         // first action ("performance", "upload", …)
+	ActionURL      string      `json:"action_url"`     // cHash-signed link from the page
+	Actions        []RowAction `json:"actions,omitempty"`
+}
+
+// RowAction is one icon link of a report row.
+type RowAction struct {
+	Action string `json:"action"`
+	Label  string `json:"label"`
+	URL    string `json:"url"`
 }
 
 // Bewertung is the grading detail (performance view) of one report.
 type Bewertung struct {
-	ID        string            `json:"id"`         // transferTermPaperId
-	Fields    map[string]string `json:"fields"`     // header label -> value (Matrikel-Nr., Thema, Modul, …)
-	Kriterien []Kriterium       `json:"kriterien"`  // per-criterion grading
-	Documents []Document        `json:"documents"`  // downloadable attachments
+	ID        string            `json:"id"`        // transferTermPaperId
+	Fields    map[string]string `json:"fields"`    // header label -> value (Matrikel-Nr., Thema, Modul, …)
+	Kriterien []Kriterium       `json:"kriterien"` // per-criterion grading
+	Documents []Document        `json:"documents"` // downloadable attachments
 	// Gesamtnote is a weighted average of the per-criterion notes, computed
 	// client-side (Σ note·weight / Σ weight). The CIS itself shows no overall
 	// grade — see HasGesamtnote.
@@ -69,56 +77,47 @@ type Document struct {
 
 // FetchList fetches the Transferleistungen overview and returns all reports.
 func FetchList(c *client.Client) ([]Report, error) {
-	resp, err := c.Get(PagePath)
+	p, err := c.Page(PagePath)
 	if err != nil {
 		return nil, fmt.Errorf("fetch transfer list: %w", err)
 	}
-	defer resp.Body.Close()
-	body, err := io.ReadAll(resp.Body)
+	return parseList(p.Body, c.Base), nil
+}
+
+// FetchBewertung follows the cHash-signed "performance" link of the report
+// from the live overview (TYPO3 rejects links without a valid cHash).
+func FetchBewertung(c *client.Client, transferTermPaperID string) (*Bewertung, error) {
+	list, err := FetchList(c)
 	if err != nil {
 		return nil, err
 	}
-	return parseList(string(body)), nil
-}
-
-// FetchBewertung fetches the grading detail for one report.
-func FetchBewertung(c *client.Client, transferTermPaperID string) (*Bewertung, error) {
-	q := url.Values{}
-	q.Set("tx_natransfertermpaper_natransferleistungen[action]", "performance")
-	q.Set("tx_natransfertermpaper_natransferleistungen[controller]", "TransferTermPaper")
-	q.Set("tx_natransfertermpaper_natransferleistungen[transferTermPaperId]", transferTermPaperID)
-	// Note: a cHash is normally required. Prefer following the performance link
-	// from FetchList; this direct form is a fallback used by tests/fixtures.
-	resp, err := c.Get(PagePath + "?" + q.Encode())
+	link := ""
+	for _, r := range list {
+		for _, a := range r.Actions {
+			if r.ID == transferTermPaperID && a.Action == "performance" {
+				link = a.URL
+			}
+		}
+	}
+	if link == "" {
+		return nil, fmt.Errorf("Transferleistung %s has no grading view (not graded yet or unknown id)", transferTermPaperID)
+	}
+	p, err := c.Page(link)
 	if err != nil {
 		return nil, fmt.Errorf("fetch performance: %w", err)
 	}
-	defer resp.Body.Close()
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	b := parseBewertung(string(body))
+	b := parseBewertung(p.Body, c.Base)
 	b.ID = transferTermPaperID
 	return b, nil
 }
 
 // Download fetches a document attachment and returns its bytes plus content type.
 func Download(c *client.Client, downloadURL string) ([]byte, string, error) {
-	resp, err := c.GetURL(downloadURL)
-	if err != nil {
-		return nil, "", fmt.Errorf("download: %w", err)
-	}
-	defer resp.Body.Close()
-	ct := resp.Header.Get("Content-Type")
-	data, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, ct, fmt.Errorf("read download: %w", err)
-	}
-	return data, ct, nil
+	data, ct, _, err := c.Download(downloadURL)
+	return data, ct, err
 }
 
-func parseBewertung(body string) *Bewertung {
+func parseBewertung(body, base string) *Bewertung {
 	doc, err := html.Parse(strings.NewReader(body))
 	if err != nil {
 		return &Bewertung{Fields: map[string]string{}}
@@ -142,7 +141,7 @@ func parseBewertung(body string) *Bewertung {
 	walk(doc)
 
 	b.Kriterien = parseKriterien(doc)
-	b.Documents = parseDocuments(doc)
+	b.Documents = parseDocuments(doc, base)
 	b.Gesamtnote, b.HasGesamtnote = WeightedAverage(b.Kriterien)
 	return b
 }
@@ -187,7 +186,7 @@ func parsePercent(s string) (float64, bool) {
 }
 
 // parseList parses the Transferleistungen overview table.
-func parseList(body string) []Report {
+func parseList(body, base string) []Report {
 	doc, err := html.Parse(strings.NewReader(body))
 	if err != nil {
 		return nil
@@ -220,7 +219,7 @@ func parseList(body string) []Report {
 	var walk func(*html.Node)
 	walk = func(n *html.Node) {
 		if n.Type == html.ElementNode && n.Data == "tr" {
-			if r, ok := parseListRow(n); ok {
+			if r, ok := parseListRow(n, base); ok {
 				reports = append(reports, r)
 			}
 			return
@@ -233,7 +232,7 @@ func parseList(body string) []Report {
 	return reports
 }
 
-func parseListRow(tr *html.Node) (Report, bool) {
+func parseListRow(tr *html.Node, base string) (Report, bool) {
 	var cells []*html.Node
 	for td := tr.FirstChild; td != nil; td = td.NextSibling {
 		if td.Type == html.ElementNode && td.Data == "td" {
@@ -254,11 +253,21 @@ func parseListRow(tr *html.Node) (Report, bool) {
 		Versuch:        textOf(cells[6]),
 		Status:         textOf(cells[7]),
 	}
-	if a := firstAnchor(cells[8]); a != nil {
-		href := normalizeURL(attr(a, "href"))
-		r.ActionURL = href
-		r.Action = queryParam(href, "action")
-		r.ID = queryParam(href, "transferTermPaperId")
+	for _, a := range htmlx.All(cells[8], htmlx.Tag("a")) {
+		href := htmlx.AbsURL(base, attr(a, "href"))
+		act := queryParam(href, "action")
+		if act == "" {
+			continue
+		}
+		label := ""
+		if sp := htmlx.First(a, func(n *html.Node) bool { return htmlx.Attr(n, "title") != "" }); sp != nil {
+			label = htmlx.Attr(sp, "title")
+		}
+		r.Actions = append(r.Actions, RowAction{Action: act, Label: label, URL: href})
+		if r.ActionURL == "" {
+			r.ActionURL, r.Action = href, act
+			r.ID = queryParam(href, "transferTermPaperId")
+		}
 	}
 	if r.No == "" && r.Topic == "" {
 		return Report{}, false
@@ -384,7 +393,7 @@ func parseKriterien(doc *html.Node) []Kriterium {
 	return out
 }
 
-func parseDocuments(doc *html.Node) []Document {
+func parseDocuments(doc *html.Node, base string) []Document {
 	var docs []Document
 	seen := map[string]bool{}
 	var walk func(*html.Node)
@@ -392,7 +401,7 @@ func parseDocuments(doc *html.Node) []Document {
 		if n.Type == html.ElementNode && n.Data == "a" {
 			href := attr(n, "href")
 			if strings.Contains(href, "action%5D=document") || strings.Contains(href, "action]=document") {
-				u := normalizeURL(href)
+				u := htmlx.AbsURL(base, href)
 				if !seen[u] {
 					seen[u] = true
 					label := textOf(n)
@@ -412,14 +421,6 @@ func parseDocuments(doc *html.Node) []Document {
 }
 
 // ── shared helpers ──────────────────────────────────────────────────────────
-
-func normalizeURL(href string) string {
-	href = strings.ReplaceAll(href, "&amp;", "&")
-	if href != "" && !strings.HasPrefix(href, "http") {
-		href = client.BaseURL + href
-	}
-	return href
-}
 
 func attr(n *html.Node, key string) string {
 	for _, a := range n.Attr {

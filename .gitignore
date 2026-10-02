@@ -1,6 +1,8 @@
 # Build artifacts
-cis
+/cis
 explore-cis
+/nak
+_explore/
 explore/
 
 # Local notes (not for the repo)

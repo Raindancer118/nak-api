@@ -17,7 +17,7 @@ func fixture(t *testing.T, name string) string {
 }
 
 func TestParseList(t *testing.T) {
-	reports := parseList(fixture(t, "liste.html"))
+	reports := parseList(fixture(t, "liste.html"), "https://cis.nordakademie.de")
 	if len(reports) == 0 {
 		t.Fatal("expected reports, got none")
 	}
@@ -46,7 +46,7 @@ func TestParseList(t *testing.T) {
 }
 
 func TestParseBewertung(t *testing.T) {
-	b := parseBewertung(fixture(t, "bewertung.html"))
+	b := parseBewertung(fixture(t, "bewertung.html"), "https://cis.nordakademie.de")
 
 	if b.Fields["Matrikel-Nr."] != "99999" {
 		t.Errorf("Matrikel-Nr. = %q", b.Fields["Matrikel-Nr."])
@@ -99,7 +99,7 @@ func TestWeightedAverage(t *testing.T) {
 }
 
 func TestBewertungGesamtnoteComputed(t *testing.T) {
-	b := parseBewertung(fixture(t, "bewertung.html"))
+	b := parseBewertung(fixture(t, "bewertung.html"), "https://cis.nordakademie.de")
 	if !b.HasGesamtnote {
 		t.Fatal("expected a computed Gesamtnote from the fixture criteria")
 	}

@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="de-DE"><head><meta charset="utf-8"><title>CIS fixture</title></head><body>
+<main>
+                <div class="na-bg-transparent na-no-padding na-no-padding-top"><section class="container"><div class="na-pagetitle"><h1>Adressen verwalten</h1></div></section></div>
+
+                <div class="na-bg-white na-no-padding"><div class="container"><div class="row"><ol class="col-md-12 hidden-xs breadcrumb" itemscope itemtype="http://schema.org/BreadcrumbList"><li itemprop="itemListElement" itemscope="" itemtype="http://schema.org/ListItem"><a href="/" title="CIS Startseite" itemprop="item"><span itemprop="name">CIS Startseite</span></a><meta itemprop="position" content="1" /></li><li itemprop="itemListElement" itemscope="" itemtype="http://schema.org/ListItem"><a href="/mein-profil" title="Mein Profil" itemprop="item"><span itemprop="name">Mein Profil</span></a><meta itemprop="position" content="2" /></li><li itemprop="itemListElement" itemscope="" itemtype="http://schema.org/ListItem"><a href="/mein-profil/meine-profildaten" title="Meine Profildaten" itemprop="item"><span itemprop="name">Meine Profildaten</span></a><meta itemprop="position" content="3" /></li><li itemprop="itemListElement" itemscope="" itemtype="http://schema.org/ListItem"><span itemprop="name">Adressen verwalten</span><meta itemprop="position" content="4" /></li></ol></div></div></div>
+    <!--TYPO3SEARCH_begin-->
+                <section class="container">
+    
+
+            <div id="c1822" class="frame frame-default frame-type-list frame-layout-0">
+                
+                
+                    
+
+
+
+                
+                
+                    
+
+    
+
+
+
+                
+                
+
+    
+        <div class="tx-na-studentdata">
+	
+
+    <form onchange="javascript:document.addressType.submit()" method="post" name="addressType" class="form-horizontal" action="/mein-profil/meine-profildaten/adressen-verwalten?tx_nastudentdata_nastudentdata%5Baction%5D=list&amp;tx_nastudentdata_nastudentdata%5Bcontroller%5D=Studentdata&amp;cHash=00000000000000000000000000000000">
+<div>
+<input type="hidden" name="tx_nastudentdata_nastudentdataaddress[__referrer][@extension]" value="NaStudentdata" />
+<input type="hidden" name="tx_nastudentdata_nastudentdataaddress[__referrer][@controller]" value="Studentdata" />
+<input type="hidden" name="tx_nastudentdata_nastudentdataaddress[__referrer][@action]" value="address" />
+<input type="hidden" name="tx_nastudentdata_nastudentdataaddress[__referrer][arguments]" value="YTowOnt00000000000000000000000000000000000000000" />
+<input type="hidden" name="tx_nastudentdata_nastudentdataaddress[__referrer][@request]" value="{&quot;@extension&quot;:&quot;NaStudentdata&quot;,&quot;@controller&quot;:&quot;Studentdata&quot;,&quot;@action&quot;:&quot;address&quot;}0000000000000000000000000000000000000000" />
+<input type="hidden" name="tx_nastudentdata_nastudentdataaddress[__trustedProperties]" value="{&quot;addressType&quot;:{&quot;typeId&quot;:1}}0000000000000000000000000000000000000000" />
+</div>
+
+        <div class="form-group">
+            <label for="typeId" class="control-label col-sm-2">Adresstyp: </label>
+            <span class="col-sm-2"><select class="form-control" id="typeId" size="1" name="tx_nastudentdata_nastudentdataaddress[addressType][typeId]"><option value="1" selected="selected">Hauptadresse</option>
+<option value="5">Semesteradresse</option>
+</select></span>
+            <span class="col-sm-2"><input class="form-control" type="submit" value="OK" /></span>
+            <span class="col-sm-6">&nbsp;</span>
+        </div>
+        <div class="clearfix"></div>
+    </form>
+
+    <h3>Adresse wie sie in einem Brief für solch einen Typ genutzt werden würde</h3>
+    Ist keine Adresse angegeben wird entsprechend die Hauptadresse verwendet<br /><br />
+
+    Herr<br />
+Max Mustermann<br />
+Musterweg 1<br />
+12345 Musterstadt
+    <br /><br />
+    <h3>Adresse ändern</h3>
+
+    
+
+    <form method="post" class="form-horizontal" action="/mein-profil/meine-profildaten/adressen-verwalten?tx_nastudentdata_nastudentdataaddress%5Baction%5D=address&amp;tx_nastudentdata_nastudentdataaddress%5Bcontroller%5D=Studentdata&amp;cHash=00000000000000000000000000000000">
+<div>
+<input type="hidden" name="tx_nastudentdata_nastudentdataaddress[__referrer][@extension]" value="NaStudentdata" />
+<input type="hidden" name="tx_nastudentdata_nastudentdataaddress[__referrer][@controller]" value="Studentdata" />
+<input type="hidden" name="tx_nastudentdata_nastudentdataaddress[__referrer][@action]" value="address" />
+<input type="hidden" name="tx_nastudentdata_nastudentdataaddress[__referrer][arguments]" value="YTowOnt00000000000000000000000000000000000000000" />
+<input type="hidden" name="tx_nastudentdata_nastudentdataaddress[__referrer][@request]" value="{&quot;@extension&quot;:&quot;NaStudentdata&quot;,&quot;@controller&quot;:&quot;Studentdata&quot;,&quot;@action&quot;:&quot;address&quot;}0000000000000000000000000000000000000000" />
+<input type="hidden" name="tx_nastudentdata_nastudentdataaddress[__trustedProperties]" value="{&quot;address&quot;:{&quot;typeId&quot;:1,&quot;additionalAddress&quot;:1,&quot;street&quot;:1,&quot;zipCode&quot;:1,&quot;city&quot;:1,&quot;delete&quot;:1,&quot;change&quot;:1}}0000000000000000000000000000000000000000" />
+</div>
+
+        <input type="hidden" name="tx_nastudentdata_nastudentdataaddress[address][typeId]" value="1" />
+
+        <div class="form-group">
+            <label for="addionalInfo" class="col-md-2 col-sm-4 control-label">Adresszusatz:</label>
+            <div class="col-md-10 col-sm-8 col">
+                <input placeholder="..." class="form-control" id="addionalInfo" type="text" name="tx_nastudentdata_nastudentdataaddress[address][additionalAddress]" />
+            </div>
+        </div>
+        
+        <div class="form-group">
+            <label for="street" class="col-md-2 col-sm-4 control-label">Straße:</label>
+            <div class="col-md-10 col-sm-8 col">
+                <input placeholder="Hauptstraße 123" class="form-control" id="street" type="text" name="tx_nastudentdata_nastudentdataaddress[address][street]" value="Musterweg 1" />
+            </div>
+        </div>
+        <div class="form-group">
+            <label for="zipCode" class="col-md-2 col-sm-4 control-label">PLZ:</label>
+            <div class="col-md-10 col-sm-8 col">
+                <input size="5" placeholder="12345" class="form-control" id="zipCode" type="text" name="tx_nastudentdata_nastudentdataaddress[address][zipCode]" value="12345" />
+            </div>
+        </div>
+        <div class="form-group">
+            <label for="city" class="col-md-2 col-sm-4 control-label">Ort:</label>
+            <div class="col-md-10 col-sm-8 col">
+                <input placeholder="City" class="form-control" id="city" type="text" name="tx_nastudentdata_nastudentdataaddress[address][city]" value="Musterstadt" />
+            </div>
+        </div>
+        <div class="form-group">
+            <div class="col-md-offset-2 col-md-10 col-sm-offset-4 col-sm-8">
+                <input class="btn btn-danger" type="submit" value="Adresse löschen" name="tx_nastudentdata_nastudentdataaddress[address][delete]" />
+            </div>
+        </div>
+        <div class="form-group">
+            <div class="col-md-offset-2 col-md-10 col-sm-offset-4 col-sm-8">
+                <input class="btn btn-default" type="submit" value="Adresse ändern" name="tx_nastudentdata_nastudentdataaddress[address][change]" />
+            </div>
+        </div>
+    </form>
+
+</div>
+    
+
+
+                
+                    
+
+
+
+                
+                
+                    
+
+
+
+                
+            </div>
+
+        
+
+</section>
+    <!-- TYPO3SEARCH_end-->
+            </main>
+<a href="/login/?logintype=logout">Logout</a></body></html>

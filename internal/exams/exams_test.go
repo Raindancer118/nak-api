@@ -2,21 +2,22 @@ package exams
 
 import (
 	"os"
+	"strings"
 	"testing"
+	"time"
 )
 
 func loadFixture(t *testing.T) string {
 	t.Helper()
 	b, err := os.ReadFile("testdata/exams.html")
 	if err != nil {
-		// Fixtures hold personal CIS data and are git-ignored; skip when absent.
-		t.Skipf("fixture not present (kept local for privacy): %v", err)
+		t.Fatal(err)
 	}
 	return string(b)
 }
 
 func TestParseExams(t *testing.T) {
-	list := parseExams(loadFixture(t))
+	list := legacy(t)
 	if len(list) == 0 {
 		t.Fatal("expected exams, got none")
 	}
@@ -50,7 +51,7 @@ func TestParseExams(t *testing.T) {
 }
 
 func TestActionURLDecoded(t *testing.T) {
-	list := parseExams(loadFixture(t))
+	list := legacy(t)
 	for _, e := range list {
 		if e.ActionURL == "" {
 			continue
@@ -68,7 +69,7 @@ func TestActionURLDecoded(t *testing.T) {
 }
 
 func TestAllRowsHaveExamID(t *testing.T) {
-	list := parseExams(loadFixture(t))
+	list := legacy(t)
 	ids := map[string]bool{}
 	for _, e := range list {
 		if e.ExamID != "" {
@@ -83,11 +84,52 @@ func TestAllRowsHaveExamID(t *testing.T) {
 	}
 }
 
-func containsSub(s, sub string) bool {
-	for i := 0; i+len(sub) <= len(s); i++ {
-		if s[i:i+len(sub)] == sub {
-			return true
+func containsSub(s, sub string) bool { return strings.Contains(s, sub) }
+
+func legacy(t *testing.T) []Exam {
+	list, found := parseExams(loadFixture(t), "https://cis.example", time.Now())
+	if !found {
+		t.Fatal("table not found")
+	}
+	return list
+}
+
+func TestPersonalPageAndDeadlines(t *testing.T) {
+	b, err := os.ReadFile("testdata/meine-pruefungen.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Date(2026, 9, 20, 12, 0, 0, 0, berlin)
+	list, found := parseExams(string(b), "https://cis.example", now)
+	if !found || len(list) != 17 {
+		t.Fatalf("found=%v rows=%d", found, len(list))
+	}
+	reg := list[1]
+	if !reg.Registered || reg.Action != "deregister" || reg.ExamID != "12260" || reg.Section != "Studiengangsleistungen" {
+		t.Errorf("registered row = %+v", reg)
+	}
+	if list[0].Registered || list[0].Action != "register" {
+		t.Errorf("open row = %+v", list[0])
+	}
+	d := list[0].Deadlines
+	if d == nil || d.RegisterOpens != "07.09.2026" || d.RegisterCloses != "22.09.2026 23:59" ||
+		d.DeregisterUntil != "30.09.2026 23:59" || d.DaysUntilExam != 12 {
+		t.Errorf("deadlines = %+v", d)
+	}
+	var wp *Exam
+	for i := range list {
+		if strings.Contains(list[i].Title, "Internationale Beziehungen") {
+			wp = &list[i]
 		}
 	}
-	return false
+	if wp == nil || len(wp.Dozenten) != 2 || wp.Deadlines != nil {
+		t.Errorf("multi-lecturer Hausarbeit row = %+v", wp)
+	}
+}
+
+func TestFlashMessage(t *testing.T) {
+	body := `<main><div class="typo3-messages"><div class="alert alert-success">Sie wurden angemeldet.</div></div></main>`
+	if got := FlashMessage(body); got != "Sie wurden angemeldet." {
+		t.Errorf("flash = %q", got)
+	}
 }

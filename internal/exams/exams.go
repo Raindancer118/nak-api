@@ -1,59 +1,90 @@
-// Package exams reads the exam registration overview (Prüfungsan-/abmeldung)
-// from the CIS and performs register/deregister actions.
+// Package exams reads the Prüfungsübersicht (tx_naexams, controller
+// Pruefungsverwaltung) and performs register/deregister actions.
 //
-// The page /studium/pruefungen/an-und-abmeldung-von-pruefungen renders a table
-// (TYPO3 extension tx_naexams, controller Pruefungsverwaltung). Each row offers
-// at most one action link in the "An-/Abmelden" column — "register" when you may
-// sign up, or a deregister variant when you are already registered. The action,
-// its label and its cHash-signed URL are read directly from the page, so this
-// package never has to construct a cHash itself.
+// Each row offers at most one action link ("register" or "deregister"). The
+// link is a cHash-signed GET — following it IS the binding action, so it is
+// only ever followed through client.WriteGet after explicit confirmation.
 package exams
 
 import (
 	"fmt"
-	"io"
-	"net/url"
 	"strings"
+	"time"
 
-	"github.com/Raindancer118/cis-api/internal/client"
+	"github.com/Raindancer118/nak-api/internal/client"
+	"github.com/Raindancer118/nak-api/internal/htmlx"
 	"golang.org/x/net/html"
 )
 
-// PagePath is the exam registration overview.
-const PagePath = "/studium/pruefungen/an-und-abmeldung-von-pruefungen"
+// PagePath is the personal exam overview; LegacyPath shows the same table
+// below the general exam information page.
+const (
+	PagePath   = "/mein-profil/meine-planung/meine-pruefungen"
+	LegacyPath = "/studium/pruefungen/an-und-abmeldung-von-pruefungen"
+)
 
-// Exam is one row of the Prüfungsübersicht.
+var berlin = mustLoc("Europe/Berlin")
+
+func mustLoc(n string) *time.Location {
+	l, err := time.LoadLocation(n)
+	if err != nil {
+		return time.FixedZone("CET", 3600)
+	}
+	return l
+}
+
 type Exam struct {
-	ExamID      string   `json:"exam_id"`
-	ModuleNr    string   `json:"module_nr"`
-	Title       string   `json:"title"`
-	Zenturien   []string `json:"zenturien"`
-	Dozenten    []string `json:"dozenten"`
-	Start       string   `json:"start"`
-	Ende        string   `json:"ende"`
-	Status      string   `json:"status"`
-	Action      string   `json:"action"`       // "register", "deregister", ... or "" if none offered
-	ActionLabel string   `json:"action_label"` // visible button text, e.g. "Anmelden"
-	ActionURL   string   `json:"action_url"`   // absolute, cHash-signed; "" if no action
+	ExamID      string     `json:"exam_id"`
+	Section     string     `json:"section,omitempty"`
+	ModuleNr    string     `json:"module_nr"`
+	Title       string     `json:"title"`
+	Zenturien   []string   `json:"zenturien"`
+	Dozenten    []string   `json:"dozenten"`
+	Start       string     `json:"start"`
+	Ende        string     `json:"ende"`
+	Status      string     `json:"status"`
+	Registered  bool       `json:"registered"`
+	Action      string     `json:"action"`       // "register", "deregister" or ""
+	ActionLabel string     `json:"action_label"` // button text
+	ActionURL   string     `json:"action_url"`   // cHash-signed; following it is the binding action
+	Deadlines   *Deadlines `json:"deadlines,omitempty"`
 }
 
-// FetchList fetches and parses the exam overview.
+// Deadlines per Prüfungsverfahrensordnung §10/§11 for written exams: sign-up
+// opens 25 and closes 10 calendar days before (24:00), deregistration closes 2
+// days before (24:00). Computed client-side; the CIS link availability wins.
+type Deadlines struct {
+	RegisterOpens   string `json:"register_opens"`
+	RegisterCloses  string `json:"register_closes"`
+	DeregisterUntil string `json:"deregister_until"`
+	DaysUntilExam   int    `json:"days_until_exam"`
+	Note            string `json:"note"`
+}
+
+// FetchList loads the personal overview, falling back to the legacy page.
 func FetchList(c *client.Client) ([]Exam, error) {
-	resp, err := c.Get(PagePath)
-	if err != nil {
-		return nil, fmt.Errorf("fetch exams: %w", err)
-	}
-	defer resp.Body.Close()
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	return parseExams(string(body)), nil
+	return fetch(c, time.Now())
 }
 
-// Resolve fetches the live overview and returns the exam with the given ID,
-// including its current action link. Returns an error if the exam is not listed
-// or currently offers no action.
+func fetch(c *client.Client, now time.Time) ([]Exam, error) {
+	var lastErr error
+	for _, path := range []string{PagePath, LegacyPath} {
+		p, err := c.Page(path)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		if list, found := parseExams(p.Body, c.Base, now); found {
+			return list, nil
+		}
+	}
+	if lastErr != nil {
+		return nil, fmt.Errorf("fetch exams: %w", lastErr)
+	}
+	return nil, nil
+}
+
+// Resolve fetches the live overview and returns the exam with that ID.
 func Resolve(c *client.Client, examID string) (*Exam, error) {
 	list, err := FetchList(c)
 	if err != nil {
@@ -71,105 +102,63 @@ func Resolve(c *client.Client, examID string) (*Exam, error) {
 	return nil, fmt.Errorf("exam %s not found in the current overview", examID)
 }
 
-// Submit performs the register/deregister action by following the page-provided,
-// cHash-signed URL. This is a binding write operation — call it only after an
-// explicit user confirmation. It returns a short result message.
+// Submit follows the page-provided action link. BINDING — confirm first.
 func Submit(c *client.Client, actionURL string) (string, error) {
-	resp, err := c.GetURL(actionURL)
+	p, err := c.WriteGet(actionURL)
 	if err != nil {
 		return "", fmt.Errorf("submit exam action: %w", err)
 	}
-	defer resp.Body.Close()
-	body, _ := io.ReadAll(resp.Body)
-	return extractFlashMessage(string(body)), nil
+	return FlashMessage(p.Body), nil
 }
 
-func parseExams(body string) []Exam {
-	doc, err := html.Parse(strings.NewReader(body))
-	if err != nil {
-		return nil
-	}
-
-	table := findExamTable(doc)
-	if table == nil {
-		return nil
-	}
-
-	var exams []Exam
-	var walk func(*html.Node)
-	walk = func(n *html.Node) {
-		if n.Type == html.ElementNode && n.Data == "tr" {
-			if e, ok := parseRow(n); ok {
-				exams = append(exams, e)
-			}
-			return
+// parseExams returns all rows of every exam table; found=false when the page
+// has no Prüfungsübersicht at all.
+func parseExams(body, base string, now time.Time) ([]Exam, bool) {
+	doc := htmlx.MustParse(body)
+	var out []Exam
+	found := false
+	for _, tbl := range htmlx.All(doc, htmlx.Tag("table")) {
+		head := strings.ToLower(htmlx.Text(htmlx.First(tbl, htmlx.Tag("thead"))))
+		if head == "" {
+			head = strings.ToLower(htmlx.Text(tbl))
 		}
-		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			walk(c)
+		if !strings.Contains(head, "modulnummer") || !strings.Contains(head, "abmelden") {
+			continue
 		}
-	}
-	// Only walk the tbody so the thead header row is skipped.
-	for c := table.FirstChild; c != nil; c = c.NextSibling {
-		if c.Type == html.ElementNode && c.Data == "tbody" {
-			walk(c)
-		}
-	}
-	return exams
-}
-
-// findExamTable returns the first table whose header contains both a
-// "Modulnummer" and an "An-/Abmelden" column — i.e. the Prüfungsübersicht and
-// not some unrelated table on the page.
-func findExamTable(doc *html.Node) *html.Node {
-	var found *html.Node
-	var walk func(*html.Node)
-	walk = func(n *html.Node) {
-		if found != nil {
-			return
-		}
-		if n.Type == html.ElementNode && n.Data == "table" {
-			head := strings.ToLower(innerText(n))
-			if strings.Contains(head, "modulnummer") && strings.Contains(head, "abmelden") {
-				found = n
-				return
+		found = true
+		section := precedingHeading(tbl)
+		for _, tr := range htmlx.Rows(tbl) {
+			if e, ok := parseRow(tr, base); ok {
+				e.Section = section
+				e.Deadlines = computeDeadlines(e.Start, now)
+				out = append(out, e)
 			}
 		}
-		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			walk(c)
-		}
 	}
-	walk(doc)
-	return found
+	return out, found
 }
 
-func parseRow(tr *html.Node) (Exam, bool) {
-	var cells []*html.Node
-	for td := tr.FirstChild; td != nil; td = td.NextSibling {
-		if td.Type == html.ElementNode && td.Data == "td" {
-			cells = append(cells, td)
-		}
-	}
+func parseRow(tr *html.Node, base string) (Exam, bool) {
+	cells := htmlx.Children(tr, htmlx.Tag("td"))
 	if len(cells) < 8 {
 		return Exam{}, false
 	}
-
 	e := Exam{
-		ModuleNr:  textOf(cells[0]),
-		Title:     textOf(cells[1]),
+		ModuleNr:  htmlx.Text(cells[0]),
+		Title:     htmlx.Text(cells[1]),
 		Zenturien: spanTexts(cells[2]),
 		Dozenten:  spanTexts(cells[3]),
-		Start:     textOf(cells[4]),
-		Ende:      textOf(cells[5]),
-		Status:    textOf(cells[6]),
+		Start:     htmlx.Text(cells[4]),
+		Ende:      htmlx.Text(cells[5]),
+		Status:    htmlx.Text(cells[6]),
 	}
-
-	// Action cell: find the first <a href> and read its action + examId + label.
-	if a := findFirstAnchor(cells[7]); a != nil {
-		href := normalizeURL(attr(a, "href"))
+	e.Registered = strings.Contains(strings.ToLower(e.Status), "angemeldet") && !strings.Contains(strings.ToLower(e.Status), "abgemeldet")
+	if a := htmlx.First(cells[7], func(n *html.Node) bool { return htmlx.Tag("a")(n) && htmlx.Attr(n, "href") != "" }); a != nil {
+		href := htmlx.AbsURL(base, htmlx.Attr(a, "href"))
 		e.ActionURL = href
-		e.ActionLabel = textOf(a)
-		e.Action = queryParam(href, "action")
-		e.ExamID = queryParam(href, "examId")
+		e.ActionLabel = htmlx.Text(a)
+		e.Action = htmlx.Action(href)
+		e.ExamID = htmlx.QueryParam(href, "examId")
 	}
 	if e.ModuleNr == "" && e.Title == "" {
 		return Exam{}, false
@@ -177,131 +166,60 @@ func parseRow(tr *html.Node) (Exam, bool) {
 	return e, true
 }
 
-func extractFlashMessage(body string) string {
-	doc, err := html.Parse(strings.NewReader(body))
-	if err != nil {
-		return "Action submitted."
-	}
-	var msg string
-	var walk func(*html.Node)
-	walk = func(n *html.Node) {
-		if msg != "" {
-			return
-		}
-		if n.Type == html.ElementNode {
-			class := attr(n, "class")
-			if strings.Contains(class, "alert") || strings.Contains(class, "message") || strings.Contains(class, "flash") {
-				if t := strings.TrimSpace(innerText(n)); t != "" {
-					msg = t
-					return
-				}
+func precedingHeading(n *html.Node) string {
+	for p := n; p != nil; p = p.Parent {
+		for s := p.PrevSibling; s != nil; s = s.PrevSibling {
+			if h := htmlx.First(s, htmlx.Tag("h2", "h3", "h4")); h != nil {
+				return htmlx.Text(h)
 			}
-		}
-		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			walk(c)
-		}
-	}
-	walk(doc)
-	if msg == "" {
-		return "Action submitted (no confirmation message found on the response page)."
-	}
-	return msg
-}
-
-// ── small HTML helpers ──────────────────────────────────────────────────────
-
-func normalizeURL(href string) string {
-	href = strings.ReplaceAll(href, "&amp;", "&")
-	if href != "" && !strings.HasPrefix(href, "http") {
-		href = client.BaseURL + href
-	}
-	return href
-}
-
-// queryParam returns a TYPO3-style query parameter. It matches both the bare
-// name and the tx_ext[name] bracket notation.
-func queryParam(rawURL, param string) string {
-	u, err := url.Parse(rawURL)
-	if err != nil {
-		return ""
-	}
-	for k, v := range u.Query() {
-		if (k == param || strings.HasSuffix(k, "["+param+"]")) && len(v) > 0 {
-			return v[0]
 		}
 	}
 	return ""
 }
 
-func findFirstAnchor(n *html.Node) *html.Node {
-	var found *html.Node
-	var walk func(*html.Node)
-	walk = func(n *html.Node) {
-		if found != nil {
-			return
-		}
-		if n.Type == html.ElementNode && n.Data == "a" && attr(n, "href") != "" {
-			found = n
-			return
-		}
-		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			walk(c)
+func computeDeadlines(start string, now time.Time) *Deadlines {
+	t, err := time.ParseInLocation("02.01.2006 15:04", start, berlin)
+	if err != nil {
+		return nil // no time → not a written exam with a fixed slot (e.g. Hausarbeit window)
+	}
+	day := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, berlin)
+	endOf := func(d time.Time) string { return d.Add(-time.Minute).Format("02.01.2006 15:04") }
+	today := time.Date(now.In(berlin).Year(), now.In(berlin).Month(), now.In(berlin).Day(), 0, 0, 0, 0, berlin)
+	return &Deadlines{
+		RegisterOpens:   day.AddDate(0, 0, -25).Format("02.01.2006"),
+		RegisterCloses:  endOf(day.AddDate(0, 0, -9)),
+		DeregisterUntil: endOf(day.AddDate(0, 0, -1)),
+		DaysUntilExam:   int(day.Sub(today).Hours() / 24),
+		Note:            "berechnet nach PVO §10/§11 (Klausur); maßgeblich ist, ob das CIS den Link anbietet",
+	}
+}
+
+// FlashMessage extracts the TYPO3 flash/alert message of a response page.
+func FlashMessage(body string) string {
+	doc := htmlx.Main(htmlx.MustParse(body))
+	for _, cls := range []string{"typo3-messages", "alert", "flash", "message"} {
+		for _, n := range htmlx.All(doc, func(n *html.Node) bool {
+			return n.Type == html.ElementNode && strings.Contains(htmlx.Attr(n, "class"), cls)
+		}) {
+			if t := htmlx.Text(n); t != "" {
+				return t
+			}
 		}
 	}
-	walk(n)
-	return found
+	return "Request sent (no confirmation message on the response page — check the CIS)."
 }
 
 func spanTexts(n *html.Node) []string {
 	var out []string
-	var walk func(*html.Node)
-	walk = func(n *html.Node) {
-		if n.Type == html.ElementNode && n.Data == "span" {
-			if t := strings.TrimSpace(innerText(n)); t != "" {
-				out = append(out, t)
-			}
-		}
-		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			walk(c)
+	for _, s := range htmlx.All(n, htmlx.Tag("span")) {
+		if t := htmlx.Text(s); t != "" {
+			out = append(out, t)
 		}
 	}
-	walk(n)
 	if len(out) == 0 {
-		if t := textOf(n); t != "" {
+		if t := htmlx.Text(n); t != "" {
 			out = append(out, t)
 		}
 	}
 	return out
-}
-
-func textOf(n *html.Node) string {
-	return strings.TrimSpace(collapseSpace(innerText(n)))
-}
-
-func collapseSpace(s string) string {
-	return strings.Join(strings.Fields(s), " ")
-}
-
-func attr(n *html.Node, key string) string {
-	for _, a := range n.Attr {
-		if a.Key == key {
-			return a.Val
-		}
-	}
-	return ""
-}
-
-func innerText(n *html.Node) string {
-	var sb strings.Builder
-	var walk func(*html.Node)
-	walk = func(n *html.Node) {
-		if n.Type == html.TextNode {
-			sb.WriteString(n.Data)
-		}
-		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			walk(c)
-		}
-	}
-	walk(n)
-	return sb.String()
 }

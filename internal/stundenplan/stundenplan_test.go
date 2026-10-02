@@ -16,7 +16,7 @@ func loadFixture(t *testing.T) string {
 }
 
 func TestParsePlans(t *testing.T) {
-	plans := parsePlans(loadFixture(t))
+	plans := parsePlans(loadFixture(t), "https://cis.nordakademie.de")
 	if len(plans) == 0 {
 		t.Fatal("expected plans, got none")
 	}
@@ -43,7 +43,7 @@ func TestParsePlans(t *testing.T) {
 }
 
 func TestParsePlansKnownEntry(t *testing.T) {
-	plans := parsePlans(loadFixture(t))
+	plans := parsePlans(loadFixture(t), "https://cis.nordakademie.de")
 
 	// The fixture is known to contain an HTML schedule for the A24a_4 group.
 	var found *Plan
@@ -71,7 +71,7 @@ func TestParsePlansKnownEntry(t *testing.T) {
 }
 
 func TestFilter(t *testing.T) {
-	plans := parsePlans(loadFixture(t))
+	plans := parsePlans(loadFixture(t), "https://cis.nordakademie.de")
 
 	// Filter by Zenturie prefix is case-insensitive.
 	icsW := Filter(plans, "w24", "ics")

@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="de-DE"><head><meta charset="utf-8"><title>CIS fixture</title></head><body>
+<main>
+                <div class="na-bg-transparent na-no-padding na-no-padding-top"><section class="container"><div class="na-pagetitle"><h1>Leistungsübersicht</h1></div></section></div>
+
+                <div class="na-bg-white na-no-padding"><div class="container"><div class="row"><ol class="col-md-12 hidden-xs breadcrumb" itemscope itemtype="http://schema.org/BreadcrumbList"><li itemprop="itemListElement" itemscope="" itemtype="http://schema.org/ListItem"><a href="/" title="CIS Startseite" itemprop="item"><span itemprop="name">CIS Startseite</span></a><meta itemprop="position" content="1" /></li><li itemprop="itemListElement" itemscope="" itemtype="http://schema.org/ListItem"><a href="/mein-profil" title="Mein Profil" itemprop="item"><span itemprop="name">Mein Profil</span></a><meta itemprop="position" content="2" /></li><li itemprop="itemListElement" itemscope="" itemtype="http://schema.org/ListItem"><a href="/mein-profil/mein-postfach" title="Mein Postfach" itemprop="item"><span itemprop="name">Mein Postfach</span></a><meta itemprop="position" content="3" /></li><li itemprop="itemListElement" itemscope="" itemtype="http://schema.org/ListItem"><span itemprop="name">Leistungsübersicht</span><meta itemprop="position" content="4" /></li></ol></div></div></div>
+    <!--TYPO3SEARCH_begin-->
+                <section class="container">
+    
+
+            <div id="c1923" class="frame frame-default frame-type-list frame-layout-0">
+                
+                
+                    
+
+
+
+                
+                
+                    
+
+    
+
+
+
+                
+                
+
+    
+        <script type="text/javascript" src="https://www.google.com/jsapi"></script>
+
+<script type="text/javascript">
+    google.load("visualization", "1", {packages:["corechart"]});
+    google.setOnLoadCallback(drawChart);
+    function drawChart() {
+        var data = google.visualization.arrayToDataTable([
+            ['Note','Anzahl'],['1,0',1],['1,3',1],['1,7',2],['2,0',8],['2,3',8],['2,7',5],['3,0',13],['3,3',10],['3,7',10],['4,0',22],['5,0',30],
+        ]);
+        var options = {
+            "is3D": true,
+            "pieSliceText": "label",
+            "legend": 'none'
+
+            };
+        options.slices = { "8" : {"offset":0.1} };
+
+        var chart = new google.visualization.PieChart(document.getElementById('piechart_3d'));
+        chart.draw(data, options);
+    }
+
+    google.load("visualization", "1", {packages:["table"]});
+    google.setOnLoadCallback(drawTable);
+
+    function drawTable() {
+        var data = new google.visualization.arrayToDataTable([
+            ['Note','1,0','1,3','1,7','2,0','2,3','2,7','3,0','3,3','3,7','4,0','5,0',],['Anzahl','1','1','2','8','8','5','13','10','10','22','30',]
+        ]);
+
+        var table = new google.visualization.Table(document.getElementById('table_div'));
+
+        table.draw(data, {showRowNumber: false});
+    }
+
+        $(window).resize(function(){
+            drawChart();
+            drawTable();
+        });
+</script>
+
+<div class="tx_na_grades">
+    <h3>Notenverteilung im Modul Automatentheorie und formale Sprachen bei Marcus Soll, Astrid Kiehn, Hans-Werner Sehring </h3>
+    
+            <div>Durchschnitt: 3,64 - 110 Klausuren</div>
+            <div id="table_div" style="width:100%"></div>
+            <div id="piechart_3d" style="width: 100%; min-height:450px;"></div><!-- width:1300 mit Legende -->
+            <div class="clearfix"></div>
+        
+    <a href="/mein-profil/mein-postfach/leistungsuebersicht?tx_nagrades_nagradesmodules%5Baction%5D=list&amp;tx_nagrades_nagradesmodules%5Bcontroller%5D=Notenverwaltung&amp;cHash=00000000000000000000000000000000">Zurück zur Leistungsübersicht</a><br />
+</div>
+    
+
+
+                
+                    
+
+
+
+                
+                
+                    
+
+
+
+                
+            </div>
+
+        
+
+</section>
+    <!-- TYPO3SEARCH_end-->
+            </main>
+<a href="/login/?logintype=logout">Logout</a></body></html>

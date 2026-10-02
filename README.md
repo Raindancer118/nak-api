@@ -1,127 +1,88 @@
-# cis-api
+# nak-api
 
-Go CLI + MCP server for the [NORDAKADEMIE](https://www.nordakademie.de) Campus Information System (CIS).
+**One MCP server and CLI for the NORDAKADEMIE: Campus Information System (CIS) + Moodle.**
 
-Reverse-engineered from the TYPO3-based portal at `cis.nordakademie.de`. Works as a standalone CLI and as an MCP server so Claude Code can interact directly with the CIS.
+Successor of [`cis-api`](https://github.com/Raindancer118/cis-api) and [`moodle-mcp`](https://github.com/Raindancer118/moodle-mcp), merged into one Go binary.
+The CIS has no API — everything is reverse-engineered from the TYPO3 pages. Moodle is accessed through its mobile web service.
 
-## Features
+## What it can do
 
-| | CLI | MCP |
-|---|---|---|
-| Login / Logout | ✓ | ✓ |
-| Grades (Leistungsübersicht) | ✓ | ✓ |
-| Stundenplan list + download (.ics/.html per Zenturie) | ✓ | ✓ |
-| Klausuren list + register/deregister (binding) | ✓ | ✓ |
-| Transferleistungen list + grading (computed Gesamtnote) | ✓ | ✓ |
-| Seminar list + details | — | ✓ |
-| Wahlpflichtmodul list + details + selection (binding) | ✓ | ✓ |
-| Certificate list + download | ✓ | ✓ |
+| Area | Tools |
+|---|---|
+| **Overview** | `nak_dashboard` (today: lectures, urgent deadlines, exams, unread messages) · `nak_deadlines` (CIS + Moodle, chronological) · `nak_agenda` (combined calendar) · `nak_module` (one module across both systems) |
+| **Grades** | `cis_grades` (modules, attempts, seminars, Transferleistungen, stats) · `cis_grade_distribution` (Notenspiegel + your rank) · `cis_attendance` · `cis_transcript` (PDF) · `cis_progress` (credits, thesis prerequisites) |
+| **Planning** | `cis_timetable` (lectures as events, only your electives) · `cis_studienplan` · `cis_vorlesungszeiten` · `cis_abschlussfristen` · Stundenplan files |
+| **Exams** | `cis_list_klausuren` (incl. computed PVO deadlines) · `cis_klausur_action` ⚠ |
+| **Seminars** | list per quarter / mine · detail · participation counts · `cis_seminar_action` ⚠ |
+| **Electives** | `cis_list_wahlpflicht` · detail · `cis_select_wahlpflicht` ⚠ |
+| **Transferleistungen** | list · grading with weighted mark · documents · `cis_transfer_register` ⚠ |
+| **Profile** | personal data · contact · address · sharing · SEPA status (read only) · classmates (name + company only) · copy balance · `cis_update_contact` ⚠ `cis_update_address` ⚠ `cis_set_sharing` ⚠ `cis_set_vertiefung` ⚠ |
+| **Documents** | enrolment certificates (PDF) · any CIS page as text + downloads (`cis_page`, `cis_download`) |
+| **Moodle** | courses, contents, find, files (PDF text), assignments + submissions ⚠, grades, forums ⚠, messages ⚠, quizzes + reviews, choices ⚠, completion, what's new, raw web service calls |
 
-> **Binding write actions** (Klausur an-/abmelden, Wahlpflicht wählen) default to a
-> dry run. They only execute with `--confirm` plus an interactive typed confirmation.
+`nak tools` lists all 78 tools.
+
+## Safety
+
+Tools marked ⚠ change data (exam registration, seminar sign-up, elective choice, submissions …).
+
+- Without `confirm=true` they return a **preview** and send nothing — enforced centrally in the tool registry and covered by tests for every write tool.
+- `NAK_READONLY=1` blocks every write in both HTTP clients before any network I/O.
+- Every write is appended to `~/.config/cis-api/writes.log` (target and field names, never values).
+- On the CLI, `confirm=true` additionally requires typing `JA` in an interactive terminal.
+- Other students' personal data (birthdays, phone numbers, participant names) is never returned.
 
 ## Install
 
 ```sh
-git clone https://github.com/Raindancer118/cis-api.git
-cd cis-api
-go build -o cis .
+go install github.com/Raindancer118/nak-api@latest   # binary: nak-api
+# or
+git clone https://github.com/Raindancer118/nak-api && cd nak-api && go build -o nak .
 ```
 
-Requires Go 1.21+.
+Release binaries (Linux, macOS, Windows) are attached to every [GitHub release](https://github.com/Raindancer118/nak-api/releases).
 
-## CLI Usage
+## Configuration
 
-```sh
-# Login (interactive prompt, or via env vars)
-./cis login
-CIS_USER=20066 CIS_PASS='yourpassword' ./cis login
+| Variable | Meaning |
+|---|---|
+| `CIS_USER`, `CIS_PASS` | NAK login (also used for Moodle) |
+| `MOODLE_USER`, `MOODLE_PASS` | optional separate Moodle credentials |
+| `NAK_READONLY=1` | block all writes |
+| `NAK_DOWNLOAD_DIR` | default download folder (`~/Downloads/nak`) |
+| `MOODLE_URL`, `CIS_BASE_URL`, `NAK_TZ` | overrides (defaults: moodle2.nordakademie.de, cis.nordakademie.de, Europe/Berlin) |
 
-# Grades
-./cis grades
-./cis grades --lang en
-./cis grades --json
+The CIS session is cached in `~/.config/cis-api/session.json` (0600) and renewed automatically when it expires.
 
-# Stundenplan (timetable calendars per Zenturie)
-./cis stundenplan                          # list all
-./cis stundenplan -z I24a -f ics           # filter
-./cis stundenplan -z I24a -f ics -d -o ~/Downloads   # download the .ics
-
-# Klausuren (exam registration — binding writes need --confirm)
-./cis klausuren                            # list exams + examIds
-./cis klausuren --register 12022           # dry run
-./cis klausuren --register 12022 --confirm # actually register (asks again)
-
-# Transferleistungen
-./cis transfer                             # overview
-./cis transfer --bewertung 14534           # grading detail + weighted Gesamtnote
-
-# Wahlpflichtmodule
-./cis wpf                                  # list
-./cis wpf --select 1234 --confirm          # binding selection (asks again)
-
-# Certificates
-./cis certs
-./cis certs --download 1 --out ~/Downloads
-
-# Logout
-./cis logout
-```
-
-## MCP Server
-
-Add to your Claude Code `~/.claude/.mcp.json` (create the file if it doesn't exist):
+## Use as MCP server
 
 ```json
 {
   "mcpServers": {
-    "cis": {
-      "command": "/path/to/cis",
-      "args": ["mcp"],
-      "env": {
-        "CIS_USER": "your_student_id",
-        "CIS_PASS": "your_password"
-      }
-    }
+    "nak": { "command": "/path/to/nak", "args": ["mcp"], "env": { "CIS_USER": "…", "CIS_PASS": "…" } }
   }
 }
 ```
 
-Or run `cis login` once first — the session is saved to `~/.config/cis-api/session.json` and reused automatically.
+## CLI
 
-### Available MCP Tools
+```sh
+nak login
+nak tool nak_dashboard
+nak tool cis_grade_distribution module_nr=I140
+nak tool cis_timetable from=2026-10-12 days=5
+nak tool moodle_find query="foliensatz 9"
+nak tool cis_klausur_action exam_id=12345 action=register            # preview only
+```
 
-| Tool | Description |
-|---|---|
-| `cis_login` | Log in with username + password |
-| `cis_logout` | Log out and clear session |
-| `cis_grades` | Fetch grades (Leistungsübersicht) |
-| `cis_list_stundenplan` | List timetable files per Zenturie (.ics/.html) |
-| `cis_download_stundenplan` | Download a timetable file to a local path |
-| `cis_list_klausuren` | List the exam overview (Prüfungsübersicht) |
-| `cis_klausur_action` | Register/deregister for an exam (binding; needs `confirm=true`) |
-| `cis_list_transfer` | List Transferleistungen / Praxisberichte |
-| `cis_transfer_bewertung` | Grading detail + client-side weighted Gesamtnote |
-| `cis_download_transfer_document` | Download a Transferleistung attachment |
-| `cis_list_seminars` | List all available seminars with IDs |
-| `cis_seminar_detail` | Seminar details (dozent, dates, credits) |
-| `cis_list_wahlpflicht` | List Wahlpflichtmodule for your curriculum |
-| `cis_wahlpflicht_detail` | Module details + whether selection is open |
-| `cis_select_wahlpflicht` | Select a Wahlpflichtmodul (when period is open) |
-| `cis_list_certs` | List downloadable certificates |
-| `cis_download_cert` | Download a certificate to a local file |
+## Development
 
-## How it works
+```sh
+go test -race ./...
+```
 
-The CIS runs on **TYPO3 (Extbase)** — no REST API, all responses are server-rendered HTML.
+Parser tests run against anonymised fixtures in `internal/*/testdata/` (real CIS structure, fake personal data). The end-to-end tests in `internal/tools` start the MCP server against a fake CIS and a fake Moodle and assert that no write tool sends anything without confirmation.
 
-**Auth:** `GET /` → extract hidden TYPO3 form fields → `POST` credentials. Session stored as `fe_typo_user_cae070b` cookie, persisted in `~/.config/cis-api/session.json` (mode 0600).
+## License
 
-**cHash:** TYPO3 signs every URL with a `cHash` parameter that cannot be computed client-side. The client always extracts pre-signed links from page HTML and follows those — making it robust against parameter changes.
-
-**Wahlpflichtmodule selection:** The selection form only appears during the selection period. `cis_wahlpflicht_detail` reports `select_available: true` when the button is live.
-
-## Security
-
-- Credentials are **never stored on disk** — only the session cookie is persisted (mode 0600).
-- Pass credentials via `CIS_USER` / `CIS_PASS` env vars for scripting/MCP.
+[WTFPL](LICENSE) — see [THIRD-PARTY.md](THIRD-PARTY.md) for bundled dependencies.

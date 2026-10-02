@@ -8,10 +8,10 @@ package stundenplan
 
 import (
 	"fmt"
-	"io"
 	"strings"
 
-	"github.com/Raindancer118/cis-api/internal/client"
+	"github.com/Raindancer118/nak-api/internal/client"
+	"github.com/Raindancer118/nak-api/internal/htmlx"
 	"golang.org/x/net/html"
 )
 
@@ -30,31 +30,17 @@ type Plan struct {
 
 // FetchList fetches the timetable overview and returns all downloadable plans.
 func FetchList(c *client.Client) ([]Plan, error) {
-	resp, err := c.Get(PagePath)
+	p, err := c.Page(PagePath)
 	if err != nil {
 		return nil, fmt.Errorf("fetch stundenplaene: %w", err)
 	}
-	defer resp.Body.Close()
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	return parsePlans(string(body)), nil
+	return parsePlans(p.Body, c.Base), nil
 }
 
 // Download fetches a plan file and returns its raw bytes plus content type.
 func Download(c *client.Client, downloadURL string) ([]byte, string, error) {
-	resp, err := c.GetURL(downloadURL)
-	if err != nil {
-		return nil, "", fmt.Errorf("download: %w", err)
-	}
-	defer resp.Body.Close()
-	ct := resp.Header.Get("Content-Type")
-	data, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, ct, fmt.Errorf("read download: %w", err)
-	}
-	return data, ct, nil
+	data, ct, _, err := c.Download(downloadURL)
+	return data, ct, err
 }
 
 // Filter returns plans whose Zenturie starts with the given prefix
@@ -78,7 +64,7 @@ func Filter(plans []Plan, zenturiePrefix, format string) []Plan {
 }
 
 // parsePlans extracts every <li> inside a <ul class="ce-uploads"> list.
-func parsePlans(body string) []Plan {
+func parsePlans(body, base string) []Plan {
 	doc, err := html.Parse(strings.NewReader(body))
 	if err != nil {
 		return nil
@@ -87,10 +73,10 @@ func parsePlans(body string) []Plan {
 	var plans []Plan
 	var walk func(*html.Node)
 	walk = func(n *html.Node) {
-		if n.Type == html.ElementNode && n.Data == "ul" && strings.Contains(attr(n, "class"), "ce-uploads") {
+		if n.Type == html.ElementNode && n.Data == "ul" && htmlx.HasClass(n, "ce-uploads") {
 			for li := n.FirstChild; li != nil; li = li.NextSibling {
 				if li.Type == html.ElementNode && li.Data == "li" {
-					if p, ok := parseUploadItem(li); ok {
+					if p, ok := parseUploadItem(li, base); ok {
 						plans = append(plans, p)
 					}
 				}
@@ -105,24 +91,24 @@ func parsePlans(body string) []Plan {
 	return plans
 }
 
-func parseUploadItem(li *html.Node) (Plan, bool) {
+func parseUploadItem(li *html.Node, base string) (Plan, bool) {
 	var p Plan
 	var walk func(*html.Node)
 	walk = func(n *html.Node) {
 		if n.Type == html.ElementNode {
 			switch {
 			case n.Data == "a":
-				if href := attr(n, "href"); href != "" && p.URL == "" {
-					p.URL = normalizeURL(href)
+				if href := htmlx.Attr(n, "href"); href != "" && p.URL == "" {
+					p.URL = htmlx.AbsURL(base, href)
 				}
 			case n.Data == "span":
-				switch class := attr(n, "class"); {
+				switch class := htmlx.Attr(n, "class"); {
 				case strings.Contains(class, "ce-uploads-fileName"):
-					p.Filename = strings.TrimSpace(innerText(n))
+					p.Filename = strings.TrimSpace(htmlx.RawText(n))
 				case strings.Contains(class, "ce-uploads-time"):
-					p.Date = strings.TrimSpace(innerText(n))
+					p.Date = strings.TrimSpace(htmlx.RawText(n))
 				case strings.Contains(class, "ce-uploads-filesize"):
-					p.Size = strings.TrimSpace(innerText(n))
+					p.Size = strings.TrimSpace(htmlx.RawText(n))
 				}
 			}
 		}
@@ -142,38 +128,4 @@ func parseUploadItem(li *html.Node) (Plan, bool) {
 		p.Zenturie = p.Filename
 	}
 	return p, true
-}
-
-// normalizeURL turns a possibly relative, HTML-entity-encoded href into an
-// absolute URL. TYPO3 emits dumpFile links with &amp; separators.
-func normalizeURL(href string) string {
-	href = strings.ReplaceAll(href, "&amp;", "&")
-	if !strings.HasPrefix(href, "http") {
-		href = client.BaseURL + href
-	}
-	return href
-}
-
-func attr(n *html.Node, key string) string {
-	for _, a := range n.Attr {
-		if a.Key == key {
-			return a.Val
-		}
-	}
-	return ""
-}
-
-func innerText(n *html.Node) string {
-	var sb strings.Builder
-	var walk func(*html.Node)
-	walk = func(n *html.Node) {
-		if n.Type == html.TextNode {
-			sb.WriteString(n.Data)
-		}
-		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			walk(c)
-		}
-	}
-	walk(n)
-	return sb.String()
 }
