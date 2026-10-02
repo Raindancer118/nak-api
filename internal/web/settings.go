@@ -55,6 +55,8 @@ func (s *Server) getSettings(w http.ResponseWriter, r *http.Request) {
 		"nav":        s.app.Settings().NavOrDefault(),
 		"nav_items":  app.NavItems,
 		"home":       s.app.Settings().HomeOrDefault(),
+		"top_hidden": nonNil(s.app.Settings().TopHidden),
+		"top_items":  app.TopItems,
 		"operator":   map[string]string{"name": s.cfg.Operator, "contact": s.cfg.OperatorContact},
 		"home_items": app.HomeItems,
 		"account":    s.accountInfo(),
@@ -144,6 +146,21 @@ func (s *Server) putHome(w http.ResponseWriter, r *http.Request) {
 		st.Home = v
 		return st.HomeOrDefault()
 	})
+}
+
+// putTop stores which top-bar buttons are hidden (none by default).
+func (s *Server) putTop(w http.ResponseWriter, r *http.Request) {
+	s.putList(w, r, "top_hidden", app.TopItems, 0, len(app.TopItems), "", func(st *app.Settings, v []string) []string {
+		st.TopHidden = v
+		return nonNil(v)
+	})
+}
+
+func nonNil(v []string) []string {
+	if v == nil {
+		return []string{}
+	}
+	return v
 }
 
 // putList takes {"<key>": [ids]}: known, distinct, between min and max; an

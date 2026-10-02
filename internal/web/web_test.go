@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -806,7 +807,7 @@ func TestHomeSettings(t *testing.T) {
 		v, _ := m["home"].([]any)
 		return v
 	}
-	if n := get(); len(n) != 6 || n[0] != "next" {
+	if n := get(); len(n) != 7 || n[0] != "next" {
 		t.Fatalf("default home = %v", n)
 	}
 	if res := h.do(t, "PUT", "/api/settings/home", `{"home":["grades","messages"]}`, bearer); res.StatusCode != 200 {
@@ -820,7 +821,7 @@ func TestHomeSettings(t *testing.T) {
 			t.Errorf("%s: %d, want 400", bad, res.StatusCode)
 		}
 	}
-	if res := h.do(t, "PUT", "/api/settings/home", `{"home":[]}`, bearer); res.StatusCode != 200 || len(get()) != 6 {
+	if res := h.do(t, "PUT", "/api/settings/home", `{"home":[]}`, bearer); res.StatusCode != 200 || len(get()) != 7 {
 		t.Errorf("empty list must reset to the default")
 	}
 }
@@ -885,5 +886,58 @@ func TestPublicDemoBlocksSettingsAndOutboundCalls(t *testing.T) {
 	}
 	if st := a.Settings(); st.Notify.NtfyURL != "" || len(st.Nav) != 0 {
 		t.Errorf("demo settings changed: %+v", st)
+	}
+}
+
+// the UI's bar/tile/top-bar ids and the server's allowed ids must not drift
+// apart (a new page in the UI that the server refuses to save)
+func TestUIListsMatchServer(t *testing.T) {
+	js, err := os.ReadFile("ui/assets/app.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	keys := func(name string) []string {
+		i := strings.Index(string(js), "const "+name+" = {")
+		if i < 0 {
+			t.Fatalf("%s not found", name)
+		}
+		body := string(js)[i:]
+		body = body[:strings.Index(body, "\n};")]
+		var out []string
+		for _, m := range regexp.MustCompile(`(?m)^  ([a-z_]+): `).FindAllStringSubmatch(body, -1) {
+			out = append(out, m[1])
+		}
+		return out
+	}
+	for name, want := range map[string][]string{"navDefs": app.NavItems, "homeDefs": app.HomeItems, "topDefs": app.TopItems} {
+		if got := keys(name); fmt.Sprint(got) != fmt.Sprint(want) {
+			t.Errorf("%s = %v, server allows %v", name, got, want)
+		}
+	}
+}
+
+func TestTopBarSettings(t *testing.T) {
+	h := newHarness(t)
+	h.app.ConfigDir = t.TempDir()
+	get := func() []any {
+		m := decode(t, h.do(t, "GET", "/api/settings", "", bearer))
+		v, _ := m["top_hidden"].([]any)
+		return v
+	}
+	if n := get(); len(n) != 0 {
+		t.Fatalf("default: nothing hidden, got %v", n)
+	}
+	if res := h.do(t, "PUT", "/api/settings/top", `{"top_hidden":["stamp","theme"]}`, bearer); res.StatusCode != 200 {
+		t.Fatalf("save: %d", res.StatusCode)
+	}
+	if n := get(); fmt.Sprint(n) != "[stamp theme]" {
+		t.Fatalf("saved = %v", n)
+	}
+	// the settings button stays: without it the setting could not be undone
+	if res := h.do(t, "PUT", "/api/settings/top", `{"top_hidden":["settings"]}`, bearer); res.StatusCode != 400 {
+		t.Errorf("hiding settings: %d, want 400", res.StatusCode)
+	}
+	if res := h.do(t, "PUT", "/api/settings/top", `{"top_hidden":[]}`, bearer); res.StatusCode != 200 || len(get()) != 0 {
+		t.Errorf("empty list shows everything again")
 	}
 }

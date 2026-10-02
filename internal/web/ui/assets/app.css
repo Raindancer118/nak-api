@@ -1386,3 +1386,4 @@ ul.spend-bars li { display: grid; grid-template-rows: 1fr auto; height: 100%; ga
 ul.spend-bars .bar { align-self: end; justify-self: center; width: min(100%, 2.4rem); height: calc(var(--v) * 100%); min-height: 2px; border-radius: .35rem .35rem .15rem .15rem; background: var(--ink); opacity: .85; }
 ul.spend-bars .lbl { font-size: .7rem; color: var(--dim); text-align: center; }
 .filters.mensa-veg { margin: .5rem 0 .25rem; }
+.top .top-off { display: none !important; }

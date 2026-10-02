@@ -1760,7 +1760,7 @@ async function settingsPage(root) {
       h("div", { class: "row-actions" }, h("button", { class: "primary", type: "button", text: "App-Einstellungen", onclick: () => window.NaknakApp.openSettings() }))));
   }
 
-  grid.append(navSettings(st), homeSettings(st), mensaSettings());
+  grid.append(navSettings(st), homeSettings(st), topSettings(st), mensaSettings());
 
   // EduVault
   const ev = st.eduvault || {};
@@ -2653,6 +2653,27 @@ async function mensaPage(root) {
     bookingRows(acc.bookings || [], 8)]);
 }
 
+// which top-bar buttons show; saved on the server like the bar below
+function topSettings(st) {
+  let hidden = Array.isArray(st.top_hidden) ? st.top_hidden : savedTopHidden();
+  const msg = h("div", {});
+  const boxes = Object.entries(topDefs).map(([id, label]) => {
+    const box = h("input", { type: "checkbox" });
+    box.checked = !hidden.includes(id);
+    box.addEventListener("change", async () => {
+      const next = Object.keys(topDefs).filter((k) => k === id ? !box.checked : hidden.includes(k));
+      const res = await fetch("/api/settings/top", { method: "PUT", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ top_hidden: next }) });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) { box.checked = !box.checked; msg.replaceChildren(errorBox(new Error(body.error || `HTTP ${res.status}`))); return; }
+      hidden = body.top_hidden || next;
+      applyTop(hidden);
+      msg.replaceChildren();
+    });
+    return h("label", { class: "check" }, box, h("span", {}, h("b", { text: label })));
+  });
+  return tile("Kopfleiste", { i: 0 }, h("div", { class: "settings-form" }, ...boxes), msg);
+}
+
 function mensaSettings() {
   const on = h("input", { type: "checkbox" });
   on.checked = mensaSpendingOn();
@@ -3188,7 +3209,33 @@ function applyNav(ids) {
   markNav();
 }
 
+// top-bar elements that can be switched off (Einstellungen → Kopfleiste)
+const topDefs = {
+  stamp: "„Stand: vor … min“",
+  refresh: "Neu laden",
+  privacy: "Werte verbergen (Auge)",
+  bell: "Benachrichtigungen",
+  theme: "Hell/Dunkel",
+  logout: "Abmelden",
+};
+
+function savedTopHidden() {
+  try {
+    const v = JSON.parse(localStorage.getItem("nak-top-hidden") || "[]");
+    if (Array.isArray(v)) return v.filter((id) => topDefs[id]);
+  } catch {}
+  return [];
+}
+
+function applyTop(hidden) {
+  if (!Array.isArray(hidden)) return;
+  localStorage.setItem("nak-top-hidden", JSON.stringify(hidden));
+  document.querySelectorAll(".top [data-top]").forEach((el) => el.classList.toggle("top-off", hidden.includes(el.dataset.top)));
+}
+
 function header() {
+  const hidden = savedTopHidden();
+  const tag = (id, el) => { el.dataset.top = id; el.classList.toggle("top-off", hidden.includes(id)); return el; };
   const refresh = h("button", { class: "icon-btn hide-sm", type: "button", title: "Neu laden (frisch aus CIS und Moodle)", "aria-label": "Neu laden" }, svg(icons.refresh));
   refresh.addEventListener("click", async () => {
     refresh.classList.add("spin");
@@ -3199,13 +3246,13 @@ function header() {
     h("a", { class: "mark", href: "#/", "aria-label": "naknak – Übersicht" }, h("img", { src: "/assets/naknak.svg", alt: "", width: 26, height: 26 }), "naknak"),
     navBar(),
     h("div", { class: "tools" },
-      h("span", { class: "stamp", "aria-live": "polite" }),
-      refresh,
-      h("button", { class: "icon-btn eye-btn", type: "button", onclick: togglePrivate }),
-      bellButton(),
+      tag("stamp", h("span", { class: "stamp", "aria-live": "polite" })),
+      tag("refresh", refresh),
+      tag("privacy", h("button", { class: "icon-btn eye-btn", type: "button", onclick: togglePrivate })),
+      tag("bell", bellButton()),
       h("a", { class: "icon-btn", href: "#/einstellungen", title: "Einstellungen", "aria-label": "Einstellungen" }, svg(icons.gear)),
-      h("button", { class: "icon-btn theme-btn", type: "button", onclick: switchTheme }),
-      h("form", { method: "post", action: "/logout", onsubmit: () => { navigator.serviceWorker?.controller?.postMessage("clear"); } }, h("button", { class: "icon-btn", type: "submit", title: "Abmelden", "aria-label": "Abmelden" }, svg(["M15 4h4v16h-4", "M10 8l-4 4 4 4", "M6 12h10"]))))));
+      tag("theme", h("button", { class: "icon-btn theme-btn", type: "button", onclick: switchTheme })),
+      tag("logout", h("form", { method: "post", action: "/logout", onsubmit: () => { navigator.serviceWorker?.controller?.postMessage("clear"); } }, h("button", { class: "icon-btn", type: "submit", title: "Abmelden", "aria-label": "Abmelden" }, svg(["M15 4h4v16h-4", "M10 8l-4 4 4 4", "M6 12h10"])))))));
 }
 
 let renderSeq = 0;
@@ -3279,7 +3326,7 @@ function boot() {
   addEventListener("hashchange", render);
   render();
   if (!document.documentElement.classList.contains("still")) {
-    fetch("/api/settings", { credentials: "same-origin" }).then((r) => r.ok ? r.json() : null).then((st) => { if (st) { applyNav(st.nav); applyHome(st.home); } }).catch(() => {});
+    fetch("/api/settings", { credentials: "same-origin" }).then((r) => r.ok ? r.json() : null).then((st) => { if (st) { applyNav(st.nav); applyHome(st.home); applyTop(st.top_hidden); } }).catch(() => {});
   }
 }
 

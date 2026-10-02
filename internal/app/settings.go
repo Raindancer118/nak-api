@@ -20,18 +20,24 @@ type Settings struct {
 	Nav []string `json:"nav,omitempty"`
 	// Home is the choice and order of dashboard tiles (ids from HomeItems).
 	Home []string `json:"home,omitempty"`
+	// TopHidden are top-bar buttons the owner switched off (ids from TopItems).
+	TopHidden []string `json:"top_hidden,omitempty"`
 }
+
+// TopItems are the top-bar elements that can be hidden. Settings is not
+// among them: without it the choice could not be undone.
+var TopItems = []string{"stamp", "refresh", "privacy", "bell", "theme", "logout"}
 
 // NavItems are the pages the navigation bar can hold; the web UI knows
 // their labels and icons.
-var NavItems = []string{"start", "woche", "kurse", "inbox", "noten", "studium", "pruefungen", "abgaben", "transfer", "thesis"}
+var NavItems = []string{"start", "woche", "kurse", "inbox", "noten", "studium", "pruefungen", "abgaben", "transfer", "thesis", "mensa"}
 
 var DefaultNav = []string{"start", "woche", "kurse", "inbox", "noten", "studium"}
 
 // HomeItems are the dashboard tiles; the web UI renders them.
-var HomeItems = []string{"next", "deadlines", "week", "grades", "exams", "moodle", "messages", "pending", "transfer", "transfer_grades", "thesis"}
+var HomeItems = []string{"next", "deadlines", "week", "grades", "exams", "moodle", "messages", "pending", "transfer", "transfer_grades", "thesis", "mensa", "mensa_spending"}
 
-var DefaultHome = []string{"next", "deadlines", "week", "grades", "exams", "moodle"}
+var DefaultHome = []string{"next", "deadlines", "week", "grades", "exams", "mensa", "moodle"}
 
 func (s Settings) HomeOrDefault() []string {
 	if len(s.Home) == 0 {
