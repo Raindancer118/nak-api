@@ -247,11 +247,10 @@ func (s *Server) tryLogin(w http.ResponseWriter, r *http.Request, tok string) {
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
+// loginPage never accepts a token from the query string (it would end up in
+// browser history and proxy logs); the log link carries it as #fragment and
+// login.js posts it.
 func (s *Server) loginPage(w http.ResponseWriter, r *http.Request) {
-	if tok := r.URL.Query().Get("token"); tok != "" {
-		s.tryLogin(w, r, tok)
-		return
-	}
 	s.renderLogin(w, http.StatusOK, "")
 }
 

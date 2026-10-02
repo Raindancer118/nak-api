@@ -29,7 +29,7 @@ func TestBinaryServesWebUI(t *testing.T) {
 	}
 	defer cmd.Process.Kill()
 
-	linkRe := regexp.MustCompile(`(http://127\.0\.0\.1:\d+)/login\?token=(\S+)`)
+	linkRe := regexp.MustCompile(`(http://127\.0\.0\.1:\d+)/login#token=(\S+)`)
 	found := make(chan []string, 1)
 	go func() {
 		sc := bufio.NewScanner(stderr)
@@ -106,5 +106,25 @@ func TestBinaryServesWebUI(t *testing.T) {
 
 	if out, err := exec.Command(bin, "healthcheck", "--url", base+"/healthz").CombinedOutput(); err == nil {
 		t.Fatalf("healthcheck succeeded against a stopped server: %s", out)
+	}
+
+	// Second start with the stored token: the log says where it is but does
+	// not repeat it.
+	again := exec.Command(bin, "serve", "--addr", "127.0.0.1:0")
+	again.Env = cmd.Env
+	out, _ := again.StderrPipe()
+	if err := again.Start(); err != nil {
+		t.Fatal(err)
+	}
+	defer again.Process.Kill()
+	sc := bufio.NewScanner(out)
+	for sc.Scan() {
+		line := sc.Text()
+		if strings.Contains(line, token) {
+			t.Fatalf("token repeated in the log: %s", line)
+		}
+		if strings.Contains(line, "web-token") {
+			break
+		}
 	}
 }

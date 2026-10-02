@@ -35,14 +35,11 @@ var serveCmd = &cobra.Command{
 
 		token := strings.TrimSpace(os.Getenv("NAK_WEB_TOKEN"))
 		fromFile := token == ""
+		created := false
 		if fromFile {
-			var created bool
 			var err error
 			if token, created, err = web.LoadOrCreateToken(a.ConfigDir); err != nil {
 				return fmt.Errorf("access token: %w", err)
-			}
-			if created {
-				log.Printf("new access token stored in %s/web-token", a.ConfigDir)
 			}
 		}
 
@@ -59,8 +56,13 @@ var serveCmd = &cobra.Command{
 		}
 		base := "http://" + displayAddr(ln.Addr().String())
 		log.Printf("nak %s web UI on %s", Version, base)
-		if fromFile {
-			log.Printf("log in: %s/login?token=%s", base, token)
+		switch {
+		case created:
+			// shown once; the #fragment never reaches a server or proxy log
+			log.Printf("new access token stored in %s/web-token", a.ConfigDir)
+			log.Printf("log in: %s/login#token=%s", base, token)
+		case fromFile:
+			log.Printf("access token: see %s/web-token", a.ConfigDir)
 		}
 		if a.ReadOnly {
 			log.Printf("read-only mode: binding actions are blocked")

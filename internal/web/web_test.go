@@ -99,6 +99,18 @@ func noRedirect() *http.Client {
 	return &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 }
 
+func (h *harness) login(t *testing.T, tok string) *http.Response {
+	t.Helper()
+	req, _ := http.NewRequest("POST", h.srv.URL+"/login", strings.NewReader(url.Values{"token": {tok}}.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	res, err := noRedirect().Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { res.Body.Close() })
+	return res
+}
+
 var bearer = map[string]string{"Authorization": "Bearer " + token}
 
 func with(extra map[string]string) map[string]string {
@@ -176,16 +188,7 @@ func TestToolList(t *testing.T) {
 
 func TestLoginSetsStrictCookie(t *testing.T) {
 	h := newHarness(t)
-	form := func(tok string) *http.Response {
-		req, _ := http.NewRequest("POST", h.srv.URL+"/login", strings.NewReader(url.Values{"token": {tok}}.Encode()))
-		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-		res, err := noRedirect().Do(req)
-		if err != nil {
-			t.Fatal(err)
-		}
-		t.Cleanup(func() { res.Body.Close() })
-		return res
-	}
+	form := func(tok string) *http.Response { return h.login(t, tok) }
 	if res := form("nope"); res.StatusCode != 401 || len(res.Cookies()) != 0 {
 		t.Fatalf("wrong token: %d %v", res.StatusCode, res.Cookies())
 	}
@@ -217,16 +220,16 @@ func TestLoginSetsStrictCookie(t *testing.T) {
 	}
 }
 
-func TestLoginLinkFromLog(t *testing.T) {
+func TestTokenNeverTravelsInTheQuery(t *testing.T) {
 	h := newHarness(t)
+	// The log link uses a #fragment, which browsers never send; a token in the
+	// query string (history, proxy logs) is not accepted.
 	res := h.do(t, "GET", "/login?token="+token, "", nil)
-	if res.StatusCode != http.StatusSeeOther || len(res.Cookies()) == 0 {
-		t.Fatalf("login link: %d", res.StatusCode)
+	if len(res.Cookies()) != 0 {
+		t.Fatal("query token logged in")
 	}
-	// without a token the login form is shown
-	res = h.do(t, "GET", "/login", "", nil)
 	b, _ := io.ReadAll(res.Body)
-	if res.StatusCode != 200 || !strings.Contains(string(b), `name="token"`) {
+	if res.StatusCode != 200 || !strings.Contains(string(b), `name="token"`) || !strings.Contains(string(b), "/assets/login.js") {
 		t.Fatalf("login form: %d %s", res.StatusCode, b)
 	}
 }
@@ -235,17 +238,17 @@ func TestLoginRateLimit(t *testing.T) {
 	h := newHarness(t)
 	var last int
 	for i := 0; i < maxLoginFailures+1; i++ {
-		last = h.do(t, "GET", "/login?token=wrong", "", nil).StatusCode
+		last = h.login(t, "wrong").StatusCode
 	}
 	if last != http.StatusTooManyRequests {
 		t.Fatalf("after %d failures: %d", maxLoginFailures+1, last)
 	}
 	// even the right token is refused while locked
-	if res := h.do(t, "GET", "/login?token="+token, "", nil); res.StatusCode != http.StatusTooManyRequests {
+	if res := h.login(t, token); res.StatusCode != http.StatusTooManyRequests {
 		t.Fatalf("locked: %d", res.StatusCode)
 	}
 	*h.now = h.now.Add(loginWindow + time.Second)
-	if res := h.do(t, "GET", "/login?token="+token, "", nil); res.StatusCode != http.StatusSeeOther {
+	if res := h.login(t, token); res.StatusCode != http.StatusSeeOther {
 		t.Fatalf("after window: %d", res.StatusCode)
 	}
 }
