@@ -23,6 +23,8 @@ jobs:
         run: test -z "$(gofmt -l . | tee /dev/stderr)"
       - run: go vet ./...
       - run: go test -race -count=1 ./...
+      - name: Service worker offline logic
+        run: node scripts/sw-test.mjs
       - name: UI smoke test (demo mode in headless Chrome)
         run: |
           go build -o nak .

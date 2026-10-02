@@ -1,7 +1,7 @@
 // naknak service worker: the app shell works offline;
 // data always comes from the network first and only falls back to the last
 // answer when there is no connection (marked with X-Naknak-Offline).
-const SHELL = "naknak-shell-v2";
+const SHELL = "naknak-shell-v3";
 const DATA = "naknak-data-v1";
 const SHELL_FILES = ["/assets/app.css", "/assets/app.js", "/assets/theme.js", "/assets/naknak.svg", "/assets/fonts/space-grotesk.woff2", "/manifest.webmanifest"];
 
@@ -35,10 +35,11 @@ self.addEventListener("fetch", (e) => {
     return;
   }
   if (req.mode === "navigate" && url.pathname === "/") {
-    e.respondWith(fetch(req).then((res) => {
+    const net = fetch(req).then((res) => {
       if (res.ok && !res.redirected) caches.open(SHELL).then((c) => c.put("/", res.clone()));
       return res;
-    }).catch(async () => (await caches.match("/")) || Response.error()));
+    });
+    e.respondWith(patient(net, () => caches.match("/"), 5000));
   }
   // /files, /api/events, /calendar, /login: network only
 });
@@ -58,22 +59,38 @@ async function networkFirst(req) {
   }
 }
 
+// A bad connection rarely fails fast: requests just hang. After `wait` ms
+// (at once when the device knows it is offline) the cached answer goes out;
+// the network answer still lands in the cache when it arrives.
+function patient(net, cached, wait) {
+  return new Promise((resolve, reject) => {
+    let done = false;
+    const fallback = async (err) => {
+      if (done) return;
+      const hit = await cached();
+      if (hit && !done) { done = true; resolve(hit); }
+      else if (err && !done) { done = true; reject(err); }
+    };
+    net.then((res) => { if (!done) { done = true; resolve(res); } }, fallback);
+    setTimeout(fallback, navigator.onLine === false ? 0 : wait);
+  });
+}
+
 async function toolCall(req, url) {
   const body = await req.clone().text();
   // one cache entry per tool + arguments; ?fresh/?wait do not change the data
   const key = new Request(`/__offline${url.pathname}?b=${encodeURIComponent(body)}`);
-  try {
-    const res = await fetch(req);
-    if (res.ok) {
-      const cache = await caches.open(DATA);
-      cache.put(key, res.clone());
-    }
+  const net = fetch(req).then(async (res) => {
+    if (res.ok) (await caches.open(DATA)).put(key, res.clone());
     return res;
-  } catch (err) {
+  });
+  // a binding action never gets an old answer
+  if (/"confirm"\s*:\s*true/.test(body)) return net;
+  return patient(net, async () => {
     const hit = await caches.match(key);
-    if (!hit) throw err;
+    if (!hit) return null;
     const headers = new Headers(hit.headers);
     headers.set("X-Naknak-Offline", "1");
     return new Response(await hit.blob(), { status: 200, headers });
-  }
+  }, 6000);
 }

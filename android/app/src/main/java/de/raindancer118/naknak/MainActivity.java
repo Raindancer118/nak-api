@@ -23,6 +23,7 @@ import android.webkit.RenderProcessGoneDetail;
 import android.webkit.URLUtil;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
+import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
@@ -47,6 +48,7 @@ public class MainActivity extends AppCompatActivity {
 
     private WebView web;
     private SwipeRefreshLayout swipe;
+    private View offlineView;
     private View cover;
     private String server;
     private LinkPolicy policy;
@@ -90,6 +92,11 @@ public class MainActivity extends AppCompatActivity {
         web = findViewById(R.id.web);
         swipe = findViewById(R.id.swipe);
         cover = findViewById(R.id.cover);
+        offlineView = findViewById(R.id.offline);
+        findViewById(R.id.retry).setOnClickListener(v -> {
+            offlineView.setVisibility(View.GONE);
+            web.reload();
+        });
         findViewById(R.id.unlock).setOnClickListener(v -> unlock());
 
         uploadPicker = registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), r -> {
@@ -119,6 +126,12 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onPageStarted(WebView v, String url, Bitmap icon) {
                 swipe.setRefreshing(false);
+            }
+
+            // the page itself failed (not a sub-resource): only then the native screen
+            @Override
+            public void onReceivedError(WebView v, WebResourceRequest r, WebResourceError e) {
+                if (r.isForMainFrame()) offlineView.setVisibility(View.VISIBLE);
             }
 
             @Override

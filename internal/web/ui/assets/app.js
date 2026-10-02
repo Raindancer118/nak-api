@@ -75,24 +75,56 @@ class ToolError extends Error {
 }
 
 async function post(tool, args, query = "", headers = {}) {
-  const res = await fetch(`/api/tools/${tool}${query}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...headers },
-    body: JSON.stringify(args),
-    credentials: "same-origin",
-  });
+  // the service worker answers from its cache after a few seconds; without
+  // one (first visit) a hanging connection must still end
+  const stop = new AbortController();
+  const timer = setTimeout(() => stop.abort(), 30_000);
+  let res;
+  try {
+    res = await fetch(`/api/tools/${tool}${query}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...headers },
+      body: JSON.stringify(args),
+      credentials: "same-origin",
+      signal: stop.signal,
+    });
+  } catch {
+    setOffline(true);
+    throw new ToolError("Offline: für diese Ansicht ist noch kein Stand gespeichert. Sobald wieder eine Verbindung da ist, lädt naknak sie.", { offline: true });
+  } finally {
+    clearTimeout(timer);
+  }
   if (res.status === 401) {
     location.href = "/login";
     throw new ToolError("nicht angemeldet");
   }
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new ToolError(body.error || `HTTP ${res.status}`, body);
-  if (res.headers.get("X-Naknak-Offline")) { body.offline = true; offline = true; }
+  if (res.headers.get("X-Naknak-Offline")) { body.offline = true; setOffline(true); } else setOffline(false);
   return body;
 }
 
 let offline = false;
-addEventListener("online", () => { offline = false; render(); });
+
+// the bar under the header: visible on every screen size, gone with the first fresh answer
+function setOffline(on) {
+  if (offline === on) return;
+  offline = on;
+  let bar = $(".offline-bar");
+  if (on && !bar) {
+    bar = h("div", { class: "offline-bar", role: "status" });
+    $(".top")?.after(bar);
+  }
+  if (bar) bar.hidden = !on;
+  stamp();
+}
+
+function fmtStamp(d) {
+  return dayDiff(d) === 0 ? fmtTime.format(d) + " Uhr" : `${fmtShort.format(d)}, ${fmtTime.format(d)} Uhr`;
+}
+
+addEventListener("online", () => render());
+addEventListener("offline", () => setOffline(true));
 
 function api(tool, args = {}, { wait = false } = {}) {
   const p = post(tool, args, fresh ? "?fresh=1" : wait ? "?wait=1" : "").then((body) => {
@@ -2581,6 +2613,8 @@ const routes = [
 ];
 
 function stamp() {
+  const bar = $(".offline-bar");
+  if (bar && offline) bar.textContent = newest ? `Offline · du siehst den Stand von ${fmtStamp(newest)}` : "Offline · keine Verbindung zu naknak";
   const el = $(".stamp");
   if (!el) return;
   el.classList.toggle("offline", offline);

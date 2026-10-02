@@ -88,4 +88,7 @@
         <item>kind</item>
         <item>full</item>
     </string-array>
+    <string name="offline_title">Keine Verbindung</string>
+    <string name="offline_body">naknak ist gerade nicht erreichbar, und auf diesem Gerät ist noch kein Stand gespeichert. Ist das Portal einmal geladen, zeigt die App ihn auch offline.</string>
+    <string name="offline_retry">Erneut versuchen</string>
 </resources>
