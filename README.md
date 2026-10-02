@@ -213,7 +213,7 @@ docker compose logs nak      # once: a login link with a fallback access key
 Open http://localhost:8080 and sign in with your NORDAKADEMIE account. The first account that signs in owns the instance; its login is checked against the CIS and stored in the data volume (`account.json`, readable only by naknak). No `.env` needed — or set `CIS_USER`/`CIS_PASS` there if you prefer.
 
 > [!IMPORTANT]
-> The port is bound to `127.0.0.1` on purpose. To reach naknak from elsewhere, put a TLS reverse proxy in front (Caddy, nginx, Traefik …) instead of opening the port. naknak sets `Secure` cookies and HSTS as soon as the proxy sends `X-Forwarded-Proto: https`.
+> The port is bound to `127.0.0.1` on purpose. To reach naknak from elsewhere, put a TLS reverse proxy in front (Caddy, nginx, Traefik …) instead of opening the port. naknak sets `Secure` cookies and HSTS as soon as the proxy sends `X-Forwarded-Proto: https`. Before an instance is reachable by others, set `NAK_OWNER` to your NAK username so nobody else can claim it first, and `NAK_TRUST_PROXY=1` so failed logins are counted per client, not per proxy.
 
 <details>
 <summary><b>What is stored where</b></summary>
@@ -307,6 +307,8 @@ Add it to your MCP client:
 | `NAK_WEB_TOKEN` | generated | fallback access key for the web UI and API (`Authorization: Bearer …`) |
 | `NAK_WEB_CACHE_TTL` | per tool | one freshness for all tools instead of the built-in per-tool values |
 | `NAK_WEB_UI_DIR` | embedded | serve the UI from a directory (UI development) |
+| `NAK_OWNER` | – | only this NAK username may claim a fresh instance (set it before exposing naknak) |
+| `NAK_TRUST_PROXY` | off | `1` = take the client address from `X-Forwarded-For` (behind your own reverse proxy) |
 | `EDUVAULT_URL`, `EDUVAULT_TOKEN`, `EDUVAULT_MCP_SECRET` | – | EduVault credential (same variables as the EduVault MCP; the web settings win) |
 
 The CIS session lives in `~/.config/cis-api/session.json` (0600) and is renewed automatically when it expires. PDF text uses Poppler's `pdftotext` when installed, a built-in extractor otherwise.

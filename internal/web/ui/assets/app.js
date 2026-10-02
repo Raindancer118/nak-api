@@ -1542,7 +1542,12 @@ async function settingsPage(root) {
   });
   const tData = tile("Deine Daten", { cls: "w12", i: 6 },
     h("p", { class: "empty", text: "Alles, was diese Instanz über dich gespeichert hat, als ZIP: Konto, Einstellungen, zwischengespeicherte Daten, Prüfungsverlauf, Benachrichtigungen, Protokoll verbindlicher Aktionen. Passwort und Schlüssel sind nicht enthalten." }),
-    h("div", { class: "row-actions" }, h("a", { class: "primary as-btn", href: "/api/export", text: "Daten exportieren" })),
+    h("div", { class: "row-actions" }, h("a", { class: "primary as-btn", href: "/api/export", text: "Daten exportieren" }),
+      h("button", { class: "ghost", type: "button", text: "Alle Geräte abmelden", title: "Neuer Zugangsschlüssel: jede Sitzung endet, auch diese", onclick: async () => {
+        await fetch("/api/sessions/revoke", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: "{}" });
+        navigator.serviceWorker?.controller?.postMessage("clear");
+        location.href = "/login";
+      } })),
     h("h2", { class: "sub", text: "Instanz zurücksetzen" }),
     h("p", { class: "empty", text: st.account?.source === "env"
       ? "Löscht Einstellungen, Zwischenspeicher, Verlauf, Downloads und die CIS-Sitzung. Das Konto selbst kommt aus Umgebungsvariablen und bleibt bestehen."

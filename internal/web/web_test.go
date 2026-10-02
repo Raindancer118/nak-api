@@ -706,3 +706,39 @@ func TestPWAFiles(t *testing.T) {
 		t.Fatalf("manifest: %d %q", res.StatusCode, res.Header.Get("Content-Type"))
 	}
 }
+
+func TestOwnerPinRefusesOtherAccounts(t *testing.T) {
+	t.Setenv("NAK_OWNER", "99999")
+	h, posts := accountHarness(t)
+	// valid NAK credentials, but not the pinned owner: no CIS round trip, no claim
+	res := h.accountLogin(t, "12345", "right")
+	b, _ := io.ReadAll(res.Body)
+	if res.StatusCode != 401 || h.app.AccountUser() != "" || posts.Load() != 0 || !strings.Contains(string(b), "anderen") {
+		t.Fatalf("pinned owner: %d owner=%q posts=%d", res.StatusCode, h.app.AccountUser(), posts.Load())
+	}
+}
+
+func TestRateLimitPerClientBehindTrustedProxy(t *testing.T) {
+	t.Setenv("NAK_TRUST_PROXY", "1")
+	h := newHarness(t)
+	try := func(ip, tok string) int {
+		req, _ := http.NewRequest("POST", h.srv.URL+"/login", strings.NewReader(url.Values{"token": {tok}}.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("X-Forwarded-For", ip+", 10.0.0.1")
+		res, err := noRedirect().Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		res.Body.Close()
+		return res.StatusCode
+	}
+	for i := 0; i < maxLoginFailures+1; i++ {
+		try("203.0.113.9", "wrong")
+	}
+	if c := try("203.0.113.9", token); c != http.StatusTooManyRequests {
+		t.Fatalf("attacker not locked: %d", c)
+	}
+	if c := try("198.51.100.4", token); c != http.StatusSeeOther {
+		t.Fatalf("owner locked out by someone else's failures: %d", c)
+	}
+}

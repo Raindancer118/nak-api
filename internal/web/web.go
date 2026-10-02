@@ -139,6 +139,7 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("GET /api/export", s.authed(http.HandlerFunc(s.export)))
 	mux.Handle("GET /api/version", s.authed(http.HandlerFunc(s.version)))
 	mux.Handle("POST /api/reset", s.authed(s.jsonOnly(s.reset)))
+	mux.Handle("POST /api/sessions/revoke", s.authed(s.jsonOnly(s.revokeSessions)))
 	mux.Handle("GET /metrics", s.authed(http.HandlerFunc(s.metrics)))
 	mux.Handle("POST /api/upload", s.authed(s.sameOriginOnly(s.upload)))
 	mux.Handle("GET /api/notifications", s.authed(http.HandlerFunc(s.notifications)))
@@ -276,7 +277,18 @@ func (s *Server) rootFile(name, ctype string) http.HandlerFunc {
 	}
 }
 
+// clientIP is the peer address; behind a reverse proxy (NAK_TRUST_PROXY=1)
+// the first X-Forwarded-For entry, so one client's failed logins do not lock
+// out everybody coming through the same proxy. Without the switch the header
+// is ignored — anyone could send it.
 func clientIP(r *http.Request) string {
+	if os.Getenv("NAK_TRUST_PROXY") == "1" {
+		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+			if ip := strings.TrimSpace(strings.Split(xff, ",")[0]); net.ParseIP(ip) != nil {
+				return ip
+			}
+		}
+	}
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
 		return r.RemoteAddr

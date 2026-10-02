@@ -106,6 +106,14 @@ func (s *Server) reset(w http.ResponseWriter, r *http.Request) {
 	s.history.reset()
 	s.stats.reset(s.cfg.Now())
 
+	s.rotateKey()
+	http.SetCookie(w, &http.Cookie{Name: cookieName, Value: "", Path: "/", MaxAge: -1, HttpOnly: true, Secure: secure(r), SameSite: http.SameSiteStrictMode})
+	writeJSON(w, http.StatusOK, map[string]any{"reset": true, "at": time.Now().Format(time.RFC3339)})
+}
+
+// rotateKey replaces the access key: every session cookie (they are derived
+// from it) and every Bearer use of the old key stop working at once.
+func (s *Server) rotateKey() {
 	b := make([]byte, 32)
 	rand.Read(b)
 	tok := base64.RawURLEncoding.EncodeToString(b)
@@ -113,8 +121,12 @@ func (s *Server) reset(w http.ResponseWriter, r *http.Request) {
 	s.cfg.Token = tok
 	s.tokenMu.Unlock()
 	if os.Getenv("NAK_WEB_TOKEN") == "" {
-		os.WriteFile(filepath.Join(dir, tokenFile), []byte(tok+"\n"), 0o600)
+		os.WriteFile(filepath.Join(s.app.ConfigDir, tokenFile), []byte(tok+"\n"), 0o600)
 	}
+}
+
+func (s *Server) revokeSessions(w http.ResponseWriter, r *http.Request) {
+	s.rotateKey()
 	http.SetCookie(w, &http.Cookie{Name: cookieName, Value: "", Path: "/", MaxAge: -1, HttpOnly: true, Secure: secure(r), SameSite: http.SameSiteStrictMode})
-	writeJSON(w, http.StatusOK, map[string]any{"reset": true, "at": time.Now().Format(time.RFC3339)})
+	writeJSON(w, http.StatusOK, map[string]any{"revoked": true})
 }

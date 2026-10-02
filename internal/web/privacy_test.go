@@ -87,3 +87,35 @@ func mapValues(m map[string]string) []string {
 	}
 	return out
 }
+
+func TestLogoutEverywhereRotatesTheKey(t *testing.T) {
+	h := newHarness(t)
+	h.app.ConfigDir = t.TempDir()
+	login := h.do(t, "GET", "/login", "", nil)
+	login.Body.Close()
+	res := h.login(t, token)
+	var cookie *http.Cookie
+	for _, c := range res.Cookies() {
+		if c.Name == cookieName {
+			cookie = c
+		}
+	}
+	req, _ := http.NewRequest("POST", h.srv.URL+"/api/sessions/revoke", strings.NewReader("{}"))
+	req.Header.Set("Content-Type", "application/json")
+	req.AddCookie(cookie)
+	r2, err := http.DefaultClient.Do(req)
+	if err != nil || r2.StatusCode != 200 {
+		t.Fatalf("revoke: %v %v", r2, err)
+	}
+	r2.Body.Close()
+	req, _ = http.NewRequest("GET", h.srv.URL+"/api/tools", nil)
+	req.AddCookie(cookie)
+	r3, _ := http.DefaultClient.Do(req)
+	r3.Body.Close()
+	if r3.StatusCode != 401 {
+		t.Fatalf("old session still valid: %d", r3.StatusCode)
+	}
+	if res := h.do(t, "GET", "/api/tools", "", bearer); res.StatusCode != 401 {
+		t.Fatalf("old key still valid: %d", res.StatusCode)
+	}
+}
