@@ -419,34 +419,101 @@ async function overview(root) {
 // ── week ────────────────────────────────────────────────────────────────────
 
 async function week(root) {
-  root.append(h("div", { class: "page-head" }, h("h1", {}, "Woche", h("small", { text: "Vorlesungen, Klausuren und Moodle-Fristen der nächsten 14 Tage" }))));
+  let view = localStorage.getItem("nak-week-view") || (innerWidth < 760 ? "liste" : "raster");
+  const seg = h("div", { class: "filters", role: "group", "aria-label": "Ansicht" });
+  root.append(h("div", { class: "page-head" }, h("h1", {}, "Woche", h("small", { text: "Vorlesungen, Klausuren und Moodle-Fristen der nächsten 14 Tage" })), seg));
   const box = h("div", { class: "days" }, skeleton(), skeleton());
   root.append(box);
+  let data;
+  const draw = () => {
+    seg.replaceChildren(...[["raster", "Raster"], ["liste", "Liste"]].map(([k, label]) => h("button", { type: "button", "aria-pressed": k === view ? "true" : "false", text: label, onclick: () => {
+      view = k;
+      localStorage.setItem("nak-week-view", k);
+      draw();
+    } })));
+    if (!data) return;
+    const days = data.days || [];
+    if (!days.length) return box.replaceChildren(emptyRow("In den nächsten 14 Tagen steht nichts an."));
+    box.className = view === "raster" ? "week-grid-wrap" : "days";
+    box.replaceChildren(...(view === "raster" ? [weekGrid(days)] : weekList(days)));
+    if (data.unavailable_sources) box.prepend(errorBox(new Error(`Nicht erreichbar: ${Object.keys(data.unavailable_sources).join(", ")}`)));
+  };
+  draw();
   try {
-    const a = await api("nak_agenda", { days: 14 });
-    const days = a.days || [];
-    if (!days.length) {
-      box.replaceChildren(emptyRow("In den nächsten 14 Tagen steht nichts an."));
-      return;
-    }
-    box.replaceChildren(...days.map((d) => {
-      const day = parseDE(d.date);
-      const diff = day ? dayDiff(day) : 99;
-      return h("section", { class: `day ${diff === 0 ? "today" : ""}` },
-        h("h3", {}, day ? fmtDay.format(day).split(",")[0] : d.date, h("span", { text: day ? `${day.getDate()}.${day.getMonth() + 1}.` : "" })),
-        h("ul", { class: "rows" }, (d.events || []).map((e) => {
-          const src = srcOf(e.source);
-          return h("li", {}, h("div", { class: "row" },
-            h("span", { class: "time" }, e.start, e.end && e.end !== e.start && h("small", { text: e.end })),
-            h("span", { class: "dot", "data-src": src }),
-            h("span", { class: "t" }, e.title, h("span", { class: "s", text: [e.module_nr, e.room, e.lecturer].filter(Boolean).join(" · ") })),
-            h("span", { class: `chip ${src}`, text: e.kind || srcName[src] })));
-        })));
-    }));
-    if (a.unavailable_sources) box.prepend(errorBox(new Error(`Nicht erreichbar: ${Object.keys(a.unavailable_sources).join(", ")}`)));
+    data = await api("nak_agenda", { days: 14 });
+    draw();
   } catch (err) {
     box.replaceChildren(errorBox(err));
   }
+}
+
+function eventHref(e) {
+  const nr = firstNr(e.module_nr);
+  if (nr) return `#/modul/${nr}`;
+  return srcOf(e.source) === "moodle" ? "#/abgaben" : null;
+}
+
+function weekList(days) {
+  return days.map((d) => {
+    const day = parseDE(d.date);
+    const diff = day ? dayDiff(day) : 99;
+    return h("section", { class: `day ${diff === 0 ? "today" : ""}` },
+      h("h3", {}, day ? fmtDay.format(day).split(",")[0] : d.date, h("span", { text: day ? `${day.getDate()}.${day.getMonth() + 1}.` : "" })),
+      h("ul", { class: "rows" }, (d.events || []).map((e) => {
+        const src = srcOf(e.source);
+        const href = eventHref(e);
+        const kids = [
+          h("span", { class: "time" }, e.start, e.end && e.end !== e.start && h("small", { text: e.end })),
+          h("span", { class: "dot", "data-src": src }),
+          h("span", { class: "t" }, e.title, h("span", { class: "s", text: [e.module_nr, e.room, e.lecturer].filter(Boolean).join(" · ") })),
+          h("span", { class: `chip ${e.kind === "Klausur" ? "due" : src}`, text: e.kind || srcName[src] })];
+        return h("li", {}, href ? h("a", { class: "row", href }, kids) : h("div", { class: "row" }, kids));
+      })));
+  });
+}
+
+// weekGrid: days as columns, 07–21 h as rows, events positioned by time.
+function weekGrid(days) {
+  const H0 = 7, H1 = 21;
+  const span = (H1 - H0) * 60;
+  const minutes = (hhmm) => { const [hh, mm] = String(hhmm).split(":").map(Number); return (hh * 60 + mm) - H0 * 60; };
+  const today = startOfDay(new Date());
+  // seven days from today; weekend days only when something is on
+  const byDate = new Map(days.map((d) => [isoDate(parseDE(d.date) || today), d.events || []]));
+  const cols = [];
+  for (let i = 0; i < 14 && cols.length < 7; i++) {
+    const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() + i);
+    const evs = byDate.get(isoDate(d)) || [];
+    const weekend = d.getDay() === 0 || d.getDay() === 6;
+    if (weekend && !evs.length) continue;
+    cols.push({ d, evs });
+  }
+  const hours = h("div", { class: "wg-hours" }, Array.from({ length: H1 - H0 + 1 }, (_, i) => h("span", { vars: { "--t": i / (H1 - H0) }, text: `${H0 + i}` })));
+  const grid = h("div", { class: "week-grid", lang: "de", vars: { "--cols": cols.length } }, hours, cols.map(({ d, evs }, j) => {
+    const isToday = isoDate(d) === isoDate(today);
+    const col = h("div", { class: `wg-col ${isToday ? "today" : ""} ${d < today ? "past" : ""}`, vars: { "--j": j } },
+      h("div", { class: "wg-head" }, h("span", { text: wd[d.getDay()] }), h("b", { text: d.getDate() })),
+      h("div", { class: "wg-body" }, evs.map((e, k) => {
+        const src = srcOf(e.source);
+        // things outside 07–21 (a 23:59 deadline) sit at the edge, not off-grid
+        const top = Math.min(span - 75, Math.max(0, minutes(e.start))) / span;
+        const len = e.end && e.end !== e.start ? Math.max(20, minutes(e.end) - minutes(e.start)) / span : 0;
+        const href = eventHref(e);
+        const props = { class: `wg-ev ${len ? "" : "due-mark"} ${e.kind === "Klausur" ? "exam" : ""}`, "data-src": src, title: [e.start, e.end && e.end !== e.start && `– ${e.end}`, e.title, e.room].filter(Boolean).join(" "), vars: { "--top": top, "--len": len, "--k": k } };
+        const inner = [h("b", { text: e.title }), h("span", { text: [e.start + (len ? `–${e.end}` : ""), e.room].filter(Boolean).join(" · ") })];
+        return href ? h("a", { ...props, href }, inner) : h("div", props, inner);
+      }),
+      isToday && h("span", { class: "wg-now", vars: { "--top": Math.min(1, Math.max(0, ((new Date().getHours() - H0) * 60 + new Date().getMinutes()) / span)) } })));
+    return col;
+  }));
+  // the now line moves with the clock
+  const tick = setInterval(() => {
+    const line = grid.querySelector(".wg-now");
+    if (!line || !document.body.contains(grid)) return clearInterval(tick);
+    const n = new Date();
+    line.style.setProperty("--top", Math.min(1, Math.max(0, ((n.getHours() - H0) * 60 + n.getMinutes()) / span)));
+  }, 60_000);
+  return grid;
 }
 
 // ── grades ──────────────────────────────────────────────────────────────────

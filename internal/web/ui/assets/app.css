@@ -1209,3 +1209,44 @@ h2.sub { margin: 1rem 0 .4rem; }
 .danger-row { align-items: center; }
 .danger-row .cal-url { max-width: 14rem; }
 a.primary.as-btn { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
+
+/* ── week grid ──────────────────────────────────────────── */
+
+.week-grid-wrap { overflow-x: auto; padding-bottom: .5rem; }
+.week-grid {
+  --hour: 3.2rem;
+  display: grid;
+  grid-template-columns: 2.4rem repeat(var(--cols), minmax(9rem, 1fr));
+  gap: .4rem;
+  min-width: calc(2.4rem + var(--cols) * 9.4rem);
+}
+.wg-hours { position: relative; margin-top: 3.2rem; height: calc(var(--hour) * 14); }
+.wg-hours span { position: absolute; right: .3rem; top: calc(var(--t) * 100%); translate: 0 -50%; font-size: .72rem; color: var(--dim); }
+.wg-col { display: grid; grid-template-rows: 3.2rem auto; animation: rise .6s var(--spring) both; animation-delay: calc(var(--j, 0) * 45ms); }
+.wg-col.past { opacity: .55; }
+.wg-head { display: flex; align-items: baseline; justify-content: center; gap: .4rem; color: var(--dim); font-size: .82rem; }
+.wg-head b { color: var(--ink); font-size: 1.25rem; font-weight: 600; }
+.wg-col.today .wg-head b { color: var(--bg); background: var(--ink); border-radius: 8px; padding: 0 .45rem; }
+.wg-body {
+  position: relative; height: calc(var(--hour) * 14); border-radius: 12px;
+  background:
+    repeating-linear-gradient(to bottom, var(--line) 0 1px, transparent 1px var(--hour)),
+    var(--tile);
+  border: 1px solid var(--line);
+}
+.wg-ev {
+  position: absolute; left: 4px; right: 4px; top: calc(var(--top) * 100%); height: max(2.2rem, calc(var(--len) * 100%));
+  border-radius: 9px; padding: .35rem .5rem; overflow: hidden; text-decoration: none;
+  background: color-mix(in oklab, var(--src, var(--cis)) 18%, var(--tile));
+  border-left: 3px solid var(--src, var(--cis));
+  display: grid; align-content: start; gap: .1rem;
+  animation: rise .5s var(--spring) both; animation-delay: calc(200ms + var(--k, 0) * 40ms);
+  transition: translate .3s var(--spring), box-shadow .2s;
+}
+a.wg-ev:hover { translate: 0 -1px; box-shadow: 0 6px 18px -8px #0007; z-index: 2; }
+.wg-ev b { font-size: .8rem; font-weight: 600; color: var(--ink); line-height: 1.2; hyphens: auto; overflow-wrap: break-word; }
+.wg-ev span { font-size: .7rem; color: var(--text); }
+.wg-ev.exam { --src: var(--due); }
+.wg-ev.due-mark { height: auto; left: 38%; z-index: 1; border-left: 0; border-top: 2px solid var(--src); border-radius: 0 0 9px 9px; padding-top: .25rem; background: color-mix(in oklab, var(--src) 10%, var(--tile)); }
+.wg-now { position: absolute; left: -3px; right: 0; top: calc(var(--top) * 100%); height: 2px; background: var(--bad); z-index: 3; transition: top 1s linear; }
+.wg-now::before { content: ""; position: absolute; left: -2px; top: -4px; width: 10px; height: 10px; border-radius: 50%; background: var(--bad); }
