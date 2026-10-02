@@ -73,13 +73,18 @@ public class NotifyWorker extends Worker {
 
     static void post(Context c, Inbox.Item n) {
         if (!allowed(c)) return;
-        boolean details = Prefs.notifyDetails(c);
-        String title = details ? n.title : c.getString(R.string.notify_generic);
-        String body = details ? n.body : c.getString(R.string.notify_open);
-        // lock screen: never the grade or the message text
+        String mode = Prefs.notifyContent(c);
+        String kindTitle = LockScreen.title(n.kind, LockScreen.KIND);
+        String safeTitle = kindTitle != null ? kindTitle : c.getString(R.string.notify_generic);
+        boolean full = LockScreen.showsAll(mode);
+        // the notification itself carries only what the owner chose: Android
+        // shows content on the lock screen unless hidden system-wide
+        String title = full ? n.title : LockScreen.KIND.equals(mode) ? safeTitle : c.getString(R.string.notify_generic);
+        String body = full ? n.body : c.getString(R.string.notify_open);
+        // where the system does hide sensitive content, "what happened" is still shown
         Notification pub = new NotificationCompat.Builder(c, channel(n.kind))
             .setSmallIcon(R.drawable.ic_stat_duck)
-            .setContentTitle(c.getString(R.string.notify_generic))
+            .setContentTitle(LockScreen.GENERIC.equals(mode) ? c.getString(R.string.notify_generic) : safeTitle)
             .setContentText(c.getString(R.string.notify_open))
             .build();
         NotificationCompat.Builder b = new NotificationCompat.Builder(c, channel(n.kind))

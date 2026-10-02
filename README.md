@@ -269,7 +269,7 @@ The naknak app for Android is your portal in your pocket, plus what a browser ta
 
 <img alt="naknak on Android: overview in light and dark, the inbox a notification opens, the home screen widgets (made-up data)" src="docs/readme/android/screens.webp" width="100%">
 
-- **Notifications** for new grades, messages, Moodle news and deadlines, straight from naknak's watcher (no CIS call of its own). The lock screen only ever says "Neues in naknak".
+- **Notifications** for new grades, messages, Moodle news and deadlines, straight from naknak's watcher (no CIS call of its own, no ntfy needed). You choose what they say, which is also what the lock screen shows: only "Neues in naknak", what happened ("Neue Note verfügbar!", the default) or everything including the grade.
 - **Two widgets:** what's next today with the nearest deadlines, and your grade average (an eye hides it; with the app lock on it never shows).
 - **App lock** with fingerprint or device PIN, which also blocks screenshots and the recents preview.
 - **Feels native:** downloads with your session, shortcuts for week, courses, inbox and grades, pull to refresh, light and dark.

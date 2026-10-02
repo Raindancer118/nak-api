@@ -10,6 +10,7 @@ final class Prefs {
     static final String LOCK = "lock";
     static final String NOTIFY = "notify";
     static final String NOTIFY_DETAILS = "notify_details";
+    static final String LOCK_SCREEN = "lock_screen";
     static final String INBOX = "inbox_state";
     static final String WIDGET_JSON = "widget_cache";
     static final String GRADE_HIDDEN = "grade_hidden";
@@ -32,7 +33,15 @@ final class Prefs {
         return of(c).getBoolean(NOTIFY, true);
     }
 
-    static boolean notifyDetails(Context c) {
-        return of(c).getBoolean(NOTIFY_DETAILS, true);
+    /**
+     * What notifications say. Android shows a notification's content on the
+     * lock screen unless the owner hides sensitive content system-wide, so
+     * this is decided when posting. Older installs had a details switch.
+     */
+    static String notifyContent(Context c) {
+        SharedPreferences p = of(c);
+        if (p.contains(LOCK_SCREEN)) return p.getString(LOCK_SCREEN, LockScreen.KIND);
+        return p.getBoolean(NOTIFY_DETAILS, true) ? LockScreen.KIND : LockScreen.GENERIC;
     }
+
 }

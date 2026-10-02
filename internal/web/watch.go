@@ -172,6 +172,7 @@ func (w *watcher) runDue() {
 // path deserve a showcase: one invented event shortly after start, then one
 // every 20 minutes.
 var demoEvents = []Notification{
+	{Kind: "grade", Title: "Neue Note: Rechnernetze 1,7", Body: "bestanden", URL: "#/noten"},
 	{Kind: "moodle", Title: "Neue Bewertung in Übungsblatt 3", Body: "I160_I24 · Datenbanksysteme", URL: "#/neu"},
 	{Kind: "message", Title: "Neue Nachricht: Prof. Jonas Brandt", Body: "Die Übung am Freitag fällt aus.", URL: "#/nachrichten"},
 	{Kind: "news", Title: "Neu in I151_I24: Ankündigungen", Body: "2 neue Beiträge", URL: "#/kurs/2101"},

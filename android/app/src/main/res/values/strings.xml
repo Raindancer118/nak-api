@@ -18,7 +18,7 @@
     <string name="ch_deadlines">Fristen</string>
     <string name="ch_news">Neues in Moodle</string>
     <string name="notify_generic">Neues in naknak</string>
-    <string name="notify_open">Öffne naknak für Details.</string>
+    <string name="notify_open">Tippen zum Ansehen.</string>
     <string name="login_expired">Anmeldung abgelaufen</string>
     <string name="login_expired_body">Öffne naknak einmal, damit Benachrichtigungen und Widget weiterlaufen.</string>
 
@@ -47,8 +47,6 @@
     <string name="pref_notify_cat">Benachrichtigungen</string>
     <string name="pref_notify">Neues melden</string>
     <string name="pref_notify_summary">Noten, Nachrichten, Moodle, Fristen (alle 15 Minuten aus naknaks Speicher, ohne CIS-Abruf)</string>
-    <string name="pref_details">Details anzeigen</string>
-    <string name="pref_details_summary">Sonst nur „Neues in naknak“. Auf dem Sperrbildschirm nie Details.</string>
     <string name="pref_check">Jetzt prüfen</string>
     <string name="pref_about">Über</string>
     <string name="pref_version">Version</string>
@@ -70,7 +68,7 @@
     <string name="grade_locked">App-Sperre an: Noten nur in der App.</string>
     <string name="grade_credits">%1$s Credits</string>
     <string name="pref_grade_widget">Notenschnitt-Widget hinzufügen</string>
-    <string name="pref_grade_widget_summary">Durchschnitt, Credits und letzte Note</string>
+    <string name="pref_grade_widget_summary">Durchschnitt und Credits</string>
     <string name="preview_next_title">Softwaretechnik</string>
     <string name="preview_next_detail">09:00–12:15 · A 101</string>
     <string name="preview_next_row">morgen · Übungsblatt 4</string>
@@ -79,4 +77,15 @@
     <string name="widget_error">Nicht aktualisiert: %1$s</string>
     <string name="check_done">Geprüft: alles aktuell.</string>
     <string name="check_failed">Geprüft, aber: %1$s</string>
+    <string name="pref_lock_screen">Inhalt der Benachrichtigungen (auch Sperrbildschirm)</string>
+    <string-array name="lock_screen_names">
+        <item>Nur „Neues in naknak“</item>
+        <item>Was passiert ist („Neue Note verfügbar!“)</item>
+        <item>Alles, auch Note und Nachrichtentext</item>
+    </string-array>
+    <string-array name="lock_screen_values" translatable="false">
+        <item>generic</item>
+        <item>kind</item>
+        <item>full</item>
+    </string-array>
 </resources>

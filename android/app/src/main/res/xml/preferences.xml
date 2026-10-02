@@ -9,7 +9,8 @@
     </PreferenceCategory>
     <PreferenceCategory app:title="@string/pref_notify_cat" app:iconSpaceReserved="false">
         <SwitchPreferenceCompat app:key="notify" app:defaultValue="true" app:title="@string/pref_notify" app:summary="@string/pref_notify_summary" app:iconSpaceReserved="false" />
-        <SwitchPreferenceCompat app:key="notify_details" app:defaultValue="true" app:dependency="notify" app:title="@string/pref_details" app:summary="@string/pref_details_summary" app:iconSpaceReserved="false" />
+        <ListPreference app:key="lock_screen" app:defaultValue="kind" app:dependency="notify" app:title="@string/pref_lock_screen"
+            app:entries="@array/lock_screen_names" app:entryValues="@array/lock_screen_values" app:useSimpleSummaryProvider="true" app:iconSpaceReserved="false" />
         <Preference app:key="check_now" app:title="@string/pref_check" app:iconSpaceReserved="false" />
     </PreferenceCategory>
     <PreferenceCategory app:key="home_cat" app:title="@string/pref_home" app:iconSpaceReserved="false">
