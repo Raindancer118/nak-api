@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/Raindancer118/nak-api/internal/app"
+	"github.com/Raindancer118/nak-api/internal/thesis"
 	"github.com/Raindancer118/nak-api/internal/tools"
 	"github.com/Raindancer118/nak-api/internal/transfer"
 )
@@ -478,7 +479,13 @@ func Registry() *tools.Registry {
 			for _, x := range demoTransfers() {
 				list = append(list, transfer.Report{No: fmt.Sprint(x["no"]), Abgabedatum: fmt.Sprint(x["abgabedatum"]), Wertung: fmt.Sprint(x["wertung"])})
 			}
-			return transfer.BuildPlan("Angewandte Informatik (B.Sc.)", "I24a", nil, list, a.Now().In(a.Zone)), nil
+			plan := transfer.BuildPlan("Angewandte Informatik (B.Sc.)", "I24a", nil, list, a.Now().In(a.Zone))
+			if aid, ok := demoThesis(a)["planning_aid"].(thesis.PlanningAid); ok {
+				if to, err := time.ParseInLocation("02.01.2006", aid.LatestRegisterTo, a.Zone); err == nil {
+					plan.ThesisRegisterUntil, plan.ThesisRegisterBy = aid.LatestRegisterTo, to.AddDate(0, 0, -7*thesis.TLWeeks).Format("02.01.2006")
+				}
+			}
+			return plan, nil
 		}),
 		read("cis_transfer_bewertung", "Demo-Bewertung", func(*app.App, tools.Args) (any, error) {
 			return map[string]any{"kriterien": []map[string]any{{"kriterium": "Problemstellung", "note": "1,7", "gewichtung": "20 %"}, {"kriterium": "Methodik", "note": "2,0", "gewichtung": "40 %"}, {"kriterium": "Form", "note": "1,3", "gewichtung": "40 %"}}, "gesamt": "1,7"}, nil
@@ -539,6 +546,27 @@ func Registry() *tools.Registry {
 				item("6598", "2", "Auswahl einer CI/CD-Plattform", "Praxis der Softwareentwicklung (I143)", "I143", 1.75),
 			}, "average": "1,98", "final": "1,9", "count": 2, "note": transfer.GradesNote}, nil
 		}),
+		read("nak_thesis", "Demo-Bachelorthesis", func(a *app.App, _ tools.Args) (any, error) { return demoThesis(a), nil }),
+		&tools.Tool{Name: "nak_thesis_calc", Kind: tools.Read, Desc: "Demo-Rechner", Params: []tools.Param{{Name: "start"}, {Name: "registration"}},
+			Run: func(a *app.App, args tools.Args) (any, error) {
+				qs, ds := demoThesisDates(a)
+				if s := args.Str("start"); s != "" {
+					t, err := time.ParseInLocation("2006-01-02", s, a.Zone)
+					if err != nil {
+						return nil, err
+					}
+					return thesis.Calc(t, qs, ds), nil
+				}
+				t, err := time.ParseInLocation("2006-01-02", args.Str("registration"), a.Zone)
+				if err != nil {
+					return nil, fmt.Errorf("start oder registration angeben (YYYY-MM-DD)")
+				}
+				return thesis.Calc(thesis.StartFor(t), qs, ds), nil
+			}},
+		&tools.Tool{Name: "nak_thesis_reviewers", Kind: tools.Read, Desc: "Demo-Gutachtende", Params: []tools.Param{{Name: "query"}},
+			Run: func(a *app.App, args tools.Args) (any, error) {
+				return thesis.FilterReviewers(demoReviewers(), args.Str("query")), nil
+			}},
 		read("cis_status", "Demo-Status", func(*app.App, tools.Args) (any, error) {
 			return map[string]any{"name": "Max Mustermann", "zenturie": "I24a", "studiengang": "Angewandte Informatik (B.Sc.)"}, nil
 		}),
@@ -613,5 +641,74 @@ func demoTransfers() []map[string]any {
 		{"id": "6597", "no": "1", "abgabedatum": "30.09.2025", "topic": "Kennzahlen für den Service Desk", "module": "Allgemeine Betriebswirtschaftslehre (I169)", "wertung": "bestanden", "versuch": "1", "status": "bewertet"},
 		{"id": "6598", "no": "2", "abgabedatum": "10.05.2026", "topic": "Auswahl einer CI/CD-Plattform", "module": "Praxis der Softwareentwicklung (I143)", "wertung": "bestanden", "versuch": "1", "status": "bewertet"},
 		{"id": "6602", "no": "3", "abgabedatum": "09.10.2026", "korrekturfrist": "06.11.2026", "topic": "Datenqualität im Betrieb", "module": "Datenbanksysteme (I160)", "wertung": "", "versuch": "1", "status": "angemeldet"},
+	}
+}
+
+// demoThesisDates: typical NORDAKADEMIE quarters and graduation deadlines
+// around now, so the thesis tools compute real dates for the demo student.
+func demoThesisDates(a *app.App) ([]thesis.Quarter, []thesis.Deadline) {
+	var qs []thesis.Quarter
+	var ds []thesis.Deadline
+	y0 := a.Now().In(a.Zone).Year() - 1
+	at := func(y, m, d int) time.Time { return time.Date(y, time.Month(m), d, 0, 0, 0, 0, a.Zone) }
+	for y := y0; y <= y0+4; y++ {
+		yy := fmt.Sprintf("%02d", y%100)
+		qs = append(qs, thesis.Quarter{Name: "I/" + yy, From: at(y, 1, 10), To: at(y, 3, 18)}, thesis.Quarter{Name: "II/" + yy, From: at(y, 4, 15), To: at(y, 6, 20)},
+			thesis.Quarter{Name: "III/" + yy, From: at(y, 7, 28), To: at(y, 10, 3)}, thesis.Quarter{Name: "IV/" + yy, From: at(y, 10, 13), To: at(y, 12, 19)})
+		ds = append(ds, thesis.Deadline{Name: "März " + fmt.Sprint(y), LastGrades: at(y, 3, 24), Board: at(y, 3, 31), Ceremony: fmt.Sprintf("Bachelor-Graduierung: 16.04.%d", y)},
+			thesis.Deadline{Name: "Juni " + fmt.Sprint(y), LastGrades: at(y, 6, 1), Board: at(y, 6, 8)},
+			thesis.Deadline{Name: "September " + fmt.Sprint(y), LastGrades: at(y, 9, 23), Board: at(y, 9, 30)},
+			thesis.Deadline{Name: "November " + fmt.Sprint(y), LastGrades: at(y, 11, 17), Board: at(y, 11, 24)})
+	}
+	return qs, ds
+}
+
+// demoThesis: cohort 2024 (Zenturie I24a) graduates in March three and a half
+// years later; the planning aid is derived the way the CIS publishes it.
+func demoThesis(a *app.App) map[string]any {
+	qs, ds := demoThesisDates(a)
+	gy := 2028
+	var target thesis.Deadline
+	for _, d := range ds {
+		if d.Name == fmt.Sprintf("März %d", gy) {
+			target = d
+		}
+	}
+	l := thesis.Latest(target, qs, ds)
+	earliestReg := time.Date(gy-1, 10, 9, 0, 0, 0, 0, a.Zone)
+	aid := thesis.PlanningAid{Found: true, Cohort: "2024", EarliestRegistration: earliestReg.Format("02.01.2006"),
+		EarliestStart: thesis.StartFor(earliestReg).Format("02.01.2006"), Semester7From: fmt.Sprintf("25.10.%d", gy-1), Semester7To: fmt.Sprintf("12.11.%d", gy-1),
+		LatestRegisterKW: fmt.Sprint(l.KW), LatestRegisterFrom: l.RegisterWeekFrom, LatestRegisterTo: l.RegisterWeekTo, LatestStart: l.Start, LatestSubmission: l.Submission,
+		RepeatFrom: fmt.Sprintf("24.01.%d", gy), RepeatTo: fmt.Sprintf("04.02.%d", gy), LastGrades: target.LastGrades.Format("02.01.2006"), Board: target.Board.Format("02.01.2006"), Ceremony: fmt.Sprintf("16.04.%d", gy)}
+	now := a.Now().In(a.Zone)
+	latest := []map[string]any{}
+	for _, d := range ds {
+		x := thesis.Latest(d, qs, ds)
+		to, _ := time.ParseInLocation("02.01.2006", x.RegisterWeekTo, a.Zone)
+		if !x.Found || to.Before(now) || len(latest) >= 5 {
+			continue
+		}
+		latest = append(latest, map[string]any{"latest": x, "reachable": !to.Before(earliestReg)})
+	}
+	return map[string]any{
+		"eligibility":  thesis.Eligibility{Known: true, Reasons: []string{"Es wurden nicht alle benötigten Transferleistungen bestanden."}},
+		"planning_aid": aid, "latest": latest,
+		"transfer": map[string]any{"t1_5_passed": 2, "t6": "offen"},
+		"rules":    map[string]any{"months": thesis.Months, "extension_weeks": thesis.ExtensionWeeks, "review_lecture_weeks": thesis.ReviewWeeks, "start_after_weeks": thesis.StartAfterWeeks, "tl_weeks": thesis.TLWeeks},
+	}
+}
+
+func demoReviewers() []thesis.Reviewer {
+	r := func(name, dept string, load int, areas ...string) thesis.Reviewer {
+		return thesis.Reviewer{Name: name, Email: strings.ToLower(strings.ReplaceAll(strings.Split(name, ", ")[1]+"."+strings.Split(name, ", ")[0], " ", "")) + "@nordakademie.example",
+			Department: dept, Areas: areas, Load: load, LoadLabel: map[int]string{0: "frei", 1: "mittel", 2: "voll"}[load]}
+	}
+	return []thesis.Reviewer{
+		r("Brandt, Jonas", "Informatik", 0, "Datenbanksysteme", "Data Engineering", "Softwarearchitektur"),
+		r("Lindqvist, Ada", "Informatik", 1, "Softwaretechnik", "Agile Methoden", "Testautomatisierung"),
+		r("Okafor, Mira", "Informatik", 0, "Diskrete Mathematik", "Kryptographie", "IT-Sicherheit"),
+		r("Varga, Ilse", "Informatik", 2, "Rechnernetze", "Cloud Computing", "DevOps"),
+		r("Weiss, Hanna", "Wirtschaftswissenschaften", 0, "Wissenschaftliches Arbeiten", "Projektmanagement", "Change Management"),
+		r("Engel, Paul", "Informatik, Wirtschaftswissenschaften", 0, "Betriebliche Anwendungssysteme", "ERP-Systeme", "Prozessmanagement"),
 	}
 }

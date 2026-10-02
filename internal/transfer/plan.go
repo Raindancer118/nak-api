@@ -69,7 +69,10 @@ type Plan struct {
 	Next             *PlanSlot  `json:"next,omitempty"`
 	ThesisFrom       string     `json:"thesis_from,omitempty"`        // ideal start of the bachelor thesis
 	ThesisRegisterBy string     `json:"thesis_register_by,omitempty"` // latest start of the last of T1–T5 for it
-	Source           string     `json:"source"`
+	// latest registration of the thesis it is measured against (planning aid
+	// of the cohort or computed for the next bachelor graduation)
+	ThesisRegisterUntil string `json:"thesis_register_until,omitempty"`
+	Source              string `json:"source"`
 }
 
 var cohortRe = regexp.MustCompile(`(\d{2})`)

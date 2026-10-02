@@ -453,6 +453,7 @@ async function overview(root) {
     moodle: (i) => { const t = tile("Moodle · aktuelle Kurse", { cls: "w12", i, link: ["Alle Kurse", "#/kurse"] }); fill(t, () => Promise.all([dash, api("moodle_courses", { classification: "current" })]), moodleSummary); return t; },
     messages: (i) => { const t = tile("Nachrichten", { cls: "half", i, link: ["Inbox", "#/nachrichten"] }); fill(t, () => api("moodle_conversations", { limit: 4 }), messageRows); return t; },
     transfer: (i) => { const t = tile("Transferleistungen", { cls: "half", i, link: ["Alle", "#/transferleistungen"] }); fill(t, () => Promise.all([api("cis_list_transfer"), api("nak_transfer_plan").catch(() => null)]), ([list, plan]) => transferOverview(list, plan)); return t; },
+    thesis: (i) => { const t = tile("Bachelorthesis", { cls: "half", i, link: ["Alles", "#/bachelorthesis"] }); fill(t, () => api("nak_thesis"), thesisSummary); return t; },
     transfer_grades: (i) => { const t = tile("TL-Noten · rechnerisch", { cls: "half", i, link: ["Details", "#/transferleistungen"] }); fill(t, () => api("nak_transfer_grades"), (g) => transferGradeSummary(g, 4)); return t; },
     pending: (i) => { const t = tile("Noten ausstehend", { cls: "half", i, link: ["Prüfungen", "#/pruefungen"] }); fill(t, loadPending, (p) => pendingRows(p) || emptyRow("Keine Note offen.")); return t; },
   };
@@ -2530,8 +2531,10 @@ function tlAdvice(plan, st, list) {
     out.push(h("p", { class: "empty" }, h("b", { text: `Als Nächstes T${n.no}: ` }),
       asap ? `so bald wie möglich anmelden (die Praxisphase ${n.phase} ${n.state === "behind" ? "ist vorbei" : "reicht für die 9 Wochen nicht mehr ganz"}).` : `spätestens bis ${n.register_by} anmelden, um in der Praxisphase ${n.phase} fertig zu werden.`));
   }
-  if (!st.thesisOK && plan.thesis_from) {
-    out.push(h("p", { class: "empty" }, `Für die Bachelorthesis ab ${plan.thesis_from} brauchst du T1–T5 bestanden (${st.forThesis} von 5): die letzte davon spätestens am ${plan.thesis_register_by} beginnen.`));
+  if (!st.thesisOK && plan.thesis_register_by) {
+    out.push(h("p", { class: "empty" }, "Für die ", h("a", { href: "#/bachelorthesis", text: "Bachelorthesis" }),
+      plan.thesis_register_until ? ` (Anmeldung spätestens bis ${plan.thesis_register_until})` : "",
+      ` müssen T1–T5 bei der Anmeldung bestanden sein (${st.forThesis} von 5): die letzte davon spätestens am ${plan.thesis_register_by} beginnen.`));
   }
   return out;
 }
@@ -2573,6 +2576,161 @@ async function transferPage(root) {
     h("li", { text: "Das Thema der Bachelorthesis gibt es erst mit den 25 ECTS aus T1–T5 (PO § 7 Abs. 1). T6 kann eine Vorstudie zur Thesis sein." }),
     h("li", { text: "Je Transferleistung eine Praxisphase, etwa 9 Wochen von der Auftragsklärung bis zur Bewertung (Studienverlaufsplan der NORDAKADEMIE im Moodle-Kurs Transferleistungen)." }),
     h("li", { text: "Die Note hier ist rechnerisch: gewichteter Mittelwert der Bewertungskriterien, wie eine zusammengesetzte Note auf eine Nachkommastelle abgerundet (PVO § 17 Abs. 4). Offiziell gibt es keine." })));
+}
+
+// ── Bachelorthesis ──────────────────────────────────────────────────────────
+// The rules of the NORDAKADEMIE (PO § 7, PVO §§ 17, 22, CIS page
+// "Bachelorthesis" with the planning aid of the cohort): registration in a
+// week, start the Monday two weeks later, two months, review in four lecture
+// weeks, grades by the "letzte Noten" date of a graduation.
+
+const isoOf = (de) => { const m = String(de || "").match(/(\d{2})\.(\d{2})\.(\d{4})/); return m ? `${m[3]}-${m[2]}-${m[1]}` : ""; };
+
+// the dashboard tile: may I register, and the next date that matters
+function thesisSummary(t) {
+  const e = t.eligibility || {}, a = t.planning_aid || {};
+  const steps = thesisSteps(a).filter((x) => x.at && x.at >= startOfDay(new Date()));
+  const next = steps[0];
+  return [h("p", { class: `tl-alert ${e.open ? "ok" : "bad"}` }, h("b", { text: e.open ? "Anmeldung möglich." : "Anmeldung noch nicht möglich." }), e.open ? "" : ` ${(e.reasons || []).join(" ")}`),
+    next && h("div", { class: "band-num" }, h("div", { class: "avg" }, count(Math.max(0, dayDiff(next.at))), h("span", { class: "empty", text: `Tage bis: ${next.label} (${next.date})` }))),
+    a.latest_register_kw && h("p", { class: "empty", text: `Späteste Anmeldung für ${a.last_grades ? "den Abschluss " + a.board : "den nächsten Abschluss"}: KW ${a.latest_register_kw} (${a.latest_register_from} – ${a.latest_register_to}).` })];
+}
+
+function thesisSteps(a) {
+  return [
+    ["Früheste Anmeldung", a.earliest_registration], ["Frühester Start", a.earliest_start],
+    ["7. Theoriesemester (Repetitorien + Klausuren)", a.semester7_from && `${a.semester7_from} – ${a.semester7_to}`, a.semester7_from],
+    [`Späteste Anmeldung (KW ${a.latest_register_kw || "?"})`, a.latest_register_from && `${a.latest_register_from} – ${a.latest_register_to}`, a.latest_register_to],
+    ["Spätester Start", a.latest_start], ["Späteste Abgabe", a.latest_submission],
+    ["Wiederholungsklausuren 6. + 7. Semester", a.repeat_exams_from && `${a.repeat_exams_from} – ${a.repeat_exams_to}`, a.repeat_exams_from],
+    ["Letzte Noten beim Prüfungsamt", a.last_grades], ["Prüfungsausschuss = Ende des Studiums", a.board], ["Verabschiedung", a.ceremony],
+  ].filter(([, d]) => d).map(([label, date, key]) => ({ label, date, at: parseDE(key || date) }));
+}
+
+function thesisChecklist(t, progress) {
+  const tr = t.transfer || {}, req = progress?.thesis_requirements || {};
+  const mods = req.modules_until_4th_missing || [];
+  const item = (ok, text, sub, href) => h("li", {}, h(href ? "a" : "div", { class: "row", ...(href ? { href } : {}) },
+    h("span", { class: `chip ${ok === true ? "ok" : ok === false ? "bad" : ""}`, text: ok === true ? "erfüllt" : ok === false ? "fehlt" : "selbst prüfen" }),
+    h("span", { class: "t" }, text, sub && h("span", { class: "s", text: sub }))));
+  return h("ul", { class: "rows" },
+    item(tr.t1_5_passed >= 5, "Transferleistungen 1–5 bestanden", `${tr.t1_5_passed ?? "?"} von 5`, "#/transferleistungen"),
+    item(progress ? mods.length === 0 : undefined, "Alle Modulprüfungen bis einschließlich 4. Semester bestanden", mods.length ? `offen: ${mods.join(", ")}` : "", "#/noten"),
+    item(undefined, "Thema mit der gutachtenden Person abgestimmt", "Nach der Anmeldung lässt sich der Titel nicht mehr ändern."),
+    item(tr.t6 === "bestanden" ? true : undefined, "Transferleistung 6 spätestens mit der Abgabe hochladen", tr.t6 === "bestanden" ? "bestanden" : "kann auch nach der Anmeldung kommen", "#/transferleistungen"));
+}
+
+function thesisCalc(t) {
+  const a = t.planning_aid || {};
+  const mode = h("select", { "aria-label": "Datum ist" }, h("option", { value: "registration", text: "Anmeldung am" }), h("option", { value: "start", text: "Beginn am" }));
+  const date = h("input", { type: "date", value: isoOf(a.latest_register_to) || new Date().toISOString().slice(0, 10) });
+  const out = h("div", { class: "thesis-result", "aria-live": "polite" });
+  const run = async () => {
+    if (!date.value) return;
+    out.replaceChildren(...skeleton());
+    try {
+      const r = await api("nak_thesis_calc", { [mode.value]: date.value }, { wait: true });
+      const start = parseDE(r.start), earliest = parseDE(a.earliest_start);
+      const warn = [];
+      if (earliest && start < earliest) warn.push(`Vor dem frühesten Start (${a.earliest_start}): so früh gibt das Prüfungsamt kein Thema aus.`);
+      const s7f = parseDE(a.semester7_from), s7t = parseDE(a.semester7_to), sub = parseDE(r.submission);
+      if (s7f && start <= s7t && sub >= s7f) warn.push(`Die Bearbeitungszeit läuft durch das 7. Theoriesemester (${a.semester7_from} – ${a.semester7_to}).`);
+      const rf = parseDE(a.repeat_exams_from), rt = parseDE(a.repeat_exams_to);
+      if (rf && start <= rt && sub >= rf) warn.push(`Die Wiederholungsklausuren (${a.repeat_exams_from} – ${a.repeat_exams_to}) fallen in die Bearbeitungszeit.`);
+      if (r.buffer_days != null && r.graduation && r.buffer_days < 7) warn.push(`Nur ${r.buffer_days} Tage Puffer bis zu den letzten Noten; das Prüfungsamt rät zu mehr (Krankheit).`);
+      out.replaceChildren(h("dl", { class: "kv" },
+        h("dt", { text: "Beginn" }), h("dd", { text: r.start }),
+        h("dt", { text: "Abgabe" }), h("dd", {}, h("b", { text: r.submission }), " bis 23:59 (Poststempel zählt)"),
+        h("dt", { text: "Mit voller Verlängerung" }), h("dd", { text: `${r.with_extension} (5 Wochen, nur auf Antrag aus nicht selbst zu vertretenden Gründen)` }),
+        h("dt", { text: "Gutachten bis" }), h("dd", { text: `${r.review_until} (4 Vorlesungswochen)` }),
+        h("dt", { text: "Abschluss" }), h("dd", { text: r.graduation ? `${r.graduation.name}: letzte Noten ${r.graduation.last_grades}, Prüfungsausschuss ${r.graduation.board}${r.graduation.ceremony ? " · " + r.graduation.ceremony : ""}` : "kein Abschlusstermin bekannt" }),
+        r.graduation && h("dt", { text: "Puffer" }), r.graduation && h("dd", { text: `${r.buffer_days} Tage bis zu den letzten Noten` }),
+        r.graduation_with_extension && r.graduation_with_extension.name !== r.graduation?.name && h("dt", { text: "Mit Verlängerung" }),
+        r.graduation_with_extension && r.graduation_with_extension.name !== r.graduation?.name && h("dd", { class: "bad-text", text: `rutscht der Abschluss auf ${r.graduation_with_extension.name}` })),
+        ...warn.map((w) => h("p", { class: "err", text: w })));
+    } catch (err) {
+      out.replaceChildren(errorBox(err));
+    }
+  };
+  const preset = (label, m, de) => de && h("button", { class: "ghost", type: "button", text: label, onclick: () => { mode.value = m; date.value = isoOf(de); run(); } });
+  mode.addEventListener("change", run);
+  date.addEventListener("change", run);
+  run();
+  return [h("div", { class: "settings-form thesis-form" }, h("div", { class: "pair" }, h("label", {}, "Datum ist", mode), h("label", {}, "Datum", date))),
+    h("div", { class: "row-actions" }, preset("frühestmöglich", "registration", a.earliest_registration), preset("spätestmöglich", "registration", a.latest_register_to),
+      h("button", { class: "ghost", type: "button", text: "heute anmelden", onclick: () => { mode.value = "registration"; date.value = new Date().toISOString().slice(0, 10); run(); } })),
+    out];
+}
+
+function thesisReviewers() {
+  const q = h("input", { type: "search", placeholder: "Thema, z. B. Datenbank, Cloud, Controlling", "aria-label": "Fachgebiet suchen" });
+  const free = h("input", { type: "checkbox" });
+  const list = h("div", {});
+  let all = null, timer;
+  const draw = () => {
+    const words = q.value.toLowerCase().split(/\s+/).filter(Boolean);
+    const rs = (all || []).filter((r) => (!free.checked || r.load === 0) && words.every((w) => `${r.name} ${r.department} ${(r.areas || []).join(" ")}`.toLowerCase().includes(w)));
+    list.replaceChildren(rs.length ? h("ul", { class: "rows" }, rs.slice(0, 40).map((r, j) => h("li", {}, h("div", { class: "row", vars: { "--j": Math.min(j, 12) } },
+      h("span", { class: "t" }, r.email ? h("a", { href: `mailto:${r.email}`, text: r.name }) : r.name, h("span", { class: "s", text: [r.department, (r.areas || []).join(", ")].filter(Boolean).join(" · ") })),
+      h("span", { class: `chip ${r.load === 0 ? "ok" : r.load === 2 ? "bad" : r.load === 1 ? "due" : ""}`, text: r.load_label || "–" }))))) : emptyRow("Niemand passt dazu."),
+      ...(rs.length > 40 ? [h("p", { class: "empty", text: `${rs.length - 40} weitere, Suche verfeinern.` })] : []));
+  };
+  q.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(draw, 120); });
+  free.addEventListener("change", draw);
+  const box = h("div", {}, h("div", { class: "settings-form wide" }, h("label", {}, "Fachgebiet", q), h("label", { class: "check" }, free, "nur mit freier Kapazität")), list);
+  api("nak_thesis_reviewers").then((rs) => { all = rs || []; draw(); }).catch((err) => list.replaceChildren(errorBox(err)));
+  list.append(...skeleton());
+  return box;
+}
+
+async function thesisPage(root) {
+  root.append(h("div", { class: "page-head" }, h("h1", {}, "Bachelorthesis", h("small", { text: "Anmeldung, Termine, Rechner und Gutachtende" }))));
+  const grid = h("div", { class: "grid" });
+  root.append(grid);
+  const tStatus = tile("Stand", { cls: "w6", i: 0 });
+  const tPlan = tile("Dein Fahrplan", { cls: "w6", i: 1 });
+  const tCalc = tile("Rechner", { cls: "w6", i: 2 });
+  const tDates = tile("Abschlusstermine", { cls: "w6", i: 3 });
+  const tRev = tile("Gutachtende finden", { cls: "w12", i: 4 });
+  const tRules = tile("Was gilt", { cls: "w12", i: 5 });
+  grid.append(tStatus, tPlan, tCalc, tDates, tRev, tRules);
+  const data = api("nak_thesis");
+  fill(tStatus, () => Promise.all([data, api("cis_progress").catch(() => null)]), ([t, p]) => {
+    const e = t.eligibility || {};
+    return [h("p", { class: `tl-alert ${e.open ? "ok" : "bad"}` }, h("b", { text: e.open ? "Du kannst die Thesis anmelden." : "Anmeldung noch nicht möglich" }), e.open ? " (CIS → Bachelorthesis → Anmeldung)" : ""),
+      ...(e.reasons || []).map((r) => h("p", { class: "empty", text: `CIS: ${r}` })), thesisChecklist(t, p)];
+  });
+  fill(tPlan, () => data, (t) => {
+    const a = t.planning_aid || {};
+    if (!a.found) return emptyRow("Für deinen Jahrgang hat das CIS noch keine Planungshilfe; der Rechner und die Abschlusstermine gelten trotzdem.");
+    const today = startOfDay(new Date());
+    const steps = thesisSteps(a);
+    const next = steps.find((x) => x.at && x.at >= today);
+    return [h("p", { class: "empty", text: `Planungshilfe Jahrgang ${a.cohort} aus dem CIS` }),
+      h("ul", { class: "rows" }, steps.map((x, j) => h("li", {}, h("div", { class: `row ${x.at && x.at < today ? "past" : ""}`, vars: { "--j": j } },
+        h("span", { class: "dot", "data-src": "cis" }), h("span", { class: "t" }, x.label, h("span", { class: "s", text: x.date })),
+        x === next ? h("span", { class: "chip due", text: relDay(dayDiff(x.at)) }) : x.at && x.at < today ? h("span", { class: "chip", text: "vorbei" }) : null)))),
+      h("p", { class: "empty meter", text: "Das Prüfungsamt rät davon ab, erst in der letzten Anmeldewoche anzumelden: Puffer für Krankheit einplanen." })];
+  });
+  fill(tCalc, () => data, thesisCalc);
+  fill(tDates, () => data, (t) => {
+    // reachable first; the unreachable ones only say why
+    const list = [...(t.latest || [])].sort((x, y) => (y.reachable === true) - (x.reachable === true));
+    if (!list.length) return emptyRow("Keine kommenden Abschlusstermine im CIS.");
+    return h("ul", { class: "rows" }, list.map(({ latest: l, reachable }, j) => h("li", {}, h("div", { class: `row ${reachable ? "" : "past"}`, vars: { "--j": j } },
+      h("span", { class: "t" }, `Abschluss ${l.graduation.name}`, h("span", { class: "s", text: reachable
+        ? `spätestens anmelden in KW ${l.kw} (${l.register_week_from} – ${l.register_week_to}) · Start ${l.start} · Abgabe ${l.submission} · letzte TL beginnen bis ${l.tl_start_by}`
+        : "nicht erreichbar: die Anmeldung läge vor der frühesten Anmeldung deines Jahrgangs" })),
+      h("span", { class: `chip ${reachable ? "" : "bad"}`, text: l.graduation.ceremony ? l.graduation.ceremony.replace("Bachelor-Graduierung: ", "Feier ") : `Ende ${l.graduation.board}` })))));
+  });
+  tRev.append(thesisReviewers());
+  tRules.append(h("ul", { class: "rules" },
+    h("li", { text: "Anmeldung erst nach dem Ende der Vorlesungszeit des 6. Semesters und mit allen Modulprüfungen bis einschließlich 4. Semester sowie den 25 ECTS aus Transferleistung 1–5 (PO § 7 Abs. 1)." }),
+    h("li", { text: "Ablauf: Thema mit betrieblicher Betreuung und gutachtender Person abstimmen → Antrag auf Zulassung im CIS → Bescheid des Prüfungsamts mit Abgabetermin → Bearbeitung → Abgabe → betriebliche Stellungnahme → Gutachten mit Notenvorschlag → Note durch den Prüfungsausschuss." }),
+    h("li", { text: "Bearbeitungszeit 2 Monate ab der Zulassung (PO § 7 Abs. 2, PVO § 22 Abs. 2); höchstens 5 Wochen Verlängerung, nur auf Antrag vor Fristende und aus Gründen, die du nicht zu vertreten hast. Thema einmal zurückgeben: nur in den ersten 3 Wochen, aus triftigem Grund (PVO § 22 Abs. 5)." }),
+    h("li", { text: "Abgabe spätestens am letzten Tag bis 23:59: 2 gedruckte Exemplare und 2 Datenträger, persönlich an der Information, Briefkasten am Haupteingang oder per Post (Poststempel zählt); mit unterschriebener eidesstattlicher Erklärung. Transferleistung 6 spätestens gleichzeitig hochladen; die betriebliche Betreuung bekommt ein Exemplar direkt von dir." }),
+    h("li", { text: "Gutachten in 4 Vorlesungswochen (PVO § 17 Abs. 3); vorlesungsfreie Wochen zählen nicht. Die Note braucht es bis zum Termin „letzte Noten“ des Abschlusses." }),
+    h("li", { text: "Der Rechner bildet das Muster der Planungshilfe nach (Beginn am Montag zwei Wochen nach der Anmeldewoche, Fristende am Wochenende → Montag); verbindlich ist der Bescheid des Prüfungsamts." })));
 }
 
 function certsTab(grid) {
@@ -2724,6 +2882,7 @@ const routes = [
   [/^#\/noten$/, gradesPage, "#/noten"],
   [/^#\/pruefungen$/, examsPage, "#/noten"],
   [/^#\/(?:transferleistungen|transfernoten)$/, transferPage, "#/transferleistungen"],
+  [/^#\/(?:bachelorthesis|thesis)$/, thesisPage, "#/bachelorthesis"],
   [/^#\/studium(?:\/(seminare|wahlpflicht|transfer|bescheinigungen|profil))?$/, studiesPage, "#/studium"],
   [/^#\/einstellungen$/, settingsPage, "#/einstellungen"],
   [/^#\/module$/, unitsPage, "#/kurse"],
@@ -2813,6 +2972,7 @@ const navDefs = {
   pruefungen: ["Prüfungen", "Prüfung", "#/pruefungen", ["M6 3h9l4 4v14H6z", "M14 3v5h5", "M9 13l2 2 4-4"]],
   abgaben: ["Abgaben", "Abgaben", "#/abgaben", ["M12 4v11", "M7 10l5 5 5-5", "M5 20h14"]],
   transfer: ["Transferleistungen", "Transfer", "#/transferleistungen", ["M4 19h16", "M7 15l3-4 3 2 4-6"]],
+  thesis: ["Bachelorthesis", "Thesis", "#/bachelorthesis", ["M6 3h9l4 4v14H6z", "M14 3v5h5", "M9 13h6", "M9 17h4"]],
 };
 const defaultNav = ["start", "woche", "kurse", "inbox", "noten", "studium"];
 
@@ -2828,6 +2988,7 @@ const homeDefs = {
   pending: ["Noten ausstehend", "", "", ["M12 7v5l3 2", "M5 20h14"]],
   transfer: ["Transferleistungen", "", "", ["M5 4h14v16H5z", "M9 9h6", "M9 13h6"]],
   transfer_grades: ["TL-Noten (rechnerisch)", "", "", ["M4 19h16", "M7 15l3-4 3 2 4-6"]],
+  thesis: ["Bachelorthesis", "", "", ["M6 3h9l4 4v14H6z", "M14 3v5h5", "M9 13h6", "M9 17h4"]],
 };
 const defaultHome = ["next", "deadlines", "week", "grades", "exams", "moodle"];
 

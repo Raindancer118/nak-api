@@ -246,7 +246,13 @@ func nakTools() []*Tool {
 						}
 					}
 				}
-				return transfer.BuildPlan(p.Studiengang, p.Zenturie, qs, list, a.Now().In(a.Zone)), nil
+				plan := transfer.BuildPlan(p.Studiengang, p.Zenturie, qs, list, a.Now().In(a.Zone))
+				// T1–T5 must be passed when the thesis is registered: count back
+				// from the latest registration week of the next bachelor graduation
+				if plan.Known {
+					applyThesisDeadline(a, c, &plan)
+				}
+				return plan, nil
 			}},
 		{Name: "nak_dashboard", Kind: Read, Desc: "Der Überblick in einem Aufruf: heutige & morgige Vorlesungen, dringende Fristen (CIS + Moodle, 14 Tage), angemeldete Prüfungen, ungelesene Moodle-Nachrichten, aktuelles Quartal, Kopierguthaben. Guter Einstieg.",
 			Run: func(a *app.App, args Args) (any, error) { return dashboard(a) }},
@@ -548,6 +554,7 @@ func All() *Registry {
 	r.Add(cisTools()...)
 	r.Add(moodleTools()...)
 	r.Add(nakTools()...)
+	r.Add(thesisTools()...)
 	r.Add(eduvaultTools()...)
 	return r
 }
