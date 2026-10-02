@@ -17,7 +17,8 @@ const sandbox = {
   location: { origin: "https://n.example" },
   navigator: { onLine: true },
   caches: {
-    open: async () => ({ put: async (k, r) => store.set(k.url ?? k, await r.clone().text()), match: async (k) => store.has(k.url ?? k) ? new Response(store.get(k.url ?? k)) : undefined }),
+    // a real cache opens slower than a page reads its response
+    open: async () => (await new Promise((r) => setTimeout(r, 20)), { put: async (k, r) => store.set(k.url ?? k, await r.clone().text()), match: async (k) => store.has(k.url ?? k) ? new Response(store.get(k.url ?? k)) : undefined }),
     match: async (k) => (store.has(k.url ?? k) ? new Response(store.get(k.url ?? k)) : undefined),
     keys: async () => [], delete: async () => true,
   },
@@ -65,6 +66,29 @@ network = hang;
 const confirm = call('{"confirm":true}');
 const raced = await Promise.race([confirm, new Promise((r) => setTimeout(() => r("still waiting"), 7000))]);
 assert.equal(raced, "still waiting");
+
+// 6. the page shell: cached on the way through, served when the network hangs
+store.clear();
+network = async () => new Response("<html>naknak</html>", { headers: { "content-type": "text/html" } });
+let nav;
+const navReq = new SWRequest("/", { mode: "same-origin" });
+Object.defineProperty(navReq, "mode", { value: "navigate" });
+handlers.fetch({ request: navReq, respondWith: (p) => (nav = p) });
+const page = await nav;
+await page.text(); // the page consumes the body, as a browser does
+await new Promise((r) => setTimeout(r, 50));
+assert.ok([...store.keys()].some((k) => k.endsWith("/")), "shell must be cached: " + [...store.keys()]);
+network = hang;
+handlers.fetch({ request: navReq, respondWith: (p) => (nav = p) });
+assert.equal(await (await nav).text(), "<html>naknak</html>");
+
+// 7. no copy of the portal and no connection: our offline page, not an error
+store.clear();
+network = async () => { throw new TypeError("Failed to fetch"); };
+handlers.fetch({ request: navReq, respondWith: (p) => (nav = p) });
+const off = await nav;
+assert.equal(off.status, 503);
+assert.match(await off.text(), /Keine Verbindung/);
 
 console.log("sw-test: ok");
 process.exit(0);

@@ -1,7 +1,7 @@
 // naknak service worker: the app shell works offline;
 // data always comes from the network first and only falls back to the last
 // answer when there is no connection (marked with X-Naknak-Offline).
-const SHELL = "naknak-shell-v3";
+const SHELL = "naknak-shell-v4";
 const DATA = "naknak-data-v1";
 const SHELL_FILES = ["/assets/app.css", "/assets/app.js", "/assets/theme.js", "/assets/naknak.svg", "/assets/fonts/space-grotesk.woff2", "/manifest.webmanifest"];
 
@@ -36,10 +36,14 @@ self.addEventListener("fetch", (e) => {
   }
   if (req.mode === "navigate" && url.pathname === "/") {
     const net = fetch(req).then((res) => {
-      if (res.ok && !res.redirected) caches.open(SHELL).then((c) => c.put("/", res.clone()));
+      // clone now: once the page has the response its body is gone
+      if (res.ok && !res.redirected) {
+        const copy = res.clone();
+        caches.open(SHELL).then((c) => c.put("/", copy));
+      }
       return res;
     });
-    e.respondWith(patient(net, () => caches.match("/"), 5000));
+    e.respondWith(patient(net, async () => (await caches.match("/")) || offlinePage(), 5000));
   }
   // /files, /api/events, /calendar, /login: network only
 });
@@ -57,6 +61,21 @@ async function networkFirst(req) {
     if (hit) return hit;
     throw err;
   }
+}
+
+// No copy of the portal yet and no connection: a page of our own instead of
+// the browser's error (an app WebView would show its bare error screen).
+function offlinePage() {
+  return new Response(`<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>naknak · offline</title><style>
+:root{color-scheme:light dark;--bg:#f6f3ec;--ink:#0d1b33;--dim:#5b6780}@media(prefers-color-scheme:dark){:root{--bg:#07101f;--ink:#f2f5fb;--dim:#9aa6bd}}
+body{margin:0;min-height:100vh;display:grid;place-items:center;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,sans-serif;text-align:center;padding:2rem;box-sizing:border-box}
+img{width:88px;height:88px}h1{font-size:1.4rem;margin:.6rem 0 .3rem}p{color:var(--dim);max-width:24rem;margin:0 auto 1.2rem}
+button{font:inherit;font-weight:600;padding:.75rem 1.4rem;border-radius:12px;border:0;background:var(--ink);color:var(--bg);min-height:48px}
+</style></head><body><main><img src="/assets/naknak.svg" alt=""><h1>Keine Verbindung</h1>
+<p>naknak ist gerade nicht erreichbar, und auf diesem Gerät ist noch kein Stand gespeichert. Ist das Portal einmal geladen, geht es auch offline.</p>
+<button onclick="location.reload()">Erneut versuchen</button></main></body></html>`,
+    { status: 503, headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" } });
 }
 
 // A bad connection rarely fails fast: requests just hang. After `wait` ms
