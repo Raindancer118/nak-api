@@ -1836,6 +1836,10 @@ function bellButton() {
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") bell.panel.hidden = true; });
   loadBell();
   listenBell();
+  // if a proxy buffers the live stream, the bell still catches up (local
+  // list only — this never reaches the CIS or Moodle)
+  setInterval(() => { if (!document.hidden) loadBell(); }, 3 * 60_000);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) loadBell(); });
   return h("div", { class: "bell-wrap" }, bell.el, bell.panel);
 }
 
