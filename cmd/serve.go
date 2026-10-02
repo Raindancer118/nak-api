@@ -51,6 +51,9 @@ var serveCmd = &cobra.Command{
 		}
 
 		token := strings.TrimSpace(os.Getenv("NAK_WEB_TOKEN"))
+		if isDemo && token == "" {
+			token = "demo" // the demo needs no login; nothing to protect
+		}
 		fromFile := token == ""
 		created := false
 		if fromFile {
