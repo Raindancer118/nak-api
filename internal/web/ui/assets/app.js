@@ -170,6 +170,13 @@ function relDay(n) {
   return `in ${n} T.`;
 }
 
+// "{gruß}, {name}." with the parts that are known; a missing name takes its
+// comma with it
+function greet(template, now, name) {
+  const t = (template || "{gruß}, {name}.").replaceAll("{gruß}", greeting(now)).replaceAll("{gruss}", greeting(now)).replaceAll("{name}", name);
+  return t.replace(/\s*,\s*(?=[.!?]|$)/, "").replace(/\s{2,}/g, " ").trim();
+}
+
 function greeting(now = new Date()) {
   const hr = now.getHours();
   if (hr < 5) return "Gute Nacht";
@@ -426,14 +433,18 @@ function firstName(full) {
 
 async function overview(root) {
   const now = new Date();
-  const title = h("h1", {}, `${greeting(now)}.`, h("small", { text: fmtDay.format(now) }));
-  const hero = h("section", { class: "hero" }, title);
-  root.append(hero);
-  api("moodle_whoami").then((me) => {
-    const name = firstName(me.user);
-    if (name) title.firstChild.textContent = `${greeting(now)}, ${name}.`;
-  }).catch(() => {});
-  hero.append(searchBox());
+  const ui = savedUI();
+  const hero = h("section", { class: "hero" });
+  if (!ui.greeting_off) {
+    const title = h("h1", {}, greet(ui.greeting_text, now, ""), h("small", { text: fmtDay.format(now) }));
+    hero.append(title);
+    api("moodle_whoami").then((me) => {
+      const name = firstName(me.user);
+      if (name) title.firstChild.textContent = greet(ui.greeting_text, now, name);
+    }).catch(() => {});
+  }
+  if (ui.search === "home") hero.append(searchBox());
+  if (hero.children.length) root.append(hero);
   const dash = api("nak_dashboard");
   const agenda = api("nak_agenda", { days: 7 });
   const grid = h("div", { class: "grid", id: "overview-grid" });
@@ -811,6 +822,7 @@ addEventListener("keydown", (e) => {
   if (e.key === "/" && !/^(INPUT|TEXTAREA)$/.test(document.activeElement?.tagName)) {
     const s = $(".search-input");
     if (s) { e.preventDefault(); s.focus(); }
+    else if (savedUI().search !== "home") { e.preventDefault(); openSearch(); }
   }
 });
 
@@ -1730,19 +1742,22 @@ function listEditor({ title, intro, defs, current, items, min, max, endpoint, ke
 }
 
 function navSettings(st) {
-  return listEditor({ title: "Navigationsleiste", intro: "Was in der Leiste steht (2 bis 7 Einträge); zum Umsortieren am Griff ziehen.",
+  return listEditor({ title: "Navigationsleiste", intro: "2 bis 7 Einträge, am Griff ziehen zum Sortieren.",
     defs: navDefs, current: st.nav || defaultNav, items: st.nav_items || Object.keys(navDefs), min: 2, max: 7,
     endpoint: "/api/settings/nav", key: "nav", applied: applyNav });
 }
 
 function homeSettings(st) {
-  return listEditor({ title: "Startseite", intro: "Welche Kacheln die Startseite zeigt und in welcher Reihenfolge; zum Umsortieren am Griff ziehen.",
+  return listEditor({ title: "Startseite", intro: "Am Griff ziehen zum Sortieren.",
     defs: homeDefs, current: st.home || defaultHome, items: st.home_items || Object.keys(homeDefs), min: 1, max: Object.keys(homeDefs).length,
     endpoint: "/api/settings/home", key: "home", applied: applyHome, i: 1 });
 }
 
-async function settingsPage(root) {
+const settingsTabs = [["darstellung", "Aussehen"], ["benachrichtigungen", "Mitteilungen"], ["verbindungen", "Dienste"], ["konto", "Konto"]];
+
+async function settingsPage(root, tab = "darstellung") {
   root.append(h("div", { class: "page-head" }, h("h1", {}, "Einstellungen", h("small", { text: "Gilt für diese naknak-Instanz" }))));
+  root.append(h("nav", { class: "tabs", "aria-label": "Bereiche" }, settingsTabs.map(([k, label]) => h("a", { href: `#/einstellungen/${k}`, text: label, ...(k === tab ? { "aria-current": "page" } : {}) }))));
   const grid = h("div", { class: "grid" });
   root.append(grid);
   let st;
@@ -1754,13 +1769,12 @@ async function settingsPage(root) {
   }
 
   // only inside the Android app: lock, notifications and server live there
+  let tApp = null;
   if (window.NaknakApp) {
-    grid.append(tile("naknak-App", { cls: "w12", i: 0 },
+    tApp = (tile("naknak-App", { cls: "w12", i: 0 },
       h("p", { class: "empty", text: `Version ${window.NaknakApp.version()}. App-Sperre, Benachrichtigungen und Server stellst du in der App selbst ein.` }),
       h("div", { class: "row-actions" }, h("button", { class: "primary", type: "button", text: "App-Einstellungen", onclick: () => window.NaknakApp.openSettings() }))));
   }
-
-  grid.append(navSettings(st), homeSettings(st), topSettings(st), mensaSettings());
 
   // EduVault
   const ev = st.eduvault || {};
@@ -1812,8 +1826,9 @@ async function settingsPage(root) {
   // account & instance
   const acc = st.account || {};
   if (st.demo) grid.prepend(tile("Demo", { cls: "w12", i: 0 }, h("p", { class: "empty", text: "Demo mit erfundenen Daten: Einstellungen werden nicht gespeichert." })));
+  let tOp = null;
   if (st.operator?.name) {
-    grid.append(tile("Betrieb", { cls: "w12", i: 1 }, h("p", { class: "empty", text:
+    tOp = (tile("Betrieb", { cls: "w12", i: 1 }, h("p", { class: "empty", text:
       `Diese Instanz betreibt ${st.operator.name} für dich. Gespeichert sind dein NORDAKADEMIE-Login (für die Abfragen bei CIS und Moodle) und was naknak daraus zwischenspeichert; als Betreiber hat ${st.operator.name} technisch Zugriff darauf. Weiter unten kannst du alles exportieren oder die Instanz zurücksetzen (löscht alles)${st.operator.contact ? `; Fragen an ${st.operator.contact}` : ""}.` })));
   }
   const tAcc = tile("Konto & Instanz", { i: 1 },
@@ -1831,7 +1846,7 @@ async function settingsPage(root) {
   }).catch(() => {});
 
   // appearance
-  const tLook = tile("Darstellung", { i: 2 });
+  const tLook = tile("Design", { i: 2 });
   const cur = localStorage.getItem("nak-theme") || "system";
   const seg = h("div", { class: "filters", role: "group", "aria-label": "Design" }, themes.map((t) =>
     h("button", { type: "button", "aria-pressed": t === cur ? "true" : "false", text: { system: "System", light: "Hell", dark: "Dunkel" }[t], onclick: (e) => {
@@ -1916,7 +1931,13 @@ async function settingsPage(root) {
       ? "Löscht Einstellungen, Zwischenspeicher, Verlauf, Downloads und die CIS-Sitzung. Das Konto selbst kommt aus Umgebungsvariablen und bleibt bestehen."
       : "Löscht dein Konto in naknak und alle Daten dieser Instanz (Einstellungen, Zwischenspeicher, Verlauf, Downloads, CIS-Sitzung) und meldet alle Geräte ab. Danach kann sich wieder jemand als Erstes anmelden. In CIS und Moodle selbst wird nichts gelöscht." }),
     h("div", { class: "row-actions danger-row" }, word, wipe));
-  grid.append(tEv, tAcc, notifySettingsTile(st, 4), tLook, tCache, tCal, tData);
+  const sections = {
+    darstellung: () => [tLook, dashSettings(st), homeSettings(st), navSettings(st), topSettings(st), mensaSettings()],
+    benachrichtigungen: () => [notifySettingsTile(st, 0)],
+    verbindungen: () => [tEv, tCal],
+    konto: () => [tApp, tOp, tAcc, tData, tCache],
+  };
+  grid.append(...(sections[tab] || sections.darstellung)().filter(Boolean));
 }
 
 // ── EduVault on module pages ────────────────────────────────────────────────
@@ -2666,6 +2687,50 @@ async function mensaPage(root) {
     ...[bookingRows(acc.bookings || [])].flat()]);
 }
 
+// search placement and greeting
+function dashSettings(st) {
+  let ui = { ...savedUI(), ...(st.ui || {}) };
+  const msg = h("div", { "aria-live": "polite" });
+  const seg = (label, opts, get, set) => {
+    const g = h("div", { class: "filters", role: "group", "aria-label": label });
+    const draw = () => g.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === get())));
+    for (const [v, text] of opts) {
+      const b = h("button", { type: "button", text, onclick: () => { set(v); draw(); sync(); } });
+      b.dataset.v = v;
+      g.append(b);
+    }
+    draw();
+    return g;
+  };
+  let mode = ui.greeting_off ? "off" : ui.greeting_text ? "custom" : "auto";
+  const text = h("input", { value: ui.greeting_text || "", placeholder: "{gruß}, {name}.", maxlength: 80, "aria-label": "Eigene Begrüßung" });
+  const textRow = h("label", {}, "Text ({gruß} und {name} werden ersetzt)", text);
+  const preview = h("p", { class: "empty" });
+  const sync = () => {
+    textRow.hidden = mode !== "custom";
+    preview.textContent = mode === "off" ? "Keine Begrüßung." : `Vorschau: ${greet(mode === "custom" ? text.value : "", new Date(), "Max")}`;
+  };
+  text.addEventListener("input", sync);
+  const save = h("button", { class: "primary", type: "button", text: "Speichern", onclick: async () => {
+    const body = { search: ui.search, greeting_off: mode === "off", greeting_text: mode === "custom" ? text.value.trim() : "" };
+    const res = await fetch("/api/settings/ui", { method: "PUT", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const out = await res.json().catch(() => ({}));
+    if (!res.ok) { msg.replaceChildren(errorBox(new Error(out.error || `HTTP ${res.status}`))); return; }
+    ui = out.ui || body;
+    applyUI(ui);
+    msg.replaceChildren(h("p", { class: "ok-note", text: "Gespeichert." }));
+  } });
+  const form = h("div", { class: "settings-form" },
+    h("b", { text: "Suche" }),
+    seg("Suche", [["home", "Auf der Startseite"], ["top", "Oben"], ["nav", "In der Leiste"]], () => ui.search, (v) => { ui.search = v; }),
+    h("b", { text: "Begrüßung" }),
+    seg("Begrüßung", [["auto", "Automatisch"], ["custom", "Eigener Text"], ["off", "Aus"]], () => mode, (v) => { mode = v; }),
+    textRow, preview,
+    h("div", { class: "row-actions" }, save), msg);
+  sync();
+  return tile("Startseite oben", { i: 0 }, form);
+}
+
 // which top-bar buttons show; saved on the server like the bar below
 function topSettings(st) {
   let hidden = Array.isArray(st.top_hidden) ? st.top_hidden : savedTopHidden();
@@ -3071,7 +3136,7 @@ const routes = [
   [/^#\/(?:bachelorthesis|thesis)$/, thesisPage, "#/bachelorthesis"],
   [/^#\/studium(?:\/(seminare|wahlpflicht|transfer|bescheinigungen|profil))?$/, studiesPage, "#/studium"],
   [/^#\/mensa$/, mensaPage, "#/mensa"],
-  [/^#\/einstellungen$/, settingsPage, "#/einstellungen"],
+  [/^#\/einstellungen(?:\/(darstellung|benachrichtigungen|verbindungen|konto))?$/, settingsPage, "#/einstellungen"],
   [/^#\/module$/, unitsPage, "#/kurse"],
   [/^#\/modul\/([A-Z]{1,2}\d{3})(?:\/(inhalt|forum|abgaben))?(?:\/(\d+))?$/, unitPage, "#/kurse"],
   [/^#\/module\/([A-Za-z]{1,2}\d{3})$/, (root, nr) => { location.replace(`#/modul/${nr.toUpperCase()}`); }, "#/kurse"],
@@ -3205,11 +3270,49 @@ function savedNav() {
   return defaultNav;
 }
 
+// where the search sits and how the dashboard greets (Einstellungen →
+// Darstellung); kept on the server, localStorage for the first paint
+function savedUI() {
+  try {
+    const v = JSON.parse(localStorage.getItem("nak-ui") || "null");
+    if (v && typeof v === "object") return { search: v.search || "home", greeting_off: !!v.greeting_off, greeting_text: v.greeting_text || "" };
+  } catch {}
+  return { search: "home", greeting_off: false, greeting_text: "" };
+}
+
+function applyUI(ui) {
+  if (!ui || typeof ui !== "object") return;
+  const before = localStorage.getItem("nak-ui");
+  localStorage.setItem("nak-ui", JSON.stringify(ui));
+  if (before === JSON.stringify(ui)) return;
+  $(".top nav")?.replaceWith(navBar());
+  $(".top .search-top")?.classList.toggle("top-off", ui.search !== "top");
+  markNav();
+  if ((location.hash || "#/") === "#/") render();
+}
+
+const searchIcon = ["M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14z", "M20 20l-4-4"];
+
+function openSearch() {
+  if ($("dialog.search-dlg")?.open) return;
+  const box = searchBox();
+  const dlg = h("dialog", { class: "search-dlg", "aria-label": "Suche" }, box);
+  document.body.append(dlg);
+  dlg.showModal();
+  const close = () => dlg.open && dlg.close();
+  dlg.addEventListener("close", () => { dlg.remove(); removeEventListener("hashchange", close); });
+  dlg.addEventListener("click", (e) => { if (e.target === dlg) close(); });
+  addEventListener("hashchange", close);
+  box.querySelector("input")?.focus();
+}
+
 function navBar(ids = savedNav()) {
-  return h("nav", { "aria-label": "Bereiche" }, ids.map((id) => {
+  const links = ids.map((id) => {
     const [t, short, href, icon] = navDefs[id];
     return h("a", { href, title: t }, svg(icon), h("span", { class: "full", text: t }), h("span", { class: "short", text: short }));
-  }));
+  });
+  if (savedUI().search === "nav") links.push(h("a", { href: "#", role: "button", class: "nav-search", title: "Suchen", onclick: (e) => { e.preventDefault(); openSearch(); } }, svg(searchIcon), h("span", { class: "full", text: "Suchen" }), h("span", { class: "short", text: "Suche" })));
+  return h("nav", { "aria-label": "Bereiche" }, links);
 }
 
 // the server keeps the setting (same bar in browser and app); localStorage
@@ -3260,6 +3363,7 @@ function header() {
     navBar(),
     h("div", { class: "tools" },
       tag("stamp", h("span", { class: "stamp", "aria-live": "polite" })),
+      h("button", { class: `icon-btn search-top ${savedUI().search === "top" ? "" : "top-off"}`, type: "button", title: "Suchen (/)", "aria-label": "Suchen", onclick: openSearch }, svg(searchIcon)),
       tag("refresh", refresh),
       tag("privacy", h("button", { class: "icon-btn eye-btn", type: "button", onclick: togglePrivate })),
       tag("bell", bellButton()),
@@ -3339,7 +3443,7 @@ function boot() {
   addEventListener("hashchange", render);
   render();
   if (!document.documentElement.classList.contains("still")) {
-    fetch("/api/settings", { credentials: "same-origin" }).then((r) => r.ok ? r.json() : null).then((st) => { if (st) { applyNav(st.nav); applyHome(st.home); applyTop(st.top_hidden); } }).catch(() => {});
+    fetch("/api/settings", { credentials: "same-origin" }).then((r) => r.ok ? r.json() : null).then((st) => { if (st) { applyUI(st.ui); applyNav(st.nav); applyHome(st.home); applyTop(st.top_hidden); } }).catch(() => {});
   }
 }
 

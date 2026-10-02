@@ -6,7 +6,9 @@ import (
 	"io"
 	"mime"
 	"net/http"
+	"slices"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/Raindancer118/nak-api/internal/app"
 	"github.com/Raindancer118/nak-api/internal/eduvault"
@@ -57,6 +59,7 @@ func (s *Server) getSettings(w http.ResponseWriter, r *http.Request) {
 		"home":       s.app.Settings().HomeOrDefault(),
 		"top_hidden": nonNil(s.app.Settings().TopHidden),
 		"top_items":  app.TopItems,
+		"ui":         uiJSON(s.app.Settings().UI.OrDefault()),
 		"operator":   map[string]string{"name": s.cfg.Operator, "contact": s.cfg.OperatorContact},
 		"home_items": app.HomeItems,
 		"account":    s.accountInfo(),
@@ -146,6 +149,42 @@ func (s *Server) putHome(w http.ResponseWriter, r *http.Request) {
 		st.Home = v
 		return st.HomeOrDefault()
 	})
+}
+
+func uiJSON(u app.UISettings) map[string]any {
+	return map[string]any{"search": u.Search, "greeting_off": u.GreetingOff, "greeting_text": u.GreetingText}
+}
+
+// putUI replaces the dashboard/search settings as a whole.
+func (s *Server) putUI(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Search       string `json:"search"`
+		GreetingOff  bool   `json:"greeting_off"`
+		GreetingText string `json:"greeting_text"`
+	}
+	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<12)).Decode(&in); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "body must be JSON"})
+		return
+	}
+	in.GreetingText = strings.TrimSpace(in.GreetingText)
+	if in.Search != "" && !slices.Contains(app.SearchPlaces, in.Search) {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "Suche: home, top oder nav"})
+		return
+	}
+	if utf8.RuneCountInString(in.GreetingText) > 80 || strings.ContainsAny(in.GreetingText, "\r\n") {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "Begrüßung: eine Zeile, höchstens 80 Zeichen"})
+		return
+	}
+	st := s.app.Settings()
+	st.UI = app.UISettings{Search: in.Search, GreetingOff: in.GreetingOff, GreetingText: in.GreetingText}
+	if st.UI.Search == "home" {
+		st.UI.Search = ""
+	}
+	if err := s.app.SaveSettings(st); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"saved": true, "ui": uiJSON(st.UI.OrDefault())})
 }
 
 // putTop stores which top-bar buttons are hidden (none by default).

@@ -1012,6 +1012,7 @@ main.quiet *, main.quiet { animation: none !important; }
 
 .hero h1 { font-size: clamp(2.2rem, 5vw, 3.4rem); letter-spacing: -.05em; animation: rise .8s var(--spring) both; }
 .hero h1 small { font-size: 1.05rem; margin-top: .5rem; }
+.hero:not(:has(.search)) { padding-top: clamp(1.25rem, 5vh, 3rem); }
 .hero .search { margin: 0; animation-delay: 120ms; }
 .hero .search-input { min-height: 58px; font-size: 1.08rem; }
 
@@ -1387,3 +1388,6 @@ ul.spend-bars .bar { align-self: end; justify-self: center; width: min(100%, 2.4
 ul.spend-bars .lbl { font-size: .7rem; color: var(--dim); text-align: center; }
 .filters.mensa-veg { margin: .5rem 0 .25rem; }
 .top .top-off { display: none !important; }
+dialog.search-dlg { width: min(40rem, calc(100vw - 2rem)); margin: 10vh auto auto; padding: 0; border: 0; background: none; overflow: visible; }
+dialog.search-dlg::backdrop { background: color-mix(in oklab, var(--bg) 55%, transparent); backdrop-filter: blur(6px); animation: fade .25s both; }
+dialog.search-dlg .search { margin: 0; }

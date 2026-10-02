@@ -941,3 +941,33 @@ func TestTopBarSettings(t *testing.T) {
 		t.Errorf("empty list shows everything again")
 	}
 }
+
+func TestUISettings(t *testing.T) {
+	h := newHarness(t)
+	h.app.ConfigDir = t.TempDir()
+	get := func() map[string]any {
+		m := decode(t, h.do(t, "GET", "/api/settings", "", bearer))
+		ui, _ := m["ui"].(map[string]any)
+		return ui
+	}
+	if ui := get(); ui["search"] != "home" || ui["greeting_off"] != false || ui["greeting_text"] != "" {
+		t.Fatalf("defaults %v", ui)
+	}
+	if res := h.do(t, "PUT", "/api/settings/ui", `{"search":"nav","greeting_text":"  Moin {name}!  "}`, bearer); res.StatusCode != 200 {
+		t.Fatalf("save: %d", res.StatusCode)
+	}
+	if ui := get(); ui["search"] != "nav" || ui["greeting_text"] != "Moin {name}!" {
+		t.Fatalf("saved %v", ui)
+	}
+	for _, bad := range []string{`{"search":"sidebar"}`, `{"greeting_text":"` + strings.Repeat("x", 81) + `"}`, `{"greeting_text":"a\nb"}`} {
+		if res := h.do(t, "PUT", "/api/settings/ui", bad, bearer); res.StatusCode != 400 {
+			t.Errorf("%s: %d, want 400", bad, res.StatusCode)
+		}
+	}
+	if res := h.do(t, "PUT", "/api/settings/ui", `{"search":"top","greeting_off":true}`, bearer); res.StatusCode != 200 {
+		t.Fatal("save 2")
+	}
+	if ui := get(); ui["search"] != "top" || ui["greeting_off"] != true || ui["greeting_text"] != "" {
+		t.Fatalf("a full replace, not a merge: %v", ui)
+	}
+}

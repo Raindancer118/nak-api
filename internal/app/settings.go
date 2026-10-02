@@ -21,7 +21,24 @@ type Settings struct {
 	// Home is the choice and order of dashboard tiles (ids from HomeItems).
 	Home []string `json:"home,omitempty"`
 	// TopHidden are top-bar buttons the owner switched off (ids from TopItems).
-	TopHidden []string `json:"top_hidden,omitempty"`
+	TopHidden []string   `json:"top_hidden,omitempty"`
+	UI        UISettings `json:"ui,omitzero"`
+}
+
+// UISettings: where the search sits and how the dashboard greets.
+type UISettings struct {
+	Search       string `json:"search,omitempty"` // home (default), top, nav
+	GreetingOff  bool   `json:"greeting_off,omitempty"`
+	GreetingText string `json:"greeting_text,omitempty"` // with {gruß} and {name}
+}
+
+var SearchPlaces = []string{"home", "top", "nav"}
+
+func (u UISettings) OrDefault() UISettings {
+	if u.Search == "" {
+		u.Search = "home"
+	}
+	return u
 }
 
 // TopItems are the top-bar elements that can be hidden. Settings is not

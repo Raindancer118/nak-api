@@ -156,6 +156,7 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("PUT /api/settings/notify", s.notInDemo(s.authed(s.jsonOnly(s.putNotify))))
 	mux.Handle("PUT /api/settings/nav", s.notInDemo(s.authed(s.jsonOnly(s.putNav))))
 	mux.Handle("PUT /api/settings/home", s.notInDemo(s.authed(s.jsonOnly(s.putHome))))
+	mux.Handle("PUT /api/settings/ui", s.notInDemo(s.authed(s.jsonOnly(s.putUI))))
 	mux.Handle("PUT /api/settings/top", s.notInDemo(s.authed(s.jsonOnly(s.putTop))))
 	mux.Handle("GET /api/grades/pending", s.authed(http.HandlerFunc(s.pendingAPI)))
 	mux.Handle("POST /api/calendar/rotate", s.notInDemo(s.authed(s.jsonOnly(s.calendarRotate))))
