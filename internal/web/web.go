@@ -57,6 +57,9 @@ type Config struct {
 	CacheFile string
 	// Demo needs no login (invented data only) and never asks the CIS.
 	Demo bool
+	// Operator runs this instance for someone else (a friend's instance): the
+	// login page and the settings say who, what is stored, how to delete it.
+	Operator, OperatorContact string
 }
 
 // SaveCache writes pending cache changes to CacheFile (call on shutdown).
@@ -396,7 +399,8 @@ func (s *Server) renderLogin(w http.ResponseWriter, r *http.Request, status int,
 		return
 	}
 	data := map[string]any{"Error": msg, "Version": s.cfg.Version, "FirstRun": s.app.AccountUser() == "",
-		"User": strings.TrimSpace(r.PostFormValue("username")), "TokenMode": r.PostFormValue("token") != "" || r.URL.Query().Get("mode") == "token"}
+		"User": strings.TrimSpace(r.PostFormValue("username")), "TokenMode": r.PostFormValue("token") != "" || r.URL.Query().Get("mode") == "token",
+		"Operator": s.cfg.Operator, "OperatorContact": s.cfg.OperatorContact}
 	if err := tmpl.Execute(&buf, data); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

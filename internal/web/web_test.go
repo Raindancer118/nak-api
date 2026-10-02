@@ -824,3 +824,24 @@ func TestHomeSettings(t *testing.T) {
 		t.Errorf("empty list must reset to the default")
 	}
 }
+
+// an instance run for someone else says so before they enter their password
+func TestOperatorNoticeOnLoginAndSettings(t *testing.T) {
+	h := newHarness(t)
+	h.web.cfg.Operator, h.web.cfg.OperatorContact = "Tom Stieh", "tom@example.org"
+	b, _ := io.ReadAll(h.do(t, "GET", "/login", "", nil).Body)
+	for _, want := range []string{"betreibt Tom Stieh", "technisch Zugriff", "tom@example.org"} {
+		if !strings.Contains(string(b), want) {
+			t.Errorf("login page lacks %q", want)
+		}
+	}
+	m := decode(t, h.do(t, "GET", "/api/settings", "", bearer))
+	if op, _ := m["operator"].(map[string]any); op["name"] != "Tom Stieh" {
+		t.Errorf("settings operator = %v", m["operator"])
+	}
+	plain := newHarness(t)
+	b, _ = io.ReadAll(plain.do(t, "GET", "/login", "", nil).Body)
+	if strings.Contains(string(b), "betreibt") {
+		t.Error("own instance must not show an operator notice")
+	}
+}

@@ -68,7 +68,8 @@ var serveCmd = &cobra.Command{
 			return err
 		}
 		ws := web.New(a, reg, web.Config{Token: token, CacheTTL: ttl, Version: Version,
-			UIDir: os.Getenv("NAK_WEB_UI_DIR"), CacheFile: filepath.Join(a.ConfigDir, "web-cache.json"), Demo: isDemo})
+			UIDir: os.Getenv("NAK_WEB_UI_DIR"), CacheFile: filepath.Join(a.ConfigDir, "web-cache.json"), Demo: isDemo,
+			Operator: os.Getenv("NAK_OPERATOR"), OperatorContact: os.Getenv("NAK_OPERATOR_CONTACT")})
 		srv := &http.Server{
 			Handler:           ws.Handler(),
 			ReadHeaderTimeout: 10 * time.Second,

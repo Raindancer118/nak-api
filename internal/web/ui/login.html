@@ -40,7 +40,8 @@
       </form>
     </details>
 
-    <p class="fine">Deine Zugangsdaten bleiben auf diesem Server und gehen nur an CIS und Moodle der NORDAKADEMIE. naknak ist kein offizielles Angebot der NORDAKADEMIE.</p>
+    {{if .Operator}}<p class="fine operator">Diese Instanz betreibt {{.Operator}} für dich. Damit naknak CIS und Moodle für dich abfragen kann, werden dein NORDAKADEMIE-Login und das, was naknak daraus zwischenspeichert (Noten, Nachrichten, Termine), auf diesem Server gespeichert. Als Betreiber hat {{.Operator}} technisch Zugriff darauf. Alles löschen: Einstellungen → Instanz zurücksetzen{{if .OperatorContact}}, oder schreib an {{.OperatorContact}}{{end}}. naknak ist kein offizielles Angebot der NORDAKADEMIE.</p>
+    {{else}}<p class="fine">Deine Zugangsdaten bleiben auf diesem Server und gehen nur an CIS und Moodle der NORDAKADEMIE. naknak ist kein offizielles Angebot der NORDAKADEMIE.</p>{{end}}
   </section>
 
   <div class="login-art" aria-hidden="true">

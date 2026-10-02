@@ -55,6 +55,7 @@ func (s *Server) getSettings(w http.ResponseWriter, r *http.Request) {
 		"nav":        s.app.Settings().NavOrDefault(),
 		"nav_items":  app.NavItems,
 		"home":       s.app.Settings().HomeOrDefault(),
+		"operator":   map[string]string{"name": s.cfg.Operator, "contact": s.cfg.OperatorContact},
 		"home_items": app.HomeItems,
 		"account":    s.accountInfo(),
 		"read_only":  s.app.ReadOnly,

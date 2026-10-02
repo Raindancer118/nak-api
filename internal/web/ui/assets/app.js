@@ -1767,6 +1767,10 @@ async function settingsPage(root) {
 
   // account & instance
   const acc = st.account || {};
+  if (st.operator?.name) {
+    grid.append(tile("Betrieb", { cls: "w12", i: 1 }, h("p", { class: "empty", text:
+      `Diese Instanz betreibt ${st.operator.name} für dich. Gespeichert sind dein NORDAKADEMIE-Login (für die Abfragen bei CIS und Moodle) und was naknak daraus zwischenspeichert; als Betreiber hat ${st.operator.name} technisch Zugriff darauf. Weiter unten kannst du alles exportieren oder die Instanz zurücksetzen (löscht alles)${st.operator.contact ? `; Fragen an ${st.operator.contact}` : ""}.` })));
+  }
   const tAcc = tile("Konto & Instanz", { i: 1 },
     h("dl", { class: "kv" },
       h("dt", { text: "NAK-Konto" }), h("dd", { text: acc.user || "–" }),

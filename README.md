@@ -236,6 +236,15 @@ Signing out also clears the data the browser kept for offline use.
 </details>
 
 <details>
+<summary><b>Hosting naknak for friends</b></summary>
+
+Each friend gets their own instance (own container, own data volume, pinned to their NAK account with `NAK_OWNER`), so nothing can mix between people. [`deploy/friends/naknak-friends`](deploy/friends/naknak-friends) turns a `friends.conf` (`<slug> <NAK username>` per line) into compose services next to your `compose.yml`, starts them and updates them all with a health check and rollback. [`authentik-friend.py`](deploy/friends/authentik-friend.py) gives each one an Authentik proxy provider, application and group, copied from your own.
+
+With `NAK_OPERATOR` (and `NAK_OPERATOR_CONTACT`) set, a friend's login page and settings say who runs the instance, what is stored and how to delete it. Hosting other people's NAK logins and grades makes you responsible for them: tell your friends what you store, keep it to people you know, and delete an instance when asked (Einstellungen → Instanz zurücksetzen, or remove the volume).
+
+</details>
+
+<details>
 <summary><b>Android app</b></summary>
 
 `android/` holds a small Java app around your instance: the portal in a WebView plus what a browser tab cannot do.
