@@ -11,15 +11,21 @@ import (
 	"time"
 )
 
-// TestBinaryServesMCPOverStdio builds the real binary and talks JSON-RPC to it
-// the way an MCP client does — no credentials needed for initialize/tools/list.
-func TestBinaryServesMCPOverStdio(t *testing.T) {
+func buildBinary(t *testing.T) string {
+	t.Helper()
 	bin := filepath.Join(t.TempDir(), "nak")
 	build := exec.Command("go", "build", "-o", bin, "..")
 	build.Stderr = os.Stderr
 	if err := build.Run(); err != nil {
 		t.Fatal(err)
 	}
+	return bin
+}
+
+// TestBinaryServesMCPOverStdio builds the real binary and talks JSON-RPC to it
+// the way an MCP client does — no credentials needed for initialize/tools/list.
+func TestBinaryServesMCPOverStdio(t *testing.T) {
+	bin := buildBinary(t)
 	cmd := exec.Command(bin, "mcp")
 	cmd.Env = append(os.Environ(), "HOME="+t.TempDir(), "CIS_USER=", "CIS_PASS=", "MOODLE_USER=", "MOODLE_PASS=", "NAK_READONLY=1")
 	in, _ := cmd.StdinPipe()

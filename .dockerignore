@@ -1,0 +1,16 @@
+.git
+.github
+nak
+cis
+_explore
+explore
+Analyse
+*.har
+Protokoll.txt
+Project.md
+.env
+*.env
+.env.*
+dist
+docs
+scripts

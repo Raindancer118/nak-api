@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="de">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>nak — Anmelden</title><link rel="stylesheet" href="/assets/app.css"></head>
+<body class="login">
+<form method="post" action="/login">
+  <h1>nak</h1>
+  <label for="token">Zugangsschlüssel</label>
+  <input id="token" name="token" type="password" autocomplete="current-password" required autofocus>
+  {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+  <button type="submit">Anmelden</button>
+</form>
+</body>
+</html>

@@ -16,3 +16,8 @@ Analyse/
 
 # NOTE: internal/*/testdata/ fixtures are committed but are SYNTHETIC
 # (anonymised example data only). Real CIS captures live in Analyse/ (ignored).
+
+# Local secrets
+.env
+*.env
+!.env.example

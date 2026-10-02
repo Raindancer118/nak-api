@@ -118,14 +118,23 @@ func (r *Registry) Call(a *app.App, name string, raw map[string]any) (any, error
 // DriftHint explains a parser failure caused by a changed CIS page and asks
 // for an issue (the outline it would contain has no personal data).
 func DriftHint(err error) string {
+	u := DriftReportURL(err, time.Now())
+	if u == "" {
+		return ""
+	}
+	return "\n\nDas CIS hat diese Seite offenbar geändert, nak muss angepasst werden. Bitte dem Nutzer vorschlagen, das zu melden: " +
+		"nak_report_drift (legt nach Bestätigung ein GitHub-Issue nur mit der Seitenstruktur an, ohne persönliche Daten) oder dieser vorbefüllte Link: " + u
+}
+
+// DriftReportURL is a prefilled GitHub issue link for a drift error ("" for
+// any other error).
+func DriftReportURL(err error, at time.Time) string {
 	var d *drift.Error
 	if !errors.As(err, &d) {
 		return ""
 	}
 	res := health.Result{Check: "tool call", Status: health.StatusDrift, Page: d.Page, Expected: d.Expected, Print: d.Fingerprint}
-	return "\n\nDas CIS hat diese Seite offenbar geändert, nak muss angepasst werden. Bitte dem Nutzer vorschlagen, das zu melden: " +
-		"nak_report_drift (legt nach Bestätigung ein GitHub-Issue nur mit der Seitenstruktur an, ohne persönliche Daten) oder dieser vorbefüllte Link: " +
-		health.IssueURL(health.DefaultRepo, res, "nak", time.Now())
+	return health.IssueURL(health.DefaultRepo, res, Version, at)
 }
 
 func previewEnvelope(t *Tool, res any) any {

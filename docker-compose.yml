@@ -1,0 +1,22 @@
+services:
+  nak:
+    image: ghcr.io/raindancer118/nak-api:latest
+    # build: .   # instead of the image, to build from this checkout
+    command: serve
+    restart: unless-stopped
+    env_file: .env
+    # Only reachable from this machine. To use it from elsewhere, put a
+    # TLS reverse proxy in front instead of opening the port.
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - nak-data:/data
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  nak-data:

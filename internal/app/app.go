@@ -35,9 +35,15 @@ type App struct {
 
 // FromEnv reads CIS_USER/CIS_PASS, MOODLE_USER/MOODLE_PASS (falling back to
 // the CIS account — both use the NAK login), NAK_READONLY, NAK_DOWNLOAD_DIR,
-// MOODLE_URL, CIS_BASE_URL and NAK_TZ.
+// MOODLE_URL, CIS_BASE_URL and NAK_TZ. NAK_DATA_DIR moves the session, audit
+// log and (unless NAK_DOWNLOAD_DIR is set) the downloads into one directory.
 func FromEnv() *App {
 	home, _ := os.UserHomeDir()
+	configDir := filepath.Join(home, ".config", "cis-api")
+	downloadDir := filepath.Join(home, "Downloads", "nak")
+	if d := strings.TrimSpace(os.Getenv("NAK_DATA_DIR")); d != "" {
+		configDir, downloadDir = d, filepath.Join(d, "downloads")
+	}
 	zone, err := time.LoadLocation(envOr("NAK_TZ", "Europe/Berlin"))
 	if err != nil {
 		zone = time.UTC
@@ -45,8 +51,8 @@ func FromEnv() *App {
 	a := &App{
 		Zone:        zone,
 		Now:         time.Now,
-		DownloadDir: envOr("NAK_DOWNLOAD_DIR", filepath.Join(home, "Downloads", "nak")),
-		ConfigDir:   filepath.Join(home, ".config", "cis-api"),
+		DownloadDir: envOr("NAK_DOWNLOAD_DIR", downloadDir),
+		ConfigDir:   configDir,
 		ReadOnly:    truthy(os.Getenv("NAK_READONLY")) || truthy(os.Getenv("CIS_READONLY")),
 		cisUser:     os.Getenv("CIS_USER"),
 		cisPass:     os.Getenv("CIS_PASS"),
