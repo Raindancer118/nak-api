@@ -4,6 +4,7 @@ services:
     # build: .   # instead of the image, to build from this checkout
     command: serve
     restart: unless-stopped
+    stop_grace_period: 15s
     env_file: .env
     # Only reachable from this machine. To use it from elsewhere, put a
     # TLS reverse proxy in front instead of opening the port.

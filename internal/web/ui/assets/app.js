@@ -1584,8 +1584,11 @@ async function markAllRead() {
   drawBell();
 }
 
+const still = document.documentElement.classList.contains("still");
+
 function listenBell() {
-  if (!window.EventSource) return;
+  // ?still (screenshots, UI tests): no live stream, so the page can finish loading
+  if (!window.EventSource || still) return;
   bell.es?.close();
   bell.es = new EventSource("/api/events");
   bell.es.addEventListener("notification", (e) => {
@@ -1980,7 +1983,7 @@ async function revalidate(seq, r) {
 }
 
 function boot() {
-  if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
+  if ("serviceWorker" in navigator && !document.documentElement.classList.contains("still")) navigator.serviceWorker.register("/sw.js").catch(() => {});
   const app = $("#app");
   app.replaceWith(header(), h("main", { id: "main" }));
   applyTheme(new URLSearchParams(location.search).get("theme") || localStorage.getItem("nak-theme") || "system");

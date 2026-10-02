@@ -98,12 +98,15 @@ var serveCmd = &cobra.Command{
 		case <-ctx.Done():
 		}
 		log.Printf("shutting down")
-		sctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
-		defer cancel()
-		err = srv.Shutdown(sctx)
+		// save first: docker stop kills after 10 s
 		if serr := ws.SaveCache(); serr != nil {
 			log.Printf("saving cache: %v", serr)
 		}
+		ws.CloseStreams()
+		sctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+		defer cancel()
+		err = srv.Shutdown(sctx)
+		ws.SaveCache() // anything that finished while draining
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
 			return err
 		}

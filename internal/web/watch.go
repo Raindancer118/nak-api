@@ -71,10 +71,13 @@ type watcher struct {
 	state watchState
 	subs  map[chan Notification]struct{}
 	run   sync.Mutex // one pass at a time
+	// closing ends every live stream (server shutdown)
+	closing chan struct{}
+	once    sync.Once
 }
 
 func newWatcher(s *Server) *watcher {
-	w := &watcher{s: s, subs: map[chan Notification]struct{}{}}
+	w := &watcher{s: s, subs: map[chan Notification]struct{}{}, closing: make(chan struct{})}
 	if s.app.ConfigDir != "" {
 		w.file = filepath.Join(s.app.ConfigDir, "watch.json")
 		if b, err := os.ReadFile(w.file); err == nil {
@@ -197,6 +200,10 @@ func (w *watcher) push(n Notification) {
 		res.Body.Close()
 	}
 }
+
+// CloseStreams ends all SSE connections so a graceful shutdown does not wait
+// for streams that would never finish on their own.
+func (s *Server) CloseStreams() { s.watch.once.Do(func() { close(s.watch.closing) }) }
 
 func (w *watcher) list() []Notification {
 	w.mu.Lock()
@@ -408,6 +415,8 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 	for {
 		select {
 		case <-r.Context().Done():
+			return
+		case <-s.watch.closing:
 			return
 		case n := <-ch:
 			b, _ := json.Marshal(n)

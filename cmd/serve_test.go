@@ -92,6 +92,16 @@ func TestBinaryServesWebUI(t *testing.T) {
 		t.Fatalf("healthcheck: %v %s", err, out)
 	}
 
+	// an open live stream (SSE) must not hold up the shutdown
+	evReq, _ := http.NewRequest("GET", base+"/api/events", nil)
+	evReq.Header.Set("Authorization", "Bearer "+token)
+	evRes, err := http.DefaultClient.Do(evReq)
+	if err != nil || evRes.StatusCode != 200 {
+		t.Fatalf("events: %v %v", evRes, err)
+	}
+	defer evRes.Body.Close()
+
+	stopAt := time.Now()
 	cmd.Process.Signal(syscall.SIGTERM)
 	done := make(chan error, 1)
 	go func() { done <- cmd.Wait() }()
@@ -99,6 +109,9 @@ func TestBinaryServesWebUI(t *testing.T) {
 	case err := <-done:
 		if err != nil {
 			t.Fatalf("exit after SIGTERM: %v", err)
+		}
+		if d := time.Since(stopAt); d > 3*time.Second {
+			t.Fatalf("shutdown took %v (docker stop kills after 10 s)", d)
 		}
 	case <-time.After(10 * time.Second):
 		t.Fatal("no shutdown after SIGTERM")

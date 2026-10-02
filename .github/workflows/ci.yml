@@ -23,6 +23,10 @@ jobs:
         run: test -z "$(gofmt -l . | tee /dev/stderr)"
       - run: go vet ./...
       - run: go test -race -count=1 ./...
+      - name: UI smoke test (demo mode in headless Chrome)
+        run: |
+          go build -o nak .
+          scripts/ui-smoke.sh ./nak
       - name: Fixtures contain no personal data
         run: |
           # Fixtures are anonymised; fail if real-looking personal markers sneak in.
