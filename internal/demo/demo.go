@@ -177,8 +177,13 @@ func progress() map[string]any {
 	for _, m := range modules {
 		mods = append(mods, map[string]any{"module_nr": m.nr, "title": m.title, "status": m.status, "grade": m.grade, "credits": m.credits})
 	}
-	sem = append(sem, map[string]any{"semester": 1, "passed": 7, "open": 2, "failed": 0, "modules": mods})
-	return map[string]any{"credits": map[string]any{"module_earned": earned - 25, "module_planned": 173, "transfer_earned": 25, "transfer_planned": 30, "total_earned": earned, "total_required": 210, "cis_credits_total": fmt.Sprint(earned)}, "semesters": sem}
+	sem = append(sem, map[string]any{"semester": 1, "passed": 4, "open": 0, "failed": 0, "modules": mods[2:6]},
+		map[string]any{"semester": 2, "passed": 3, "open": 0, "failed": 0, "modules": mods[6:]},
+		map[string]any{"semester": 3, "passed": 0, "open": 2, "failed": 0, "modules": mods[:2]})
+	return map[string]any{
+		"thesis_requirements": map[string]any{"fulfilled": false, "modules_until_4th_missing": []string{"I160 Datenbanksysteme"}, "transferleistungen_missing": []string{"6"},
+			"rule": "Alle Modulprüfungen bis einschließlich 4. Semester bestanden und Transferleistungen 1–5 erfolgreich (Bachelorthesis-Seite im CIS)."},
+		"credits": map[string]any{"module_earned": earned - 25, "module_planned": 173, "transfer_earned": 25, "transfer_planned": 30, "total_earned": earned, "total_required": 210, "cis_credits_total": fmt.Sprint(earned)}, "semesters": sem}
 }
 
 func exams(a *app.App) []map[string]any {

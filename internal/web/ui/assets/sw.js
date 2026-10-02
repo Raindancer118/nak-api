@@ -1,7 +1,7 @@
-// naknak service worker: the app shell loads instantly and works offline;
+// naknak service worker: the app shell works offline;
 // data always comes from the network first and only falls back to the last
 // answer when there is no connection (marked with X-Naknak-Offline).
-const SHELL = "naknak-shell-v1";
+const SHELL = "naknak-shell-v2";
 const DATA = "naknak-data-v1";
 const SHELL_FILES = ["/assets/app.css", "/assets/app.js", "/assets/theme.js", "/assets/naknak.svg", "/assets/fonts/space-grotesk.woff2", "/manifest.webmanifest"];
 
@@ -31,7 +31,7 @@ self.addEventListener("fetch", (e) => {
   }
   if (req.method !== "GET") return;
   if (url.pathname.startsWith("/assets/") || url.pathname === "/manifest.webmanifest") {
-    e.respondWith(staleWhileRevalidate(req));
+    e.respondWith(networkFirst(req));
     return;
   }
   if (req.mode === "navigate" && url.pathname === "/") {
@@ -43,14 +43,19 @@ self.addEventListener("fetch", (e) => {
   // /files, /api/events, /calendar, /login: network only
 });
 
-async function staleWhileRevalidate(req) {
+// The shell comes from the network whenever there is one (an update shows
+// up on the next load, not the one after); the cache is only the offline copy.
+async function networkFirst(req) {
   const cache = await caches.open(SHELL);
-  const hit = await cache.match(req);
-  const net = fetch(req).then((res) => {
+  try {
+    const res = await fetch(req);
     if (res.ok) cache.put(req, res.clone());
     return res;
-  }).catch(() => hit);
-  return hit || net;
+  } catch (err) {
+    const hit = await cache.match(req);
+    if (hit) return hit;
+    throw err;
+  }
 }
 
 async function toolCall(req, url) {

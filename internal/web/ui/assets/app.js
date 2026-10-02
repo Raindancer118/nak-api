@@ -518,6 +518,72 @@ function weekGrid(days) {
 
 // ── grades ──────────────────────────────────────────────────────────────────
 
+function thesisView(tr) {
+  if (!tr) return emptyRow("Keine Angaben im CIS.");
+  const label = (x) => typeof x === "string" ? x : [x.module_nr, x.title || x.name || x.topic].filter(Boolean).join(" ") || JSON.stringify(x);
+  const mods = tr.modules_until_4th_missing || [], tls = tr.transferleistungen_missing || [];
+  return [
+    h("div", { class: "avg" }, h("span", { class: `big ${tr.fulfilled ? "ok-text" : ""}`, text: tr.fulfilled ? "✓" : String(mods.length + tls.length) }),
+      h("span", { class: "empty", text: tr.fulfilled ? "Voraussetzungen erfüllt" : "noch offen bis zur Zulassung" })),
+    !tr.fulfilled && h("ul", { class: "rows meter" }, [
+      ...mods.map((m, j) => h("li", {}, h("a", { class: "row", href: `#/modul/${firstNr(label(m))}`, vars: { "--j": j } }, h("span", { class: "dot", "data-src": "cis" }), h("span", { class: "t" }, label(m), h("span", { class: "s", text: "Modulprüfung bis einschließlich 4. Semester" })), h("span", { class: "chip due", text: "fehlt" })))),
+      ...tls.map((t, j) => h("li", {}, h("a", { class: "row", href: "#/studium/transfer", vars: { "--j": j + mods.length } }, h("span", { class: "dot", "data-src": "cis" }), h("span", { class: "t" }, `Transferleistung ${label(t)}`, h("span", { class: "s", text: "Transferleistungen 1–5" })), h("span", { class: "chip due", text: "fehlt" })))),
+    ]),
+    tr.rule && h("p", { class: "empty fine-note", text: tr.rule }),
+  ];
+}
+
+// semesterBars: passed / open / failed per semester as stacked bars.
+function semesterBars(sems) {
+  if (!sems.length) return emptyRow("Kein Studienplan.");
+  const max = Math.max(...sems.map((x) => (x.passed || 0) + (x.open || 0) + (x.failed || 0)), 1);
+  return [h("div", { class: "sem-bars", role: "img", "aria-label": sems.map((x) => `Semester ${x.semester}: ${x.passed} bestanden, ${x.open} offen, ${x.failed} nicht bestanden`).join("; ") },
+    sems.map((x, j) => h("div", { class: "sem", vars: { "--j": j } },
+      h("div", { class: "sem-stack", vars: { "--h": ((x.passed || 0) + (x.open || 0) + (x.failed || 0)) / max } },
+        [["failed", x.failed, "var(--bad)"], ["open", x.open, "var(--tile-2)"], ["passed", x.passed, "var(--ok)"]].filter(([, n]) => n > 0).map(([k, n, c]) => h("i", { class: k, vars: { "--n": n, "--c": c }, title: `${n} ${k === "passed" ? "bestanden" : k === "open" ? "offen" : "nicht bestanden"}` }))),
+      h("small", { text: `${x.semester}.` })))),
+    h("ul", { class: "legend" }, [["bestanden", "var(--ok)"], ["offen", "var(--dim)"], ["nicht bestanden", "var(--bad)"]].map(([l, c]) => h("li", { vars: { "--c": c }, text: l })))];
+}
+
+// gradeCalculator: expected grades for open modules → projected weighted average.
+function gradeCalculator(g, p) {
+  const graded = (g.overview?.modules || []).filter((m) => m.grade_value && m.grade_value <= 4);
+  let sum = 0, weight = 0;
+  for (const m of graded) { const c = num(m.credits); sum += m.grade_value * c; weight += c; }
+  const open = [];
+  const seen = new Set(graded.map((m) => firstNr(m.module_nr)));
+  for (const sem of p?.semesters || []) for (const m of sem.modules || []) {
+    const nr = firstNr(m.module_nr);
+    if (m.status !== "bestanden" && num(m.credits) > 0 && !seen.has(nr)) { seen.add(nr); open.push({ ...m, nr, semester: sem.semester }); }
+  }
+  if (!open.length) return emptyRow("Keine offenen benoteten Module.");
+  const grades = ["–", "1,0", "1,3", "1,7", "2,0", "2,3", "2,7", "3,0", "3,3", "3,7", "4,0"];
+  const result = h("span", { class: "big", text: weight ? (sum / weight).toFixed(2).replace(".", ",") : "–" });
+  const delta = h("span", { class: "empty" });
+  const pick = new Map();
+  const update = () => {
+    let s2 = sum, w2 = weight;
+    for (const [m, v] of pick) { const c = num(m.credits); s2 += v * c; w2 += c; }
+    const now = weight ? sum / weight : 0, then = w2 ? s2 / w2 : 0;
+    result.textContent = w2 ? then.toFixed(2).replace(".", ",") : "–";
+    result.classList.remove("bump");
+    void result.offsetWidth;
+    result.classList.add("bump");
+    delta.textContent = pick.size ? `${then < now ? "besser" : then > now ? "schlechter" : "gleich"} als heute (${now.toFixed(2).replace(".", ",")}) · ${pick.size} Modul${pick.size > 1 ? "e" : ""} eingerechnet` : "Wähle erwartete Noten, um den Schnitt hochzurechnen.";
+  };
+  const rows = open.map((m) => {
+    const sel = h("select", { "aria-label": `Erwartete Note ${m.title}`, onchange: (e) => {
+      const v = e.currentTarget.value;
+      if (v === "–") pick.delete(m); else pick.set(m, num(v));
+      update();
+    } }, grades.map((x) => h("option", { value: x, text: x })));
+    return h("li", { class: "calc-row" }, h("span", { class: "t" }, m.title, h("span", { class: "s", text: [m.nr, `${m.credits} Credits`, `${m.semester}. Semester`, m.status !== "offen" && m.status].filter(Boolean).join(" · ") })), sel);
+  });
+  update();
+  return [h("div", { class: "avg calc-head" }, result, delta), h("ul", { class: "rows calc" }, rows),
+    h("p", { class: "empty fine-note", text: "Gewichtet mit Credits wie im CIS; Seminare und Transferleistungen zählen nicht in den Schnitt. Nur eine Hochrechnung." })];
+}
+
 function gradeClass(m) {
   const s = `${m.status || ""} ${m.grade || ""}`.toLowerCase();
   if (s.includes("nicht") || (m.grade_value && m.grade_value > 4)) return "bad";
@@ -535,9 +601,16 @@ async function gradesPage(root) {
   const grid = h("div", { class: "grid" });
   root.append(grid);
   const tSum = tile("Überblick", { cls: "w12", i: 0 });
-  const tList = tile("Module", { cls: "w12", i: 1 });
-  grid.append(tSum, tList);
+  const tThesis = tile("Bachelorarbeit", { cls: "w6", i: 1 });
+  const tPath = tile("Studienverlauf", { cls: "w6", i: 2 });
+  const tCalc = tile("Notenrechner", { cls: "w12", i: 3 });
+  const tList = tile("Module", { cls: "w12", i: 4 });
+  grid.append(tSum, tThesis, tPath, tCalc, tList);
   const data = api("cis_grades");
+  const prog = api("cis_progress");
+  fill(tThesis, () => prog, (p) => thesisView(p.thesis_requirements));
+  fill(tPath, () => prog, (p) => semesterBars(p.semesters || []));
+  fill(tCalc, () => Promise.all([data, prog]), ([g, p]) => gradeCalculator(g, p));
 
   fill(tSum, () => Promise.all([data, api("cis_progress").catch(() => null)]), ([g, progress]) => {
     const st = g.stats || {};

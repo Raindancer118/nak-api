@@ -1250,3 +1250,21 @@ a.wg-ev:hover { translate: 0 -1px; box-shadow: 0 6px 18px -8px #0007; z-index: 2
 .wg-ev.due-mark { height: auto; left: 38%; z-index: 1; border-left: 0; border-top: 2px solid var(--src); border-radius: 0 0 9px 9px; padding-top: .25rem; background: color-mix(in oklab, var(--src) 10%, var(--tile)); }
 .wg-now { position: absolute; left: -3px; right: 0; top: calc(var(--top) * 100%); height: 2px; background: var(--bad); z-index: 3; transition: top 1s linear; }
 .wg-now::before { content: ""; position: absolute; left: -2px; top: -4px; width: 10px; height: 10px; border-radius: 50%; background: var(--bad); }
+
+/* ── grades extras ──────────────────────────────────────── */
+
+.ok-text { color: var(--ok); }
+.sem-bars { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: .6rem; align-items: end; height: 10rem; margin-top: .5rem; }
+.sem { display: grid; grid-template-rows: 1fr auto; height: 100%; justify-items: stretch; gap: .35rem; }
+.sem-stack { align-self: end; height: calc(var(--h) * 100%); display: flex; flex-direction: column; border-radius: 8px; overflow: hidden; transform-origin: bottom; animation: grow .8s var(--spring) both; animation-delay: calc(150ms + var(--j, 0) * 60ms); }
+.sem-stack i { flex: var(--n) 0 0; background: var(--c); }
+.sem-stack i.open { background: color-mix(in oklab, var(--ink) 14%, transparent); }
+.sem small { text-align: center; font-size: .75rem; color: var(--dim); }
+.calc-head { margin-bottom: .75rem; }
+.calc-row { display: grid; grid-template-columns: 1fr auto; gap: 1rem; align-items: center; padding: .45rem 0; border-bottom: 1px solid var(--line); }
+.calc-row:last-child { border-bottom: 0; }
+.calc-row .t { color: var(--ink); font-weight: 500; }
+.calc-row .s { display: block; font-size: .8rem; color: var(--dim); font-weight: 400; }
+.calc-row select { font: inherit; min-height: 40px; padding: 0 .6rem; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); }
+.big.bump { animation: bump .45s var(--spring); }
+@keyframes bump { 40% { scale: 1.08; } }
