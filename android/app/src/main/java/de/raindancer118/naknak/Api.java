@@ -24,9 +24,11 @@ final class Api {
         }
     }
 
+    private final Context context;
     private final String server;
 
     Api(Context c) {
+        context = c.getApplicationContext();
         server = Prefs.server(c);
     }
 
@@ -47,6 +49,23 @@ final class Api {
     }
 
     private JSONObject request(String method, String path, String json) throws IOException {
+        try {
+            return once(method, path, json);
+        } catch (ProxyLogin e) {
+            if (!SessionRenewer.renew(context, server)) throw new LoginRequired();
+            try {
+                return once(method, path, json);
+            } catch (ProxyLogin again) {
+                throw new LoginRequired();
+            }
+        }
+    }
+
+    /** The proxy in front of naknak redirected: its session ran out. */
+    private static final class ProxyLogin extends IOException {
+    }
+
+    private JSONObject once(String method, String path, String json) throws IOException {
         if (server == null) throw new IOException("no server configured");
         String url = server + path;
         HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
@@ -66,7 +85,11 @@ final class Api {
             }
         }
         int code = c.getResponseCode();
-        if (code == 401 || (code >= 300 && code < 400)) {
+        if (code >= 300 && code < 400) {
+            c.disconnect();
+            throw new ProxyLogin();
+        }
+        if (code == 401) { // naknak's own session (30 days) ended
             c.disconnect();
             throw new LoginRequired();
         }

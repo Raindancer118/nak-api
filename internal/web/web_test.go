@@ -742,3 +742,30 @@ func TestRateLimitPerClientBehindTrustedProxy(t *testing.T) {
 		t.Fatalf("owner locked out by someone else's failures: %d", c)
 	}
 }
+
+// every visit extends the session, so it only ends after 30 days unused
+func TestPageLoadExtendsSession(t *testing.T) {
+	h := newHarness(t)
+	var sess *http.Cookie
+	for _, c := range h.login(t, token).Cookies() {
+		if c.Name == cookieName {
+			sess = c
+		}
+	}
+	req, _ := http.NewRequest("GET", h.srv.URL+"/", nil)
+	req.AddCookie(&http.Cookie{Name: cookieName, Value: sess.Value})
+	res, err := http.DefaultTransport.RoundTrip(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res.Body.Close()
+	var again *http.Cookie
+	for _, c := range res.Cookies() {
+		if c.Name == cookieName {
+			again = c
+		}
+	}
+	if res.StatusCode != 200 || again == nil || again.Value != sess.Value || again.MaxAge < 30*24*3600 || !again.HttpOnly {
+		t.Fatalf("page load must renew the session cookie: %d %+v", res.StatusCode, again)
+	}
+}

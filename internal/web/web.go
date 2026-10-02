@@ -254,6 +254,9 @@ func (s *Server) index(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
 		return
 	}
+	if !s.cfg.Demo && r.Header.Get("Authorization") == "" {
+		s.setSession(w, r)
+	}
 	b, err := fs.ReadFile(s.ui, "index.html")
 	if err != nil {
 		http.Error(w, "UI missing", http.StatusInternalServerError)
@@ -340,11 +343,17 @@ func (s *Server) loggedIn(w http.ResponseWriter, r *http.Request, ip string) {
 	s.loginMu.Lock()
 	delete(s.logins, ip)
 	s.loginMu.Unlock()
+	s.setSession(w, r)
+	http.Redirect(w, r, "/", http.StatusSeeOther)
+}
+
+// setSession (re)issues the session cookie. Every page load calls it, so a
+// session only ends after 30 days without a visit.
+func (s *Server) setSession(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, &http.Cookie{
 		Name: cookieName, Value: s.sessionValue(), Path: "/",
 		MaxAge: 30 * 24 * 3600, HttpOnly: true, Secure: secure(r), SameSite: http.SameSiteStrictMode,
 	})
-	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
 // loginPage never accepts a token from the query string (it would end up in
