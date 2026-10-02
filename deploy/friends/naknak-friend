@@ -1,0 +1,166 @@
+#!/usr/bin/env bash
+# naknak-friend — set up (or remove) a friend's naknak in one go, from your
+# own machine:
+#
+#   naknak-friend add <slug> <NAK login> <Authentik user>   e.g. add max 20123 max@example.org
+#   naknak-friend remove <slug>       instance, Authentik and proxy go; the data volume stays
+#   naknak-friend remove <slug> --purge   … and the friend's data is deleted (asks first)
+#   naknak-friend list
+#
+# What add does, each step safe to run again:
+#   1. app host: line in friends.conf, start the instance, wait until healthy
+#   2. Authentik host: provider, group (with the user), application, outpost
+#   3. proxy host (NPMplus): Let's Encrypt certificate and proxy host
+#   4. checks https://<slug>.<domain> from outside until Authentik answers
+#
+# Settings: ~/.config/naknak/friends.env (see friends.env.example). The NPM
+# password comes from NPM_PASSWORD_CMD and only travels on stdin over ssh.
+set -euo pipefail
+HERE=$(cd "$(dirname "$0")" && pwd)
+CONF=${NAKNAK_FRIENDS_ENV:-$HOME/.config/naknak/friends.env}
+[ -f "$CONF" ] || { echo "missing $CONF (copy $HERE/friends.env.example)" >&2; exit 2; }
+# shellcheck disable=SC1090
+. "$CONF"
+: "${NAKNAK_DOMAIN:?}" "${APP_SSH:?}" "${APP_DIR:?}" "${AUTH_SSH:?}" "${AUTH_DIR:?}" "${OUTPOST:?}" \
+  "${PROXY_SSH:?}" "${NPM_USER:?}" "${NPM_PASSWORD_CMD:?}" "${FORWARD_HOST:?}" "${FORWARD_PORT:?}"
+TEMPLATE_PROVIDER=${TEMPLATE_PROVIDER:-naknak}
+NPM_API=${NPM_API:-https://localhost:81/api}
+
+say() { printf '\033[1m▸ %s\033[0m\n' "$*"; }
+ok() { printf '  ✓ %s\n' "$*"; }
+die() { printf '  ✗ %s\n' "$*" >&2; exit 1; }
+
+valid_slug() { [[ $1 =~ ^[a-z][a-z0-9-]{1,30}$ ]] || die "slug: a-z, 0-9 and -, 2-31 characters"; }
+
+remote() { # remote <ssh host> <args…>: runs stdin's script there with these args
+  local host=$1
+  shift
+  { printf 'set -- '; printf '%q ' "$@"; echo; cat; } | ssh "$host" bash -s
+}
+
+app() { # step 1 / undo: friends.conf + naknak-friends on the app host
+  remote "$APP_SSH" "$APP_DIR" "$@" <<'REMOTE'
+set -euo pipefail
+dir=$1 action=$2 slug=$3 owner=${4:-}
+cd "$dir"
+touch friends.conf; chmod 600 friends.conf
+set -a; [ -f friends.env ] && . ./friends.env; set +a
+if [ "$action" = add ]; then
+  if grep -qE "^$slug[[:space:]]" friends.conf; then
+    grep -qE "^$slug[[:space:]]+$owner([[:space:]]|$)" friends.conf || { echo "ERR $slug exists with another NAK login"; exit 1; }
+  else
+    printf '%-10s %s\n' "$slug" "$owner" >> friends.conf
+  fi
+  ./naknak-friends up >/dev/null 2>&1 || true
+  ./naknak-friends list | grep -E "^$slug " || true
+else
+  sed -i "/^$slug[[:space:]]/d" friends.conf
+  docker rm -f "naknak-naknak-$slug-1" >/dev/null 2>&1 || true
+  ./naknak-friends render
+  if [ "$action" = purge ]; then docker volume rm "naknak_naknak-$slug-data" >/dev/null && echo "volume removed"; fi
+fi
+REMOTE
+}
+
+authentik() { # step 2 / undo
+  local slug=$1 user=${2:-} remove=${3:-}
+  scp -q "$HERE/authentik-friend.py" "$AUTH_SSH:/tmp/naknak-authentik-friend.py"
+  ssh "$AUTH_SSH" bash -s 2>/dev/null <<REMOTE | grep '^RESULT' || die "Authentik: no result"
+cd "$AUTH_DIR"
+docker compose exec -T -e FRIEND="$slug" -e FRIEND_USER="$user" -e NAKNAK_DOMAIN="$NAKNAK_DOMAIN" \
+  -e TEMPLATE_PROVIDER="$TEMPLATE_PROVIDER" -e OUTPOST="$OUTPOST" -e REMOVE="$remove" server ak shell < /tmp/naknak-authentik-friend.py 2>/dev/null
+rm -f /tmp/naknak-authentik-friend.py
+REMOTE
+}
+
+proxy() { # step 3 / undo: NPMplus API on the proxy host, password via stdin
+  local action=$1 fqdn=$2
+  local pw
+  pw=$(eval "$NPM_PASSWORD_CMD") && [ -n "$pw" ] || die "NPM_PASSWORD_CMD gave no password"
+  # the password travels inside the script stream, never as an argument
+  remote "$PROXY_SSH" "$action" "$fqdn" "$NPM_API" "$NPM_USER" "$FORWARD_HOST" "$FORWARD_PORT" "$pw" <<'REMOTE'
+set -euo pipefail
+action=$1 fqdn=$2 api=$3 user=$4 fhost=$5 fport=$6 pw=$7
+set --
+J=$(mktemp); trap 'rm -f $J' EXIT
+curl -sk -c "$J" -H 'Content-Type: application/json' -d "$(jq -n --arg u "$user" --arg p "$pw" '{identity:$u, secret:$p}')" "$api/tokens" | jq -e '.expires' >/dev/null || { echo "ERR NPM login failed"; exit 1; }
+get() { curl -sk -b "$J" "$api/$1"; }
+send() { curl -sk -b "$J" -X "$1" -H 'Content-Type: application/json' ${3:+-d "$3"} "$api/$2"; }
+host=$(get nginx/proxy-hosts | jq -r --arg d "$fqdn" '.[] | select(.domain_names == [$d]) | .id' | head -1)
+cert=$(get nginx/certificates | jq -r --arg d "$fqdn" '.[] | select(.domain_names == [$d]) | .id' | head -1)
+if [ "$action" = remove ]; then
+  [ -n "$host" ] && send DELETE "nginx/proxy-hosts/$host" >/dev/null && echo "host $host removed"
+  [ -n "$cert" ] && send DELETE "nginx/certificates/$cert" >/dev/null && echo "certificate $cert removed"
+  exit 0
+fi
+if [ -z "$cert" ]; then
+  cert=$(send POST nginx/certificates "$(jq -n --arg d "$fqdn" '{provider:"letsencrypt", nice_name:$d, domain_names:[$d], meta:{dns_challenge:false}}')" | jq -r '.id // empty')
+  [ -n "$cert" ] || { echo "ERR certificate for $fqdn failed (DNS pointing here?)"; exit 1; }
+fi
+echo "certificate $cert"
+body=$(jq -n --arg d "$fqdn" --arg h "$fhost" --argjson p "$fport" --argjson c "$cert" \
+  '{domain_names:[$d], forward_scheme:"http", forward_host:$h, forward_port:$p, certificate_id:$c, ssl_forced:true, http2_support:true, hsts_enabled:true, block_exploits:true, npmplus_noindex:true}')
+if [ -z "$host" ]; then
+  host=$(send POST nginx/proxy-hosts "$body" | jq -r '.id // empty')
+else
+  send PUT "nginx/proxy-hosts/$host" "$(echo "$body" | jq 'del(.domain_names)')" >/dev/null
+fi
+[ -n "$host" ] || { echo "ERR proxy host failed"; exit 1; }
+echo "host $host"
+REMOTE
+}
+
+check() { # step 4: from outside, until the instance answers behind Authentik
+  local url=https://$1.$NAKNAK_DOMAIN
+  for _ in $(seq 1 30); do
+    if [ "$(curl -s -o /dev/null -w '%{http_code}' "$url/healthz")" = 200 ] &&
+      curl -s -o /dev/null -w '%{redirect_url}' "$url/" | grep -q outpost.goauthentik.io; then
+      ok "$url answers, everything else needs the Authentik login"
+      return 0
+    fi
+    sleep 4
+  done
+  die "$url does not answer as expected yet (DNS, certificate or outpost); run add again later"
+}
+
+case "${1:-}" in
+add)
+  [ $# -eq 4 ] || { sed -n '4,8p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
+  slug=$2 owner=$3 user=$4
+  valid_slug "$slug"
+  [[ $owner =~ ^[0-9A-Za-z._-]{3,40}$ ]] || die "NAK login looks wrong: $owner"
+  say "1/4 instance $slug on $APP_SSH"
+  out=$(app add "$slug" "$owner") || die "$out"
+  echo "$out" | grep -q healthy || die "instance not healthy: $out"
+  ok "$out"
+  say "2/4 Authentik ($AUTH_SSH)"
+  res=$(authentik "$slug" "$user" "")
+  ok "${res#RESULT }"
+  echo "$res" | grep -q warning && echo "  ! $user has no Authentik account yet: once they registered, run add again"
+  say "3/4 proxy ($PROXY_SSH)"
+  res=$(proxy add "$slug.$NAKNAK_DOMAIN") || die "$res"
+  echo "$res" | grep -q '^ERR' && die "$res"
+  ok "$(echo "$res" | tr '\n' ' ')"
+  say "4/4 check"
+  check "$slug"
+  echo
+  echo "Ready: https://$slug.$NAKNAK_DOMAIN — $user logs in with Authentik, then once with their NAK account ($owner)."
+  ;;
+remove)
+  [ $# -ge 2 ] || exit 2
+  slug=$2 purge=${3:-}
+  valid_slug "$slug"
+  action=remove
+  if [ "$purge" = --purge ]; then
+    read -r -p "Delete ALL data of $slug (NAK login, cache, history)? Type the slug: " answer
+    [ "$answer" = "$slug" ] || die "not confirmed"
+    action=purge
+  fi
+  say "proxy"; proxy remove "$slug.$NAKNAK_DOMAIN" | sed 's/^/  /'
+  say "Authentik"; authentik "$slug" "" 1 | sed 's/^RESULT /  /'
+  say "instance"; app "$action" "$slug" | sed 's/^/  /'
+  ok "$slug removed${purge:+ (data deleted)}"
+  ;;
+list) ssh "$APP_SSH" "cd $APP_DIR && ./naknak-friends list" ;;
+*) sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+esac
