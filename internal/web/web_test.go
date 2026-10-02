@@ -845,3 +845,45 @@ func TestOperatorNoticeOnLoginAndSettings(t *testing.T) {
 		t.Error("own instance must not show an operator notice")
 	}
 }
+
+// a public demo must not reach out (EduVault, ntfy) or let visitors change
+// what the next visitor sees
+func TestPublicDemoBlocksSettingsAndOutboundCalls(t *testing.T) {
+	a := app.FromEnv()
+	a.ConfigDir = t.TempDir()
+	s := New(a, fakeRegistry(&counters{}), Config{Token: token, Version: "t", Demo: true})
+	srv := httptest.NewServer(s.Handler())
+	t.Cleanup(srv.Close)
+	call := func(method, path, body string) int {
+		req, _ := http.NewRequest(method, srv.URL+path, strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Sec-Fetch-Site", "same-origin")
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		res.Body.Close()
+		return res.StatusCode
+	}
+	for _, c := range [][3]string{
+		{"PUT", "/api/settings/eduvault", `{"url":"http://10.0.0.1","token":"x","secret":"JBSWY3DPEHPK3PXP"}`},
+		{"DELETE", "/api/settings/eduvault", ``},
+		{"PUT", "/api/settings/notify", `{"ntfy_url":"https://example.org/x"}`},
+		{"PUT", "/api/settings/nav", `{"nav":["start","noten"]}`},
+		{"PUT", "/api/settings/home", `{"home":["grades"]}`},
+		{"POST", "/api/reset", `{}`},
+		{"POST", "/api/sessions/revoke", `{}`},
+		{"POST", "/api/calendar/rotate", `{}`},
+		{"POST", "/api/upload", ``},
+	} {
+		if code := call(c[0], c[1], c[2]); code != http.StatusForbidden {
+			t.Errorf("%s %s in the demo: %d, want 403", c[0], c[1], code)
+		}
+	}
+	if code := call("GET", "/api/settings", ""); code != 200 {
+		t.Errorf("reading settings in the demo: %d", code)
+	}
+	if st := a.Settings(); st.Notify.NtfyURL != "" || len(st.Nav) != 0 {
+		t.Errorf("demo settings changed: %+v", st)
+	}
+}

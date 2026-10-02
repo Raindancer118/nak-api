@@ -146,21 +146,21 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("GET /api/stats", s.authed(http.HandlerFunc(s.statsAPI)))
 	mux.Handle("GET /api/export", s.authed(http.HandlerFunc(s.export)))
 	mux.Handle("GET /api/version", s.authed(http.HandlerFunc(s.version)))
-	mux.Handle("POST /api/reset", s.authed(s.jsonOnly(s.reset)))
-	mux.Handle("POST /api/sessions/revoke", s.authed(s.jsonOnly(s.revokeSessions)))
+	mux.Handle("POST /api/reset", s.notInDemo(s.authed(s.jsonOnly(s.reset))))
+	mux.Handle("POST /api/sessions/revoke", s.notInDemo(s.authed(s.jsonOnly(s.revokeSessions))))
 	mux.Handle("GET /metrics", s.authed(http.HandlerFunc(s.metrics)))
-	mux.Handle("POST /api/upload", s.authed(s.sameOriginOnly(s.upload)))
+	mux.Handle("POST /api/upload", s.notInDemo(s.authed(s.sameOriginOnly(s.upload))))
 	mux.Handle("GET /api/notifications", s.authed(http.HandlerFunc(s.notifications)))
 	mux.Handle("POST /api/notifications/read", s.authed(s.jsonOnly(s.notificationsRead)))
 	mux.Handle("GET /api/events", s.authed(http.HandlerFunc(s.events)))
-	mux.Handle("PUT /api/settings/notify", s.authed(s.jsonOnly(s.putNotify)))
-	mux.Handle("PUT /api/settings/nav", s.authed(s.jsonOnly(s.putNav)))
-	mux.Handle("PUT /api/settings/home", s.authed(s.jsonOnly(s.putHome)))
+	mux.Handle("PUT /api/settings/notify", s.notInDemo(s.authed(s.jsonOnly(s.putNotify))))
+	mux.Handle("PUT /api/settings/nav", s.notInDemo(s.authed(s.jsonOnly(s.putNav))))
+	mux.Handle("PUT /api/settings/home", s.notInDemo(s.authed(s.jsonOnly(s.putHome))))
 	mux.Handle("GET /api/grades/pending", s.authed(http.HandlerFunc(s.pendingAPI)))
-	mux.Handle("POST /api/calendar/rotate", s.authed(s.jsonOnly(s.calendarRotate)))
+	mux.Handle("POST /api/calendar/rotate", s.notInDemo(s.authed(s.jsonOnly(s.calendarRotate))))
 	mux.HandleFunc("GET /calendar/{file}", s.calendarFeed)
-	mux.Handle("PUT /api/settings/eduvault", s.authed(s.jsonOnly(s.putEduVault)))
-	mux.Handle("DELETE /api/settings/eduvault", s.authed(s.sameOriginOnly(s.deleteEduVault)))
+	mux.Handle("PUT /api/settings/eduvault", s.notInDemo(s.authed(s.jsonOnly(s.putEduVault))))
+	mux.Handle("DELETE /api/settings/eduvault", s.notInDemo(s.authed(s.sameOriginOnly(s.deleteEduVault))))
 	mux.Handle("POST /api/cache/clear", s.authed(s.jsonOnly(func(w http.ResponseWriter, r *http.Request) {
 		s.store.clear()
 		writeJSON(w, http.StatusOK, map[string]any{"cleared": true})
@@ -225,6 +225,18 @@ func (s *Server) isAuthed(r *http.Request) bool {
 	}
 	c, err := r.Cookie(cookieName)
 	return err == nil && eq(c.Value, s.sessionValue())
+}
+
+// notInDemo blocks what a public demo must not do: reach out to other
+// servers (EduVault, ntfy), take uploads, or change what the next visitor sees.
+func (s *Server) notInDemo(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if s.cfg.Demo {
+			writeJSON(w, http.StatusForbidden, map[string]any{"error": "In der Demo nicht verfügbar."})
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 func (s *Server) authed(next http.Handler) http.Handler {

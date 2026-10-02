@@ -1767,6 +1767,7 @@ async function settingsPage(root) {
 
   // account & instance
   const acc = st.account || {};
+  if (st.demo) grid.prepend(tile("Demo", { cls: "w12", i: 0 }, h("p", { class: "empty", text: "Das ist die Demo mit erfundenen Daten: Einstellungen werden hier nicht gespeichert, und naknak spricht mit keinem anderen Server. In deiner eigenen Instanz geht alles." })));
   if (st.operator?.name) {
     grid.append(tile("Betrieb", { cls: "w12", i: 1 }, h("p", { class: "empty", text:
       `Diese Instanz betreibt ${st.operator.name} für dich. Gespeichert sind dein NORDAKADEMIE-Login (für die Abfragen bei CIS und Moodle) und was naknak daraus zwischenspeichert; als Betreiber hat ${st.operator.name} technisch Zugriff darauf. Weiter unten kannst du alles exportieren oder die Instanz zurücksetzen (löscht alles)${st.operator.contact ? `; Fragen an ${st.operator.contact}` : ""}.` })));
