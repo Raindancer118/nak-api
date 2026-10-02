@@ -21,7 +21,7 @@ type concept struct {
 }
 
 var concepts = []concept{
-	{"Datenbanken", []string{"datenbank", "sql", "nosql", "relational", "datenmodell", "abfrage", "query", "olap", "data warehouse", "datawarehouse", "data engineering", "etl", "indexierung"}},
+	{"Datenbanken", []string{"datenbank", "sql", "nosql", "relational", "datenmodell", "abfrage", "query", "olap", "data warehouse", "datawarehouse", "data engineering", "etl", "indexierung", "stammdaten", "masterdata", "master data", "mdm", "datenqualitat", "data quality", "data governance", "datenmanagement", "data management", "datenintegration"}},
 	{"KI & Data Science", []string{"kunstliche intelligenz", "ki", "ai", "machine learning", "maschinelles lernen", "ml", "deep learning", "neuronal", "neural", "llm", "language model", "sprachmodell", "generativ", "chatbot", "data science", "data analytics", "datenanalyse", "prognose", "vorhersage", "klassifikation", "klassifizier", "nlp", "computer vision"}},
 	{"Cloud & DevOps", []string{"cloud", "aws", "azure", "gcp", "kubernetes", "container", "docker", "devops", "ci", "cd", "pipeline", "microservice", "serverless", "infrastructure as code", "terraform", "verteilte system"}},
 	{"IT-Sicherheit", []string{"sicherheit", "security", "penetration", "pentest", "angriff", "verschlussel", "krypto", "siem", "soc", "iso 27001", "bsi", "informationssicherheit", "schwachstell", "phishing", "zugriffsschutz", "authentifizier"}},
@@ -106,6 +106,17 @@ func hasConcept(text string, c concept) bool {
 	return false
 }
 
+// genericPrefix: shared word starts that say nothing about the subject
+// ("Masterdata" is no "Masterstudiengang")
+func genericPrefix(p string) bool {
+	for _, g := range []string{"master", "bachelor", "studien", "grundlag", "allgemein", "angewandt"} {
+		if strings.HasPrefix(g, p) || strings.HasPrefix(p, g) {
+			return true
+		}
+	}
+	return false
+}
+
 func commonPrefix(a, b string) int {
 	n := 0
 	for n < len(a) && n < len(b) && a[n] == b[n] {
@@ -145,7 +156,7 @@ func termFit(t string, area []string) float64 {
 			return 1
 		case len(t) >= 5 && len(a) >= 5 && (strings.Contains(a, t) || strings.Contains(t, a)):
 			best = math.Max(best, 0.85)
-		case commonPrefix(a, t) >= 6:
+		case commonPrefix(a, t) >= 6 && !genericPrefix(a[:commonPrefix(a, t)]):
 			best = math.Max(best, 0.8)
 		default:
 			if j := jaccard(trigrams(t), trigrams(a)); j >= 0.45 {

@@ -117,3 +117,20 @@ func TestPersonnelTopicsFindHR(t *testing.T) {
 		t.Fatalf("top %q: %+v", top(got), got)
 	}
 }
+
+func TestMasterDataIsDataManagement(t *testing.T) {
+	rs := []Reviewer{
+		{Name: "Ludolph", Areas: []string{"Masterstudiengänge", "Controlling"}},
+		{Name: "Gohl", Areas: []string{"Datenbanken", "Softwareentwicklung"}},
+		{Name: "Christiansen", Areas: []string{"Datenanalysen", "Statistische Methoden"}},
+	}
+	got := Suggest("Masterdata Management", rs, 3)
+	if top(got) != "Gohl" {
+		t.Fatalf("top %q: %+v", top(got), got)
+	}
+	for _, m := range got {
+		if m.Reviewer.Name == "Ludolph" {
+			t.Errorf("'Master' is a prefix, not a topic: %+v", m)
+		}
+	}
+}

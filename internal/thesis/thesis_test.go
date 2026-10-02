@@ -1,6 +1,7 @@
 package thesis
 
 import (
+	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -126,5 +127,19 @@ func TestReviewers(t *testing.T) {
 	}
 	if got := FilterReviewers(rs, "software"); len(got) != 1 || got[0].Name != "Beispiel, Erika" {
 		t.Errorf("filter: %+v", got)
+	}
+}
+
+func TestReviewerSectionHeaders(t *testing.T) {
+	body := `<table><tr><td><a href="mailto:f@x">Ludolph, Fred</a></td><td>Wirtschaftswissenschaften</td>
+<td>Bachelorstudiengänge:<br>Allgemeine<br>Betriebswirtschaftslehre<br>Controlling<br>Masterstudiengänge:<br>Controlling</td><td></td></tr></table>`
+	rs := ParseReviewers(body)
+	if len(rs) != 1 {
+		t.Fatalf("got %d", len(rs))
+	}
+	// "Master:" headers are labels, not subject areas; the dangling adjective joins its noun
+	want := []string{"Allgemeine Betriebswirtschaftslehre", "Controlling"}
+	if fmt.Sprint(rs[0].Areas) != fmt.Sprint(want) {
+		t.Errorf("areas %q", rs[0].Areas)
 	}
 }

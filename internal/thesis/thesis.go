@@ -289,7 +289,11 @@ var (
 	checkedRe = regexp.MustCompile(`value="(\d)"[^>]*checked`)
 	brRe      = regexp.MustCompile(`<br\s*/?>`)
 	// a line ending like this continues on the next one
-	joinEnd = regexp.MustCompile(`(?i)(\bund|\bsowie|\boder|\bder|\bdie|\bdes|\bvon|\bzu|\bfür|\bim|\bin|\bmit|&|-)$`)
+	// "Masterstudiengänge:" and the like structure the list, they are no areas
+	sectionHead = regexp.MustCompile(`:\s*$`)
+	// a line that is only an adjective ("Allgemeine") belongs to the next one
+	danglingAdj = regexp.MustCompile(`^\p{Lu}[\p{Ll}-]+(ische|liche|ale|eine|ige|ive|elle|ene|ere)$`)
+	joinEnd     = regexp.MustCompile(`(?i)(\bund|\bsowie|\boder|\bder|\bdie|\bdes|\bvon|\bzu|\bfür|\bim|\bin|\bmit|&|-)$`)
 )
 
 var loadLabels = map[int]string{0: "frei", 1: "mittel", 2: "voll"}
@@ -314,7 +318,7 @@ func ParseReviewers(body string) []Reviewer {
 		var cur string
 		for _, line := range brRe.Split(cells[2][1], -1) {
 			l := text(line)
-			if l == "" {
+			if l == "" || sectionHead.MatchString(l) {
 				continue
 			}
 			if cur != "" {
@@ -322,13 +326,13 @@ func ParseReviewers(body string) []Reviewer {
 			} else {
 				cur = l
 			}
-			if !joinEnd.MatchString(cur) {
-				r.Areas = append(r.Areas, cleanArea(cur))
+			if !joinEnd.MatchString(cur) && !danglingAdj.MatchString(cur) {
+				r.Areas = addArea(r.Areas, cleanArea(cur))
 				cur = ""
 			}
 		}
 		if cur != "" {
-			r.Areas = append(r.Areas, cleanArea(cur))
+			r.Areas = addArea(r.Areas, cleanArea(cur))
 		}
 		if len(cells) > 3 {
 			if m := checkedRe.FindStringSubmatch(cells[3][1]); m != nil {
@@ -339,6 +343,15 @@ func ParseReviewers(body string) []Reviewer {
 		out = append(out, r)
 	}
 	return out
+}
+
+func addArea(as []string, a string) []string {
+	for _, x := range as {
+		if strings.EqualFold(x, a) {
+			return as
+		}
+	}
+	return append(as, a)
 }
 
 // cleanArea drops list bullets and a trailing comma
