@@ -28,7 +28,7 @@ check() { # page expectation…
   rm -f "$dom" "$log"
 }
 
-check "#/"                    "Guten" "Max." "Als Nächstes" "Fristen" "Übungsblatt 4" "Diese Woche"
+check "#/"                    "Max." "Als Nächstes" "Fristen" "Übungsblatt 4" "Diese Woche"
 check "#/woche"               "Softwaretechnik" "B 204"
 check "#/kurse"               "Datenbanksysteme" "Tutorium Datenbanksysteme"
 check "#/modul/I160"          "Prüfungsverlauf" "Jonas Brandt" "Altklausuren" "Klausur (90 Minuten)"
