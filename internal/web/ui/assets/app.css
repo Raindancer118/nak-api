@@ -1146,3 +1146,26 @@ a.icon-btn { color: inherit; }
 .palette-list h2 { padding: .6rem .6rem .25rem; }
 .palette .hit { grid-template-columns: 1fr auto; }
 .palette-foot { margin: 0; padding: .55rem 1rem; border-top: 1px solid var(--line); font-size: .75rem; color: var(--dim); }
+
+/* ── actions ────────────────────────────────────────────── */
+
+.action { display: grid; gap: .6rem; margin-top: .6rem; justify-items: start; }
+.action .preview-box { justify-self: stretch; }
+.preview-box .kv { margin: .4rem 0 .6rem; }
+.reply { margin-top: .75rem; }
+.reply summary { cursor: pointer; color: var(--dim); font-size: .88rem; min-height: 40px; display: inline-flex; align-items: center; }
+.reply summary:hover, .reply[open] summary { color: var(--ink); }
+.reply textarea, .submit-form textarea { width: 100%; font: inherit; padding: .7rem .85rem; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); resize: vertical; margin-top: .4rem; }
+.submit-form { display: grid; gap: .65rem; margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--line); }
+.drop { display: grid; place-items: center; gap: .4rem; min-height: 6rem; border: 1.5px dashed color-mix(in oklab, var(--ink) 25%, transparent); border-radius: 14px; color: var(--dim); cursor: pointer; text-align: center; padding: 1rem; transition: border-color .2s, background .2s; }
+.drop.over { border-color: var(--moodle); background: color-mix(in oklab, var(--moodle) 8%, transparent); }
+.drop input { max-width: 100%; color: var(--text); }
+.submit-form label.check { display: grid; grid-template-columns: auto 1fr; gap: .75rem; align-items: start; cursor: pointer; }
+.submit-form label.check input { width: 20px; height: 20px; margin-top: .15rem; accent-color: var(--moodle); }
+.submit-form label.check b { display: block; font-weight: 500; color: var(--ink); }
+.submit-form label.check small { display: block; color: var(--dim); font-size: .82rem; }
+.tl-body .action { margin-top: .4rem; }
+.exam-row { padding-bottom: .25rem; }
+.exam-row .t a { color: inherit; text-decoration: none; }
+.exam-row .t a:hover { color: var(--cis); }
+.exam-row .action { margin: 0 0 .6rem 1.6rem; }

@@ -395,7 +395,7 @@ async function overview(root) {
   const tDead = tile("Fristen", { i: 1, link: ["Woche", "#/woche"] });
   const tWeek = tile("Diese Woche", { cls: "half", i: 2, link: ["Alle Termine", "#/woche"] });
   const tGrades = tile("Noten", { cls: "half", i: 3, link: ["Alle Noten", "#/noten"] });
-  const tExams = tile("Prüfungen", { cls: "half", i: 4 });
+  const tExams = tile("Prüfungen", { cls: "half", i: 4, link: ["Alle Prüfungen", "#/pruefungen"] });
   const tMoodle = tile("Moodle · aktuelle Kurse", { cls: "w12", i: 5, link: ["Alle Kurse", "#/kurse"] });
   grid.append(tNext, tDead, tWeek, tGrades, tExams, tMoodle);
 
@@ -765,11 +765,50 @@ async function assignmentPage(root, id) {
         h("dl", { class: "kv" }, Object.entries(sub).filter(([, v]) => typeof v !== "object" && v !== "").map(([k, v]) => [h("dt", { text: statusLabel[k] || k }), h("dd", { text: statusLabel[v] || v })])),
         (sub.files || []).length > 0 && h("ul", { class: "rows files meter" }, sub.files.map((f, k) => typeof f === "object" ? fileRow(f, k) : h("li", { class: "s", text: f }))),
         a.feedback && textBlock(typeof a.feedback === "string" ? a.feedback : JSON.stringify(a.feedback)),
-        h("p", { class: "empty meter", text: "Hochladen kommt als Nächstes in nak; bis dahin in Moodle abgeben." }),
-        a.url && h("a", { class: "go", href: a.url, target: "_blank", rel: "noopener", text: "In Moodle abgeben ↗" })));
+        submitForm(a)));
   } catch (err) {
     box.replaceChildren(errorBox(err));
   }
+}
+
+// Upload goes to naknak first (/api/upload), the submission itself through
+// the confirm gate: draft by default, "endgültig einreichen" only when ticked.
+function submitForm(a) {
+  const files = h("input", { type: "file", multiple: true, "aria-label": "Dateien" });
+  const text = h("textarea", { rows: 3, placeholder: "Online-Text (falls die Aufgabe das erlaubt)" });
+  const final = h("input", { type: "checkbox" });
+  const note = h("p", { class: "empty" });
+  const drop = h("label", { class: "drop" }, files, h("span", { text: "Dateien hierher ziehen oder auswählen" }));
+  const list = h("ul", { class: "rows files" });
+  const showFiles = () => list.replaceChildren(...[...files.files].map((f) => h("li", { class: "s", text: `${f.name} · ${Math.round(f.size / 1024)} KB` })));
+  files.addEventListener("change", showFiles);
+  drop.addEventListener("dragover", (e) => { e.preventDefault(); drop.classList.add("over"); });
+  drop.addEventListener("dragleave", () => drop.classList.remove("over"));
+  drop.addEventListener("drop", (e) => { e.preventDefault(); drop.classList.remove("over"); files.files = e.dataTransfer.files; showFiles(); });
+  const flow = confirmFlow({
+    tool: "moodle_assignment_submit", label: "Vorschau der Abgabe", cls: "primary",
+    confirm: "Verbindlich an Moodle senden",
+    args: async () => {
+      let paths = [];
+      if (files.files.length) {
+        const fd = new FormData();
+        for (const f of files.files) fd.append("file", f);
+        note.textContent = "Lade Dateien zu naknak hoch …";
+        const res = await fetch("/api/upload", { method: "POST", body: fd, credentials: "same-origin" });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) { note.textContent = body.error || `Upload fehlgeschlagen (HTTP ${res.status})`; return null; }
+        paths = body.files.map((f) => f.path);
+        note.textContent = "";
+      }
+      if (!paths.length && !text.value.trim()) { note.textContent = "Wähle Dateien oder schreibe einen Online-Text."; return null; }
+      return { assignid: a.assignid, files: paths, online_text: text.value.trim() || undefined, submit_for_grading: final.checked };
+    },
+    done: refreshPage,
+  });
+  return h("div", { class: "submit-form" },
+    h("h2", { text: "Abgeben" }), drop, list, text,
+    h("label", { class: "check" }, final, h("span", {}, h("b", { text: "Endgültig zur Bewertung einreichen" }), h("small", { text: "Sonst bleibt es ein Entwurf, den du noch ändern kannst." }))),
+    note, flow);
 }
 
 const statusLabel = {
@@ -798,10 +837,17 @@ async function discussionPage(root, id) {
     const r = await api("moodle_forum_posts", { discussionid: Number(id) });
     const posts = Array.isArray(r) ? r : r?.posts || [];
     if (posts[0]) head.querySelector("h1").textContent = posts[0].subject;
-    box.replaceChildren(...posts.map((p, i) => h("article", { class: "post tile", vars: { "--i": Math.min(i, 10) } },
-      h("header", {}, h("b", { text: p.author }), h("span", { class: "s", text: p.time })),
-      i > 0 && p.subject && !String(p.subject).startsWith("Re:") && h("h3", { text: p.subject }),
-      textBlock(p.message))));
+    box.replaceChildren(...posts.map((p, i) => {
+      const ta = h("textarea", { rows: 3, placeholder: `Antwort an ${p.author} …`, "aria-label": "Antwort" });
+      const reply = h("details", { class: "reply" }, h("summary", { text: "Antworten" }), ta,
+        confirmFlow({ tool: "moodle_forum_reply", label: "Vorschau", confirm: "Antwort verbindlich posten", cls: "primary",
+          args: () => ta.value.trim() ? { postid: p.postid, message: ta.value.trim() } : null, done: refreshPage }));
+      return h("article", { class: "post tile", vars: { "--i": Math.min(i, 10) } },
+        h("header", {}, h("b", { text: p.author }), h("span", { class: "s", text: p.time })),
+        i > 0 && p.subject && !String(p.subject).startsWith("Re:") && h("h3", { text: p.subject }),
+        textBlock(p.message),
+        p.postid && reply);
+    }));
   } catch (err) {
     box.replaceChildren(errorBox(err));
   }
@@ -835,10 +881,11 @@ async function newsPage(root) {
   fill(tNote, () => api("moodle_notifications", { limit: 30 }), (r) => {
     const list = Array.isArray(r) ? r : r?.notifications || [];
     if (!list.length) return emptyRow("Keine Benachrichtigungen.");
-    return h("ul", { class: "rows" }, list.map((n, j) => h("li", {}, h("div", { class: `row ${n.unread ? "unread" : ""}`, vars: { "--j": j } },
+    const unread = list.filter((n) => n.unread).length;
+    return [unread > 0 && confirmFlow({ tool: "moodle_mark_notifications_read", args: {}, label: `${unread} als gelesen markieren`, confirm: "In Moodle als gelesen markieren", done: refreshPage }), h("ul", { class: "rows" }, list.map((n, j) => h("li", {}, h("div", { class: `row ${n.unread ? "unread" : ""}`, vars: { "--j": j } },
       h("span", { class: "dot", "data-src": "moodle" }),
       h("span", { class: "t" }, n.subject, h("span", { class: "s", text: n.time })),
-      n.unread && h("span", { class: "chip moodle", text: "neu" })))));
+      n.unread && h("span", { class: "chip moodle", text: "neu" })))))];
   });
 }
 
@@ -1205,6 +1252,15 @@ function examTimeline(u, m, hist, current) {
     if (x.dozenten?.length && (x.registered || (!prev.registered && !prev.dozenten.length))) prev.dozenten = x.dozenten;
     prev.registered ||= !!x.registered;
     if (x.grade) { prev.result = x; prev.attempt = x.attempt || prev.attempt; }
+    // the CIS offers one action per exam (register before, deregister until the deadline)
+    if (x.exam_id && "action" in x) {
+      // your registered entry decides; otherwise every group's offer is listed
+      // separately (with group and examiner) — never pick a group for you
+      const offer = { action: x.action, label: x.action_label, examId: x.exam_id, deadlines: x.deadlines, group: (x.zenturien || []).join(", "), examiner: (x.dozenten || []).map((d) => d.includes(",") ? d.split(",").map((y) => y.trim()).reverse().join(" ") : d).join(", ") };
+      prev.offers ||= [];
+      if (x.registered) { prev.mine = true; prev.offers = x.action ? [offer] : []; prev.deadlines = x.deadlines; }
+      else if (!prev.mine && x.action) { prev.offers.push(offer); prev.deadlines ||= x.deadlines; }
+    }
     byKey.set(k, prev);
   };
   for (const e of current) put(e);
@@ -1226,7 +1282,21 @@ function examTimeline(u, m, hist, current) {
           r.upcoming && h("span", { class: `chip ${r.registered ? "ok" : "due"}`, text: r.registered ? (dayDiff(r.at) === 0 ? "heute · angemeldet" : `angemeldet · ${relDay(dayDiff(r.at))}`) : "nicht angemeldet" }),
           !r.upcoming && res && h("span", { class: `chip ${cls}`, text: res.grade }),
           !r.upcoming && !res && h("span", { class: "chip", text: r.registered ? "Ergebnis steht aus" : "vergangen" })),
-        h("span", { class: "s", text: [r.title, r.attempt ? `${r.attempt}. Versuch` : "", r.dozenten.map((d) => d.includes(",") ? d.split(",").map((x) => x.trim()).reverse().join(" ") : d).join(", ")].filter(Boolean).join(" · ") })));
+        h("span", { class: "s", text: [r.title, r.attempt ? `${r.attempt}. Versuch` : "", r.dozenten.map((d) => d.includes(",") ? d.split(",").map((x) => x.trim()).reverse().join(" ") : d).join(", ")].filter(Boolean).join(" · ") }),
+        r.upcoming && r.deadlines && h("span", { class: "s", text: [r.deadlines.register_closes && `Anmeldung bis ${r.deadlines.register_closes}`, r.deadlines.deregister_until && `Abmeldung bis ${r.deadlines.deregister_until}`].filter(Boolean).join(" · ") }),
+        r.upcoming && (() => {
+          // the CIS sometimes still offers an action after its deadline
+          const open = (o) => {
+            const until = parseDE(o.action === "register" ? o.deadlines?.register_closes : o.deadlines?.deregister_until);
+            return !until || until > new Date();
+          };
+          const late = (r.offers || []).filter((o) => !open(o));
+          return late.length > 0 && !(r.offers || []).some(open) && h("span", { class: "chip", text: late[0].action === "register" ? "Anmeldefrist vorbei" : "Abmeldefrist vorbei" });
+        })(),
+        r.upcoming && (r.offers || []).filter((o) => (o.action === "register" || o.action === "deregister") && (() => { const until = parseDE(o.action === "register" ? o.deadlines?.register_closes : o.deadlines?.deregister_until); return !until || until > new Date(); })()).map((o) => confirmFlow({
+          tool: "cis_klausur_action", args: { exam_id: o.examId, action: o.action },
+          label: [o.label || (o.action === "register" ? "Anmelden" : "Abmelden"), (r.offers.length > 1 || !r.mine) && o.group, (r.offers.length > 1 || !r.mine) && o.examiner].filter(Boolean).join(" · "),
+          confirm: o.action === "register" ? `Verbindlich anmelden${o.group ? ` (${o.group})` : ""}` : "Verbindlich abmelden", done: refreshPage }))));
   }));
 }
 
@@ -1603,6 +1673,7 @@ function paletteCommands() {
     { group: "Seiten", title: "Neuigkeiten", run: go("#/neu") },
     { group: "Seiten", title: "Nachrichten", run: go("#/nachrichten") },
     { group: "Seiten", title: "Noten", run: go("#/noten") },
+    { group: "Seiten", title: "Prüfungen & Anmeldungen", run: go("#/pruefungen") },
     { group: "Seiten", title: "Einstellungen", run: go("#/einstellungen") },
     { group: "Aktionen", title: "Neu laden (frisch aus CIS und Moodle)", run: () => $(".top .icon-btn")?.click() },
     { group: "Aktionen", title: "Design wechseln (System → Hell → Dunkel)", run: () => $(".theme-btn")?.click() },
@@ -1662,6 +1733,121 @@ addEventListener("keydown", (e) => {
   }
 });
 
+// ── binding actions: preview first, then an explicit second click ───────────
+
+const previewLabels = {
+  action: "Aktion", exam: "Prüfung", title: "Titel", start: "Beginn", ende: "Ende", module_nr: "Modul", dozenten: "Prüfer",
+  zenturien: "Gruppe", section: "Bereich", message: "Nachricht", subject: "Betreff", text: "Text", course: "Kurs", name: "Name",
+  files: "Dateien", online_text: "Online-Text", submit_for_grading: "Endgültig einreichen", assignment: "Aufgabe", to: "An",
+  conversation: "Unterhaltung", forum: "Forum", discussion: "Diskussion", count: "Anzahl", would: "Würde", status: "Status",
+};
+const previewSkip = /(^|_)(id|ids|url|urls|token|cmid|hash)$|^(next|mode|tool|deadlines|action_url|days_until_exam)$/;
+
+// previewView turns a tool preview into a readable list: German labels,
+// no ids or URLs, nested objects flattened one level.
+function previewView(pre) {
+  const p = pre?.preview ?? pre;
+  if (typeof p === "string") return h("pre", { text: p });
+  const rows = [];
+  const val = (v) => Array.isArray(v) ? v.map((x) => typeof x === "object" ? JSON.stringify(x) : String(x)).join(", ") : typeof v === "boolean" ? (v ? "ja" : "nein") : String(v);
+  const walk = (obj, depth) => {
+    for (const [k, v] of Object.entries(obj || {})) {
+      if (v === null || v === "" || previewSkip.test(k)) continue;
+      if (typeof v === "object" && !Array.isArray(v)) {
+        if (depth < 1) walk(v, depth + 1);
+        continue;
+      }
+      rows.push([previewLabels[k] || k, val(v)]);
+    }
+  };
+  if (p && typeof p === "object") walk(p, 0);
+  if (!rows.length) return h("pre", { text: JSON.stringify(p, null, 2) });
+  return h("dl", { class: "kv" }, rows.map(([k, v]) => [h("dt", { text: k }), h("dd", { text: v })]));
+}
+
+// confirmFlow renders a button; the first click asks the server for a preview
+// (nothing is sent to CIS/Moodle), only the second, labelled click executes.
+function confirmFlow({ tool, args, label, confirm, done, cls = "ghost" }) {
+  const box = h("div", { class: "preview-box", hidden: true });
+  const btn = h("button", { class: cls, type: "button", text: label });
+  btn.addEventListener("click", async () => {
+    const a = typeof args === "function" ? await args() : args;
+    if (!a) return;
+    box.hidden = false;
+    box.replaceChildren(h("p", { class: "empty", text: "Vorschau wird erstellt …" }));
+    try {
+      const pre = await post(tool, a);
+      const go = h("button", { class: "primary", type: "button", text: confirm });
+      go.addEventListener("click", async () => {
+        go.disabled = true;
+        go.classList.add("busy");
+        try {
+          const r = await post(tool, { ...a, confirm: true }, "", { "X-Nak-Confirm": "JA" });
+          box.replaceChildren(h("p", { class: "ok-note", text: "Erledigt." }));
+          unitsP = null;
+          historyP = null;
+          done?.(r);
+        } catch (err) {
+          box.replaceChildren(errorBox(err));
+        }
+      });
+      box.replaceChildren(
+        h("p", { class: "empty", text: "Noch nichts gesendet. Das würde passieren:" }),
+        previewView(pre.result),
+        h("div", { class: "row-actions" }, go, h("button", { class: "ghost", type: "button", text: "Abbrechen", onclick: () => { box.hidden = true; } })));
+    } catch (err) {
+      box.replaceChildren(errorBox(err));
+    }
+  });
+  return h("div", { class: "action" }, btn, box);
+}
+
+async function refreshPage() {
+  fresh = true;
+  try { await render(); } finally { fresh = false; }
+}
+
+// ── all exams (incl. electives without a module number) ─────────────────────
+
+async function examsPage(root) {
+  root.append(h("div", { class: "page-head" }, h("h1", {}, "Prüfungen", h("small", { text: "Anmeldungen, offene Anmeldungen und Termine aus dem CIS" }))));
+  const grid = h("div", { class: "grid" });
+  root.append(grid);
+  const tMine = tile("Angemeldet", { cls: "w6", i: 0 });
+  const tOpen = tile("Anmeldung offen", { cls: "w6", i: 1 });
+  grid.append(tMine, tOpen);
+  const data = Promise.all([api("cis_list_klausuren"), loadUnits().catch(() => null)]);
+  const row = (e, j, withAction, units) => {
+    const at = parseDE(e.start);
+    const u = units?.unitOf(`${e.module_nr} ${e.title}`);
+    const until = parseDE(e.action === "register" ? e.deadlines?.register_closes : e.deadlines?.deregister_until);
+    const canAct = withAction && (e.action === "register" || e.action === "deregister") && (!until || until > new Date());
+    const examiner = (e.dozenten || []).map((d) => d.includes(",") ? d.split(",").map((y) => y.trim()).reverse().join(" ") : d).join(", ");
+    return h("li", { class: "exam-row", vars: { "--j": Math.min(j, 12) } },
+      h("div", { class: "row" },
+        h("span", { class: "dot", "data-src": "cis" }),
+        h("span", { class: "t" }, u ? h("a", { href: `#/modul/${u.nr}`, text: e.title }) : e.title,
+          h("span", { class: "s", text: [at && fmtDay.format(at), at && !/00:00/.test(fmtTime.format(at)) && fmtTime.format(at), (e.zenturien || []).join(", "), examiner].filter(Boolean).join(" · ") }),
+          until && h("span", { class: "s", text: `${e.action === "register" ? "Anmeldung" : "Abmeldung"} bis ${e.action === "register" ? e.deadlines.register_closes : e.deadlines.deregister_until}` })),
+        at && h("span", { class: `chip ${dayDiff(at) <= 3 && dayDiff(at) >= 0 ? "due" : ""}`, text: relDay(dayDiff(at)) })),
+      canAct && confirmFlow({ tool: "cis_klausur_action", args: { exam_id: e.exam_id, action: e.action },
+        label: e.action_label || (e.action === "register" ? "Anmelden" : "Abmelden"),
+        confirm: e.action === "register" ? "Verbindlich anmelden" : "Verbindlich abmelden", done: refreshPage }));
+  };
+  fill(tMine, () => data, ([list, units]) => {
+    const mine = (list || []).filter((e) => e.registered).sort((a, b) => (parseDE(a.start) || 0) - (parseDE(b.start) || 0));
+    return mine.length ? h("ul", { class: "rows" }, mine.map((e, j) => row(e, j, true, units))) : emptyRow("Zu keiner Prüfung angemeldet.");
+  });
+  fill(tOpen, () => data, ([list, units]) => {
+    // one exam per group: hide offers for exams you are already registered for
+    const mineKeys = new Set((list || []).filter((e) => e.registered).map((e) => `${e.start}|${norm(e.title).join(" ")}`));
+    const open = (list || []).filter((e) => !e.registered && e.action === "register" && !mineKeys.has(`${e.start}|${norm(e.title).join(" ")}`))
+      .filter((e) => { const until = parseDE(e.deadlines?.register_closes); return !until || until > new Date(); })
+      .sort((a, b) => (parseDE(a.deadlines?.register_closes) || 0) - (parseDE(b.deadlines?.register_closes) || 0));
+    return open.length ? h("ul", { class: "rows" }, open.map((e, j) => row(e, j, true, units))) : emptyRow("Gerade keine offenen Anmeldungen.");
+  });
+}
+
 // ── header, theme, routing ──────────────────────────────────────────────────
 
 const routes = [
@@ -1675,6 +1861,7 @@ const routes = [
   [/^#\/neu$/, newsPage, "#/neu"],
   [/^#\/nachrichten(?:\/(\d+))?$/, messagesPage, "#/nachrichten"],
   [/^#\/noten$/, gradesPage, "#/noten"],
+  [/^#\/pruefungen$/, examsPage, "#/noten"],
   [/^#\/einstellungen$/, settingsPage, "#/einstellungen"],
   [/^#\/module$/, unitsPage, "#/kurse"],
   [/^#\/modul\/([A-Z]{1,2}\d{3})(?:\/(inhalt|forum|abgaben))?(?:\/(\d+))?$/, unitPage, "#/kurse"],
