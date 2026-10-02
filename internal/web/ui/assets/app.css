@@ -1128,3 +1128,21 @@ a.icon-btn { color: inherit; }
 .tl-item.past .tl-head b { color: var(--text); }
 @keyframes pulse { 50% { box-shadow: 0 0 0 6px color-mix(in oklab, var(--due) 22%, transparent); } }
 [hidden] { display: none !important; }
+.stamp.offline { color: var(--due); font-weight: 600; }
+
+/* ── command palette ────────────────────────────────────── */
+
+.palette {
+  width: min(40rem, calc(100vw - 2rem)); margin: 12vh auto auto; padding: 0;
+  border: 1px solid var(--line); border-radius: 18px; background: var(--tile); color: var(--text);
+  box-shadow: 0 40px 100px -30px #000b; overflow: hidden;
+  animation: drop .35s var(--spring) both;
+}
+.palette::backdrop { background: color-mix(in oklab, var(--bg) 55%, transparent); backdrop-filter: blur(6px); animation: fade .25s both; }
+@keyframes fade { from { opacity: 0; } }
+.palette-input { width: 100%; font: inherit; font-size: 1.1rem; min-height: 60px; padding: 0 1.25rem; border: 0; border-bottom: 1px solid var(--line); background: transparent; color: var(--ink); }
+.palette-input:focus { outline: none; }
+.palette-list { max-height: min(55vh, 28rem); overflow: auto; padding: .5rem; }
+.palette-list h2 { padding: .6rem .6rem .25rem; }
+.palette .hit { grid-template-columns: 1fr auto; }
+.palette-foot { margin: 0; padding: .55rem 1rem; border-top: 1px solid var(--line); font-size: .75rem; color: var(--dim); }

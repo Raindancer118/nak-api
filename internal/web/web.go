@@ -127,6 +127,7 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("GET /api/settings", s.authed(http.HandlerFunc(s.getSettings)))
 	mux.Handle("GET /api/calendar", s.authed(http.HandlerFunc(s.calendarInfo)))
 	mux.Handle("GET /api/history", s.authed(http.HandlerFunc(s.historyAPI)))
+	mux.Handle("POST /api/upload", s.authed(s.sameOriginOnly(s.upload)))
 	mux.Handle("GET /api/notifications", s.authed(http.HandlerFunc(s.notifications)))
 	mux.Handle("POST /api/notifications/read", s.authed(s.jsonOnly(s.notificationsRead)))
 	mux.Handle("GET /api/events", s.authed(http.HandlerFunc(s.events)))
@@ -147,6 +148,9 @@ func (s *Server) Handler() http.Handler {
 		assets.ServeHTTP(w, r)
 	}))
 	mux.HandleFunc("GET /{$}", s.index)
+	// the service worker must live at the root to control the whole app
+	mux.HandleFunc("GET /sw.js", s.rootFile("assets/sw.js", "text/javascript; charset=utf-8"))
+	mux.HandleFunc("GET /manifest.webmanifest", s.rootFile("assets/manifest.webmanifest", "application/manifest+json"))
 	return s.headers(mux)
 }
 
@@ -235,6 +239,19 @@ func (s *Server) index(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Write(b)
+}
+
+func (s *Server) rootFile(name, ctype string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		b, err := fs.ReadFile(s.ui, name)
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", ctype)
+		w.Header().Set("Cache-Control", "no-cache")
+		w.Write(b)
+	}
 }
 
 func clientIP(r *http.Request) string {

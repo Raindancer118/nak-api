@@ -691,3 +691,16 @@ func TestSettingsShowAccountButNoPassword(t *testing.T) {
 		t.Fatalf("settings: %s", b)
 	}
 }
+
+func TestPWAFiles(t *testing.T) {
+	h := newHarness(t)
+	res := h.do(t, "GET", "/sw.js", "", nil)
+	if res.StatusCode != 200 || !strings.Contains(res.Header.Get("Content-Type"), "javascript") || res.Header.Get("Cache-Control") != "no-cache" {
+		t.Fatalf("sw.js: %d %q %q", res.StatusCode, res.Header.Get("Content-Type"), res.Header.Get("Cache-Control"))
+	}
+	res = h.do(t, "GET", "/manifest.webmanifest", "", nil)
+	b, _ := io.ReadAll(res.Body)
+	if res.StatusCode != 200 || !strings.Contains(res.Header.Get("Content-Type"), "manifest+json") || !strings.Contains(string(b), `"naknak"`) {
+		t.Fatalf("manifest: %d %q", res.StatusCode, res.Header.Get("Content-Type"))
+	}
+}

@@ -1,3 +1,6 @@
+// On the login page nobody is signed in: drop data cached for offline use.
+if (window.caches) caches.delete("naknak-data-v1");
+
 // The start-up log prints /login#token=…; the fragment never leaves the browser.
 const m = location.hash.match(/token=([^&]+)/);
 if (m) {

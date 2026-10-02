@@ -85,8 +85,12 @@ async function post(tool, args, query = "", headers = {}) {
   }
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new ToolError(body.error || `HTTP ${res.status}`, body);
+  if (res.headers.get("X-Naknak-Offline")) { body.offline = true; offline = true; }
   return body;
 }
+
+let offline = false;
+addEventListener("online", () => { offline = false; render(); });
 
 function api(tool, args = {}, { wait = false } = {}) {
   const p = post(tool, args, fresh ? "?fresh=1" : wait ? "?wait=1" : "").then((body) => {
@@ -515,7 +519,7 @@ function searchBox() {
   const list = h("div", { class: "search-results", role: "listbox", hidden: true });
   const wrap = h("div", { class: "search", role: "search" },
     h("span", { class: "search-icon" }, svg(["M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14z", "M20 20l-4-4"])),
-    input, h("kbd", { text: "/" }), list);
+    input, h("kbd", { text: "/", title: "Mit / springst du hierher, mit Strg+K öffnet sich die Befehlspalette" }), list);
   let timer, seq = 0, active = -1;
 
   function items() { return [...list.querySelectorAll(".hit")]; }
@@ -972,7 +976,10 @@ function lecturersOf(u, m, hist) {
     const last = parts.length > 2 ? parts[parts.length - 1] : "";
     if (last && !/\d{2}/.test(last)) many(last, c.state === "current");
   }
+  // an exam exists once per group with its own examiners: only the one you
+  // are (or were) registered for says who you have
   for (const e of [...(u?.exams || []), ...(hist?.exams || []).filter((x) => unitMatch(u, x.module_nr, x.title))]) {
+    if (!e.registered) continue;
     const at = parseDE(e.start);
     for (const d of e.dozenten || []) add(d, !!at && at >= startOfDay(now));
   }
@@ -1192,10 +1199,11 @@ function examTimeline(u, m, hist, current) {
     if (!at) return;
     const k = isoDate(at);
     const prev = byKey.get(k) || { at, registered: false, title: "", dozenten: [], result: null, attempt: 0, upcoming: at >= startOfDay(new Date()) };
-    prev.registered ||= !!x.registered;
     prev.title ||= x.title || "";
     if (x.start && /\d{1,2}:\d{2}/.test(x.start)) prev.at = at;
-    if (x.dozenten?.length) prev.dozenten = x.dozenten;
+    // same date, other groups: keep the examiners of the entry you are registered for
+    if (x.dozenten?.length && (x.registered || (!prev.registered && !prev.dozenten.length))) prev.dozenten = x.dozenten;
+    prev.registered ||= !!x.registered;
     if (x.grade) { prev.result = x; prev.attempt = x.attempt || prev.attempt; }
     byKey.set(k, prev);
   };
@@ -1580,6 +1588,80 @@ function notifySettingsTile(st, i) {
   return t;
 }
 
+// ── command palette (Ctrl/⌘+K) ──────────────────────────────────────────────
+
+const palette = { dlg: null };
+
+function paletteCommands() {
+  const go = (hash) => () => { location.hash = hash; };
+  return [
+    { group: "Seiten", title: "Übersicht", hint: "g ü", run: go("#/") },
+    { group: "Seiten", title: "Woche", run: go("#/woche") },
+    { group: "Seiten", title: "Kurse", run: go("#/kurse") },
+    { group: "Seiten", title: "Alle Module", run: go("#/module") },
+    { group: "Seiten", title: "Abgaben & Tests", run: go("#/abgaben") },
+    { group: "Seiten", title: "Neuigkeiten", run: go("#/neu") },
+    { group: "Seiten", title: "Nachrichten", run: go("#/nachrichten") },
+    { group: "Seiten", title: "Noten", run: go("#/noten") },
+    { group: "Seiten", title: "Einstellungen", run: go("#/einstellungen") },
+    { group: "Aktionen", title: "Neu laden (frisch aus CIS und Moodle)", run: () => $(".top .icon-btn")?.click() },
+    { group: "Aktionen", title: "Design wechseln (System → Hell → Dunkel)", run: () => $(".theme-btn")?.click() },
+    { group: "Aktionen", title: "Alle Benachrichtigungen als gelesen markieren", run: markAllRead },
+    { group: "Aktionen", title: "Kalender-Abo einrichten", run: go("#/einstellungen") },
+    { group: "Aktionen", title: "Abmelden", run: () => $(".top form[action='/logout']")?.requestSubmit() },
+  ];
+}
+
+async function openPalette() {
+  if (palette.dlg?.open) return;
+  const input = h("input", { class: "palette-input", placeholder: "Wohin? Seite, Modul, Kurs oder Aktion …", "aria-label": "Befehl", autocomplete: "off", spellcheck: "false" });
+  const list = h("div", { class: "palette-list", role: "listbox" });
+  const dlg = h("dialog", { class: "palette", "aria-label": "Befehlspalette" }, input, list,
+    h("p", { class: "palette-foot", text: "↑↓ auswählen · ↵ öffnen · Esc schließen" }));
+  palette.dlg = dlg;
+  document.body.append(dlg);
+  dlg.showModal();
+  dlg.addEventListener("close", () => dlg.remove());
+  dlg.addEventListener("click", (e) => { if (e.target === dlg) dlg.close(); });
+
+  let units = [], orphans = [];
+  loadUnits().then((r) => { ({ units, orphans } = r); draw(); }).catch(() => {});
+  let active = 0, shown = [];
+  const draw = () => {
+    const q = input.value.trim();
+    const cmds = paletteCommands();
+    const unitCmds = units.map((u) => ({ group: "Module", title: u.title || u.nr, hint: u.nr, words: norm([u.nr, ...u.aliases, u.title].join(" ")), run: () => { location.hash = `#/modul/${u.nr}`; } }));
+    const courseCmds = orphans.map((c) => ({ group: "Kurse", title: courseTitle(c), hint: c.state === "current" ? "aktuell" : "", words: norm(`${c.name} ${c.shortname}`), run: () => { location.hash = `#/kurs/${c.id}`; } }));
+    const all = [...cmds, ...unitCmds, ...courseCmds];
+    shown = (q ? all.filter((c) => matches(q, c.words || norm(c.title))) : [...cmds.slice(0, 9), ...unitCmds.filter((c) => units.find((u) => u.nr === c.hint)?.courses.some((x) => x.state === "current"))]).slice(0, 40);
+    active = Math.min(active, Math.max(0, shown.length - 1));
+    let last = "";
+    list.replaceChildren(...shown.flatMap((c, i) => {
+      const head = c.group !== last ? [h("h2", { text: c.group })] : [];
+      last = c.group;
+      return [...head, h("button", { type: "button", class: "hit", role: "option", "aria-selected": i === active ? "true" : "false", onclick: () => { dlg.close(); c.run(); } },
+        h("span", { class: "t", text: c.title }), h("span", { class: "s", text: c.hint || "" }))];
+    }));
+    if (!shown.length) list.append(h("p", { class: "empty hit-note", text: "Nichts gefunden." }));
+    list.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: "nearest" });
+  };
+  input.addEventListener("input", () => { active = 0; draw(); });
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowDown") { e.preventDefault(); active = Math.min(active + 1, shown.length - 1); draw(); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); active = Math.max(active - 1, 0); draw(); }
+    else if (e.key === "Enter" && shown[active]) { e.preventDefault(); dlg.close(); shown[active].run(); }
+  });
+  draw();
+  input.focus();
+}
+
+addEventListener("keydown", (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+    e.preventDefault();
+    openPalette();
+  }
+});
+
 // ── header, theme, routing ──────────────────────────────────────────────────
 
 const routes = [
@@ -1601,7 +1683,10 @@ const routes = [
 
 function stamp() {
   const el = $(".stamp");
-  if (!el || !newest) return;
+  if (!el) return;
+  el.classList.toggle("offline", offline);
+  if (offline) { el.textContent = newest ? `offline · Stand ${fmtTime.format(newest)}` : "offline"; return; }
+  if (!newest) return;
   const mins = Math.round((Date.now() - newest) / 6e4);
   el.textContent = mins < 1 ? "Stand: gerade eben" : `Stand: vor ${mins} min`;
 }
@@ -1652,7 +1737,7 @@ function header() {
       bellButton(),
       h("a", { class: "icon-btn", href: "#/einstellungen", title: "Einstellungen", "aria-label": "Einstellungen" }, svg(icons.gear)),
       h("button", { class: "icon-btn theme-btn", type: "button", onclick: switchTheme }),
-      h("form", { method: "post", action: "/logout" }, h("button", { class: "icon-btn", type: "submit", title: "Abmelden", "aria-label": "Abmelden" }, svg(["M15 4h4v16h-4", "M10 8l-4 4 4 4", "M6 12h10"]))))));
+      h("form", { method: "post", action: "/logout", onsubmit: () => { navigator.serviceWorker?.controller?.postMessage("clear"); } }, h("button", { class: "icon-btn", type: "submit", title: "Abmelden", "aria-label": "Abmelden" }, svg(["M15 4h4v16h-4", "M10 8l-4 4 4 4", "M6 12h10"]))))));
 }
 
 let renderSeq = 0;
@@ -1708,6 +1793,7 @@ async function revalidate(seq, r) {
 }
 
 function boot() {
+  if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
   const app = $("#app");
   app.replaceWith(header(), h("main", { id: "main" }));
   applyTheme(localStorage.getItem("nak-theme") || "system");

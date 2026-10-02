@@ -1,0 +1,23 @@
+{
+  "name": "naknak",
+  "short_name": "naknak",
+  "description": "CIS und Moodle der NORDAKADEMIE an einem Ort",
+  "lang": "de",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#07101f",
+  "theme_color": "#07101f",
+  "icons": [
+    { "src": "/assets/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/assets/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/assets/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "/assets/naknak.svg", "sizes": "any", "type": "image/svg+xml" }
+  ],
+  "shortcuts": [
+    { "name": "Woche", "url": "/#/woche" },
+    { "name": "Kurse", "url": "/#/kurse" },
+    { "name": "Nachrichten", "url": "/#/nachrichten" },
+    { "name": "Noten", "url": "/#/noten" }
+  ]
+}
