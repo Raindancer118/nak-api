@@ -409,7 +409,7 @@ async function overview(root) {
   fill(tDead, () => api("nak_deadlines", { days: 30 }), (r) => deadlineRows(r.deadlines || []));
   fill(tWeek, () => agenda, weekStrip);
   fill(tGrades, () => Promise.all([api("cis_grades"), api("cis_progress").catch(() => null)]), gradeSummary);
-  fill(tExams, () => dash, examRows);
+  fill(tExams, () => Promise.all([dash, loadPending()]), ([d, p]) => [examRows(d), ...(pendingRows(p) || [])]);
   fill(tMoodle, () => Promise.all([dash, api("moodle_courses", { classification: "current" })]), moodleSummary);
 
   const foot = h("div", { class: "foot" });
@@ -1157,6 +1157,33 @@ function norm(s) {
 let unitsP = null;
 let historyP = null;
 
+let pendingP = null;
+
+// written exams still waiting for their grade, with the PVO deadline
+function loadPending() {
+  if (!pendingP || fresh) pendingP = fetch("/api/grades/pending", { credentials: "same-origin" }).then((r) => r.ok ? r.json() : { pending: [] }).catch(() => ({ pending: [] }));
+  return pendingP;
+}
+
+function pendingRows(p, keep = () => true) {
+  const list = (p?.pending || []).filter(keep);
+  if (!list.length) return null;
+  return [h("h2", { class: "sub", text: "Note ausstehend" }),
+    h("ul", { class: "rows" }, list.map((x, j) => {
+      const due = x.due_known ? parseDE(x.due) : null;
+      const chip = !due ? h("span", { class: "chip", text: "offen" })
+        : x.overdue ? h("span", { class: "chip due", text: "Frist vorbei" })
+        : h("span", { class: `chip ${dayDiff(due) <= 7 ? "due" : ""}`, text: `bis ${fmtShort.format(due)}` });
+      return h("li", {}, h("div", { class: "row", vars: { "--j": j } },
+        h("span", { class: "dot", "data-src": "cis" }),
+        h("span", { class: "t" }, x.title, h("span", { class: "s", text: x.due_known
+          ? `geschrieben ${x.written.split(" ")[0]} · Note spätestens ${x.due}`
+          : `geschrieben ${x.written.split(" ")[0]} · ${x.note || "Frist noch nicht berechenbar"}` })),
+        chip));
+    })),
+    h("p", { class: "empty meter", text: "Vier Vorlesungswochen nach der Prüfung (PVO § 17 Abs. 3); Praxisphasen zählen nicht." })];
+}
+
 function loadHistory() {
   if (!historyP || fresh) historyP = fetch("/api/history", { credentials: "same-origin" }).then((r) => r.json()).catch(() => ({ exams: [], grades: {} }));
   return historyP;
@@ -1347,7 +1374,8 @@ async function unitPage(root, nr, tab = "", courseArg = "") {
   fill(tPlan, () => data, (m) => planTile({ ...m, exams: [] }));
   const tExams = tile("Prüfungsverlauf", { cls: "w12", i: 2 });
   grid.insertBefore(tExams, tNext.nextSibling);
-  fill(tExams, () => Promise.all([data, loadHistory()]), ([m, hist]) => examTimeline(u, m, hist, examsOf(m)));
+  fill(tExams, () => Promise.all([data, loadHistory(), loadPending()]), ([m, hist, p]) => [examTimeline(u, m, hist, examsOf(m)),
+    ...(pendingRows(p, (x) => unitMatch(u, x.module_nr.split(","), x.title)) || [])]);
   fill(tNext, () => data, (m) => {
     const now = new Date();
     const exams = examsOf(m).filter((e) => e.registered && parseDE(e.start) >= startOfDay(now))
@@ -1967,6 +1995,7 @@ function notifySettingsTile(st, i) {
   const night = h("input", { type: "checkbox", checked: !!n.night });
   const ntfy = h("input", { type: "url", value: n.ntfy_url || "", placeholder: "https://ntfy.sh/dein-geheimes-thema", spellcheck: "false" });
   const details = h("input", { type: "checkbox", checked: !!n.ntfy_details });
+  const fast = h("input", { type: "checkbox", checked: !!n.fast_grades });
   const msg = h("div", { class: "form-msg", "aria-live": "polite" });
   const perm = h("button", { class: "ghost", type: "button" });
   const drawPerm = () => {
@@ -1977,8 +2006,9 @@ function notifySettingsTile(st, i) {
   perm.addEventListener("click", async () => { await Notification.requestPermission(); drawPerm(); });
   drawPerm();
   const form = h("form", { class: "settings-form wide" },
-    h("label", { class: "check" }, on, h("span", {}, h("b", { text: "Im Hintergrund nach Neuem schauen" }), h("small", { text: "Noten alle 3 h · Moodle-Inhalte und Fristen stündlich · Nachrichten alle 15 min. Was das Portal gerade geladen hat, wird wiederverwendet." }))),
+    h("label", { class: "check" }, on, h("span", {}, h("b", { text: "Im Hintergrund nach Neuem schauen" }), h("small", { text: "Noten alle 3 h (mit dem Schalter unten alle 10 min, solange eine aussteht) · Moodle-Inhalte und Fristen stündlich · Nachrichten alle 15 min. Was das Portal gerade geladen hat, wird wiederverwendet." }))),
     h("label", { class: "check" }, night, h("span", {}, h("b", { text: "Auch nachts (23–7 Uhr)" }), h("small", { text: "Sonst ruht naknak nachts und CIS/Moodle werden nicht gefragt." }))),
+    h("label", { class: "check" }, fast, h("span", {}, h("b", { text: "Neue Noten schneller melden" }), h("small", { text: "Liest zusätzlich alle 10 min die Notenübersicht (PDF): Sie kennt neue Noten oft vor der Leistungsübersicht. Nur solange für eine geschriebene Prüfung noch keine Note da ist." }))),
     h("label", {}, "ntfy-Adresse für Push aufs Handy (optional)", ntfy),
     h("label", { class: "check" }, details, h("span", {}, h("b", { text: "Details mitschicken" }), h("small", { text: "Sonst nur „Neue Note in naknak“. ntfy.sh ist ein öffentlicher Server; Noten und Nachrichten gehören da eigentlich nicht hin." }))),
     h("div", { class: "row-actions" }, h("button", { class: "primary", type: "submit", text: "Speichern" }), perm),
@@ -1986,7 +2016,7 @@ function notifySettingsTile(st, i) {
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const res = await fetch("/api/settings/notify", { method: "PUT", credentials: "same-origin", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ off: !on.checked, night: night.checked, ntfy_url: ntfy.value.trim(), ntfy_details: details.checked }) });
+      body: JSON.stringify({ off: !on.checked, night: night.checked, ntfy_url: ntfy.value.trim(), ntfy_details: details.checked, fast_grades: fast.checked }) });
     const body = await res.json().catch(() => ({}));
     msg.replaceChildren(res.ok ? h("p", { class: "ok-note", text: "Gespeichert." }) : errorBox(new Error(body.error || `HTTP ${res.status}`)));
   });
@@ -2186,6 +2216,10 @@ async function examsPage(root) {
   const tMine = tile("Angemeldet", { cls: "w6", i: 0 });
   const tOpen = tile("Anmeldung offen", { cls: "w6", i: 1 });
   grid.append(tMine, tOpen);
+  loadPending().then((p) => {
+    const rows = pendingRows(p);
+    if (rows) grid.prepend(tile("Geschrieben", { cls: "w12", i: 0 }, ...rows));
+  });
   const data = Promise.all([api("cis_list_klausuren"), loadUnits().catch(() => null)]);
   const row = (e, j, withAction, units) => {
     const at = parseDE(e.start);

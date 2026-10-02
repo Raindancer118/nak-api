@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/Raindancer118/nak-api/internal/app"
+	"github.com/Raindancer118/nak-api/internal/demo"
 	"github.com/Raindancer118/nak-api/internal/drift"
 	"github.com/Raindancer118/nak-api/internal/tools"
 )
@@ -110,6 +111,10 @@ func New(a *app.App, reg *tools.Registry, cfg Config) *Server {
 		histFile = filepath.Join(a.ConfigDir, "history.json")
 	}
 	s.history = newHistory(histFile, cfg.Now)
+	if cfg.Demo {
+		b, _ := json.Marshal(demo.WrittenExam(cfg.Now()))
+		s.history.observe("cis_list_klausuren", b)
+	}
 	s.stats = newStats(cfg.Now())
 	s.watch = newWatcher(s)
 	return s
@@ -147,6 +152,7 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("GET /api/events", s.authed(http.HandlerFunc(s.events)))
 	mux.Handle("PUT /api/settings/notify", s.authed(s.jsonOnly(s.putNotify)))
 	mux.Handle("PUT /api/settings/nav", s.authed(s.jsonOnly(s.putNav)))
+	mux.Handle("GET /api/grades/pending", s.authed(http.HandlerFunc(s.pendingAPI)))
 	mux.Handle("POST /api/calendar/rotate", s.authed(s.jsonOnly(s.calendarRotate)))
 	mux.HandleFunc("GET /calendar/{file}", s.calendarFeed)
 	mux.Handle("PUT /api/settings/eduvault", s.authed(s.jsonOnly(s.putEduVault)))

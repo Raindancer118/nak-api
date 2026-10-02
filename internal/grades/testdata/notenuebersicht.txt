@@ -1,0 +1,27 @@
+--- Seite 1 ---
+                                                     Notenübersicht
+                                                      Frau Erika Beispiel
+                                                  geboren am 01.01.2000
+                                             immatrikuliert am 01.10.2023 mit der
+                                                  Matrikelnummer 00000
+                                            hat an der NORDAKADEMIE
+                                   im Bachelorstudiengang Angewandte Informatik
+                                        bisher folgende Leistungen erbracht:
+ModulNr Name                                                                                                     Note             Credits
+I140    Automatentheorie und formale Sprachen                                                                    3,7              5 CP
+I166    Einführung in die objektorientierte Programmierung                                                       1,7              6 CP
+I151    Softwaretechnik                                                                                          #
+I168    Diskrete Mathematik 2                                                                                    4,0 (2. Versuch)
+I179    Wissenschaftliches Arbeiten 1: Informatik und Gesellschaft                                               bestanden        6 CP
+I201    Anerkanntes Modul                                                                                        2,0 *            5 CP
+I180    Wissenschaftliches Arbeiten 2: Ausgewählte Kapitel der
+        Wirtschaftsinformatik                                                                                    #
+
+
+  Diese Notenübersicht ist kein Zeugnis. Sie wird elektronisch erstellt und trägt daher weder Unterschrift noch Siegel.
+
+# Dieses Fach gehört zum Curriculum, die Prüfung wurde aber noch nicht abgelegt.
+
+
+Der derzeitige Notendurchschnitt ist 2,4
+Datum der Ausstellung der Notenübersicht: 02.10.2026

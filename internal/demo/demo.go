@@ -526,6 +526,10 @@ func Registry() *tools.Registry {
 			}
 			return out
 		}),
+		read("cis_status", "Demo-Status", func(*app.App, tools.Args) (any, error) {
+			return map[string]any{"name": "Max Mustermann", "zenturie": "I24a", "studiengang": "Angewandte Informatik (B.Sc.)"}, nil
+		}),
+		read("cis_timetable", "Demo-Stundenplan", func(a *app.App, args tools.Args) (any, error) { return timetable(a, args), nil }),
 		read("cis_balance", "Demo-Guthaben", func(*app.App, tools.Args) (any, error) { return map[string]any{"Kopierguthaben": "7,40 €"}, nil }),
 		&tools.Tool{Name: "cis_download_cert", Kind: tools.Local, Desc: "Demo-Bescheinigung", Params: []tools.Param{{Name: "download_url"}},
 			Run: func(a *app.App, args tools.Args) (any, error) {
@@ -557,4 +561,34 @@ func Registry() *tools.Registry {
 		write("moodle_mark_messages_read", "Demo: gelesen", func(tools.Args) any { return map[string]any{"would": "Alle Moodle-Nachrichten als gelesen markieren"} }),
 	)
 	return r
+}
+
+// timetable: lectures Monday to Thursday, with an invented Praxisphase
+// (weeks 1 to 3 from now) so the grade deadline has something to skip.
+func timetable(a *app.App, args tools.Args) map[string]any {
+	now := a.Now().In(a.Zone)
+	from, err := time.ParseInLocation("2006-01-02", args.Str("from"), a.Zone)
+	if err != nil {
+		from = now
+	}
+	to, err := time.ParseInLocation("2006-01-02", args.Str("to"), a.Zone)
+	if err != nil {
+		to = from.AddDate(0, 0, 7)
+	}
+	var evs []map[string]any
+	for d := from; !d.After(to); d = d.AddDate(0, 0, 1) {
+		weeks := int(d.Sub(now).Hours() / 24 / 7)
+		if d.Weekday() == time.Friday || d.Weekday() == time.Saturday || d.Weekday() == time.Sunday || (weeks >= 1 && weeks <= 3) {
+			continue
+		}
+		at := time.Date(d.Year(), d.Month(), d.Day(), 9, 0, 0, 0, a.Zone)
+		evs = append(evs, map[string]any{"start": at, "end": at.Add(3 * time.Hour), "kind": "V", "kind_name": "Vorlesung", "module_nr": "I151", "title": "Softwaretechnik", "room": "A 101"})
+	}
+	return map[string]any{"from": from.Format("2006-01-02"), "to": to.Format("2006-01-02"), "events": evs, "count": len(evs)}
+}
+
+// WrittenExam is a registered exam from six days ago that has no grade yet,
+// so the demo shows a pending grade with its deadline.
+func WrittenExam(now time.Time) []map[string]any {
+	return []map[string]any{{"exam_id": "8800", "module_nr": "I190", "title": "Theoretische Informatik", "start": now.AddDate(0, 0, -6).Format("02.01.2006") + " 09:00", "registered": true, "dozenten": []string{"Okafor, Mira"}}}
 }

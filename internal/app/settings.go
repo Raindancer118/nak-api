@@ -47,6 +47,9 @@ type NotifySettings struct {
 	NtfyDetails bool `json:"ntfy_details,omitempty"`
 	// Night lets the watcher run between 23:00 and 07:00 too.
 	Night bool `json:"night,omitempty"`
+	// FastGrades also reads the Notenübersicht PDF every 10 minutes while a
+	// grade is pending: it knows new grades before the Leistungsübersicht.
+	FastGrades bool `json:"fast_grades,omitempty"`
 }
 
 type EduVaultSettings struct {

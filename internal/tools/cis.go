@@ -293,6 +293,23 @@ func cisTools() []*Tool {
 				return saveFile(a, data, "Notenspiegel_"+lang+".pdf", args.Str("output_path"))
 			}},
 
+		{Name: "cis_transcript_grades", Kind: Read, Desc: "Noten aus der Notenübersicht (PDF) gelesen: kennt neue Noten oft vor der Leistungsübersicht. Modul, Note, Credits, Durchschnitt, Ausstellungsdatum.",
+			Run: func(a *app.App, args Args) (any, error) {
+				c, err := cis(a)
+				if err != nil {
+					return nil, err
+				}
+				data, _, err := grades.FetchTranscript(c, "de")
+				if err != nil {
+					return nil, err
+				}
+				text, err := moodle.PDFText(data)
+				if err != nil {
+					return nil, err
+				}
+				return grades.ParseTranscriptText(text)
+			}},
+
 		// ── planning ──
 		{Name: "cis_studienplan", Kind: Read, Desc: "Persönlicher Studienplan: Module je Semester mit Stunden, Prüfungssemester, Prüfungsform und Credits.",
 			Params: []Param{{Name: "semester", Type: "integer", Desc: "Nur Module mit Last oder Prüfung in diesem Semester"}},

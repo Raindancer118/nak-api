@@ -9,6 +9,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/Raindancer118/nak-api/internal/grades"
 )
 
 // history remembers what the CIS forgets: an exam drops out of the exam list
@@ -88,6 +90,13 @@ func (h *history) observe(tool string, raw json.RawMessage) {
 		}
 		json.Unmarshal(raw, &m)
 		exams = m.Exams
+	case "cis_transcript_grades":
+		var t struct {
+			Modules []map[string]any `json:"modules"`
+		}
+		json.Unmarshal(raw, &t)
+		h.observeTranscript(t.Modules)
+		return
 	case "cis_grades":
 		var g struct {
 			Overview struct {
@@ -139,6 +148,34 @@ func (h *history) observe(tool string, raw json.RawMessage) {
 			continue
 		}
 		h.data.Grades[nr] = append(steps, gradeRecord{nr, str(m, "title"), grade, str(m, "status"), date, attempt, now})
+		changed = true
+	}
+	var b []byte
+	if changed && h.file != "" {
+		b, _ = json.Marshal(h.data)
+	}
+	h.mu.Unlock()
+	if b != nil && os.WriteFile(h.file+".tmp", b, 0o600) == nil {
+		os.Rename(h.file+".tmp", h.file)
+	}
+}
+
+// observeTranscript records grades from the PDF: no exam dates there, so a
+// step only says "this result was there at Seen"; same grade, no new step.
+func (h *history) observeTranscript(mods []map[string]any) {
+	now := h.now()
+	h.mu.Lock()
+	changed := false
+	for _, m := range mods {
+		nr, grade := str(m, "module_nr"), str(m, "grade")
+		if nr == "" || grade == "" {
+			continue
+		}
+		steps := h.data.Grades[nr]
+		if n := len(steps); n > 0 && grades.NormalizeGrade(steps[n-1].Grade) == grades.NormalizeGrade(grade) {
+			continue
+		}
+		h.data.Grades[nr] = append(steps, gradeRecord{ModuleNr: nr, Title: str(m, "title"), Grade: grade, Seen: now})
 		changed = true
 	}
 	var b []byte

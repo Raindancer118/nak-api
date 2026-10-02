@@ -14,6 +14,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Raindancer118/nak-api/internal/app"
+	"github.com/Raindancer118/nak-api/internal/grades"
 	"github.com/Raindancer118/nak-api/internal/tools"
 )
 
@@ -43,17 +45,28 @@ type check struct {
 	args  tools.Args
 	every time.Duration
 	diff  func(raw json.RawMessage, seen map[string]string) []Notification
+	// active, if set, decides per pass whether the check runs at all
+	active func(w *watcher, cfg app.NotifySettings) bool
+	// sharesBaseline: another check already filled the seen keys this one uses
+	sharesBaseline string
 }
 
 // The intervals are the whole point: they decide how many CIS/Moodle calls
 // the watcher costs. A result the UI fetched recently is reused (see
 // toolAtMost), and whatever the watcher fetches warms the UI's cache.
 var checks = []check{
-	{"grades", "cis_grades", tools.Args{}, 3 * time.Hour, diffGrades},
-	{"news", "moodle_whats_new", tools.Args{"days": 2}, time.Hour, diffNews},
-	{"messages", "moodle_conversations", tools.Args{"limit": 20}, 15 * time.Minute, diffConversations},
-	{"moodle", "moodle_notifications", tools.Args{"limit": 20, "unread_only": true}, 15 * time.Minute, diffNotifications},
-	{"deadlines", "nak_deadlines", tools.Args{"days": 3}, time.Hour, diffDeadlines},
+	{"grades", "cis_grades", tools.Args{}, 3 * time.Hour, diffGrades, nil, ""},
+	{"news", "moodle_whats_new", tools.Args{"days": 2}, time.Hour, diffNews, nil, ""},
+	{"messages", "moodle_conversations", tools.Args{"limit": 20}, 15 * time.Minute, diffConversations, nil, ""},
+	{"moodle", "moodle_notifications", tools.Args{"limit": 20, "unread_only": true}, 15 * time.Minute, diffNotifications, nil, ""},
+	{"deadlines", "nak_deadlines", tools.Args{"days": 3}, time.Hour, diffDeadlines, nil, ""},
+	// opt-in, and only while a written exam waits for its grade: the PDF knows
+	// new grades before the Leistungsübersicht
+	{"grades_pdf", "cis_transcript_grades", tools.Args{}, 10 * time.Minute, diffTranscript, gradePending, "grades"},
+}
+
+func gradePending(w *watcher, cfg app.NotifySettings) bool {
+	return cfg.FastGrades && len(w.s.pendingExams(w.s.cfg.Now())) > 0
 }
 
 type watchState struct {
@@ -133,7 +146,7 @@ func (w *watcher) runDue() {
 		w.mu.Lock()
 		due := now.Sub(w.state.Last[c.name]) >= c.every
 		w.mu.Unlock()
-		if !due || w.s.reg.Get(c.tool) == nil {
+		if !due || w.s.reg.Get(c.tool) == nil || (c.active != nil && !c.active(w, cfg)) {
 			continue
 		}
 		raw, err := w.s.toolAtMost(c.tool, c.args, c.every)
@@ -141,7 +154,7 @@ func (w *watcher) runDue() {
 		w.state.Last[c.name] = now
 		if err == nil {
 			found := c.diff(raw, w.state.Seen)
-			if w.state.Baselined[c.name] {
+			if w.state.Baselined[c.name] || (c.sharesBaseline != "" && w.state.Baselined[c.sharesBaseline]) {
 				fresh = append(fresh, found...)
 			}
 			// the first pass only learns what already exists
@@ -338,12 +351,44 @@ func diffGrades(raw json.RawMessage, seen map[string]string) []Notification {
 			continue
 		}
 		old, had := seen["grade:"+nr]
-		if seenChange(seen, "grade:"+nr, grade) {
+		if gradeChange(seen, nr, grade) {
 			title := "Neue Note: " + str(m, "title") + " " + grade
 			if had && old != "" {
 				title = "Note geändert: " + str(m, "title") + " " + grade
 			}
 			out = append(out, Notification{Kind: "grade", Title: title, Body: str(m, "status"), URL: "#/modul/" + strings.SplitN(nr, ",", 2)[0]})
+		}
+	}
+	return out
+}
+
+// gradeChange compares normalised grades: the PDF writes "2,7 (2. Versuch)",
+// the page "2,7 (2.Versuch)" — one result, one notification.
+func gradeChange(seen map[string]string, nr, grade string) bool {
+	key := "grade:" + nr
+	old, ok := seen[key]
+	seen[key] = grades.NormalizeGrade(grade)
+	return !ok || grades.NormalizeGrade(old) != seen[key]
+}
+
+func diffTranscript(raw json.RawMessage, seen map[string]string) []Notification {
+	var t struct {
+		Modules []map[string]any `json:"modules"`
+	}
+	json.Unmarshal(raw, &t)
+	var out []Notification
+	for _, m := range t.Modules {
+		nr, grade := str(m, "module_nr"), str(m, "grade")
+		if nr == "" || grade == "" {
+			continue
+		}
+		old, had := seen["grade:"+nr]
+		if gradeChange(seen, nr, grade) {
+			title := "Neue Note: " + str(m, "title") + " " + grade
+			if had && old != "" {
+				title = "Note geändert: " + str(m, "title") + " " + grade
+			}
+			out = append(out, Notification{Kind: "grade", Title: title, Body: "aus der Notenübersicht", URL: "#/modul/" + nr})
 		}
 	}
 	return out

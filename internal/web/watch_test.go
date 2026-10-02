@@ -17,13 +17,16 @@ import (
 
 // fakeSources stands in for the five tools the watcher reads.
 type fakeSources struct {
-	mu        sync.Mutex
-	grade     string
-	news      []map[string]any
-	convTime  string
-	notifs    []map[string]any
-	deadlines []map[string]any
-	calls     map[string]int
+	mu         sync.Mutex
+	grade      string
+	news       []map[string]any
+	convTime   string
+	notifs     []map[string]any
+	deadlines  []map[string]any
+	transcript []map[string]any
+	pageExtra  []map[string]any
+	exams      []map[string]any
+	calls      map[string]int
 }
 
 func (f *fakeSources) registry() *tools.Registry {
@@ -39,10 +42,10 @@ func (f *fakeSources) registry() *tools.Registry {
 	}
 	r.Add(
 		run("cis_grades", func() any {
-			return map[string]any{"overview": map[string]any{"modules": []map[string]any{
+			return map[string]any{"overview": map[string]any{"modules": append([]map[string]any{
 				{"module_nr": "I160", "title": "Datenbanksysteme", "grade": f.grade, "status": "bestanden"},
 				{"module_nr": "I151", "title": "Softwaretechnik", "grade": "2,0", "status": "bestanden"},
-			}}}
+			}, f.pageExtra...)}}
 		}),
 		run("moodle_whats_new", func() any { return f.news }),
 		run("moodle_conversations", func() any {
@@ -50,6 +53,17 @@ func (f *fakeSources) registry() *tools.Registry {
 		}),
 		run("moodle_notifications", func() any { return f.notifs }),
 		run("nak_deadlines", func() any { return map[string]any{"deadlines": f.deadlines} }),
+		run("cis_transcript_grades", func() any { return map[string]any{"modules": f.transcript} }),
+		run("cis_list_klausuren", func() any { return f.exams }),
+		run("cis_status", func() any { return map[string]any{"studiengang": "Wirtschaftsinformatik (B.Sc.)"} }),
+		run("cis_timetable", func() any {
+			var evs []map[string]any
+			for _, d := range []string{"2026-10-05", "2026-10-12", "2026-11-09", "2026-11-16", "2026-11-23"} {
+				evs = append(evs, map[string]any{"start": d + "T09:00:00+02:00", "kind": "V"})
+			}
+			evs = append(evs, map[string]any{"start": "2026-10-19T09:00:00+02:00", "kind": "K"}) // an exam week is no lecture week
+			return map[string]any{"events": evs}
+		}),
 	)
 	return r
 }
@@ -238,5 +252,79 @@ func TestDemoTickRotatesInventedEvents(t *testing.T) {
 		if !strings.HasPrefix(e.URL, "#/") || e.Kind == "" {
 			t.Errorf("demo event must link into the portal: %+v", e)
 		}
+	}
+}
+
+// an exam written this morning: the PDF is read every 10 minutes and its grade
+// reported once, even when the Leistungsübersicht later spells it differently
+func TestFastGradesWhileAGradeIsPending(t *testing.T) {
+	w := newWatchHarness(t, app.NotifySettings{FastGrades: true})
+	w.f.exams = []map[string]any{{"exam_id": "77", "module_nr": "I168", "title": "Diskrete Mathematik 2", "start": "02.10.2026 08:30", "registered": true}}
+	if _, err := w.srv.cachedTool("cis_list_klausuren", tools.Args{}); err != nil {
+		t.Fatal(err)
+	}
+	w.srv.watch.runDue() // baseline
+	if w.f.calls["cis_transcript_grades"] != 1 {
+		t.Fatalf("pending grade: PDF read %d times on the first pass", w.f.calls["cis_transcript_grades"])
+	}
+	*w.now = w.now.Add(10 * time.Minute)
+	w.f.mu.Lock()
+	w.f.transcript = []map[string]any{{"module_nr": "I168", "title": "Diskrete Mathematik 2", "grade": "2,7 (2. Versuch)"}}
+	w.f.mu.Unlock()
+	w.srv.watch.runDue()
+	got := w.events(t)
+	if len(got) != 1 || !strings.Contains(got[0].Title, "Diskrete Mathematik 2 2,7") {
+		t.Fatalf("events %+v", got)
+	}
+	// the page catches up with its own spelling: no second notification
+	*w.now = w.now.Add(4 * time.Hour)
+	w.f.mu.Lock()
+	w.f.grade = "2,0"
+	w.f.pageExtra = []map[string]any{{"module_nr": "I168", "title": "Diskrete Mathematik 2", "grade": "2,7 (2.Versuch)", "exam_date": "02.10.2026"}}
+	w.f.mu.Unlock()
+	w.srv.watch.runDue()
+	if n := len(w.events(t)); n != 2 {
+		t.Fatalf("want exactly one more (Datenbanksysteme), got %d events: %+v", n, w.events(t))
+	}
+	// graded now: the fast check stops
+	before := w.f.calls["cis_transcript_grades"]
+	*w.now = w.now.Add(30 * time.Minute)
+	w.srv.watch.runDue()
+	if w.f.calls["cis_transcript_grades"] != before {
+		t.Error("no pending grade left: the PDF must not be read any more")
+	}
+}
+
+func TestFastGradesOffOrNothingPending(t *testing.T) {
+	off := newWatchHarness(t, app.NotifySettings{})
+	off.f.exams = []map[string]any{{"exam_id": "77", "module_nr": "I168", "title": "DM2", "start": "02.10.2026 08:30", "registered": true}}
+	off.srv.cachedTool("cis_list_klausuren", tools.Args{})
+	off.srv.watch.runDue()
+	idle := newWatchHarness(t, app.NotifySettings{FastGrades: true})
+	idle.srv.watch.runDue()
+	if off.f.calls["cis_transcript_grades"] != 0 || idle.f.calls["cis_transcript_grades"] != 0 {
+		t.Errorf("PDF read with the switch off (%d) or nothing pending (%d)", off.f.calls["cis_transcript_grades"], idle.f.calls["cis_transcript_grades"])
+	}
+}
+
+func TestPendingGradeDueAfterFourLectureWeeks(t *testing.T) {
+	w := newWatchHarness(t, app.NotifySettings{})
+	w.f.exams = []map[string]any{{"exam_id": "77", "module_nr": "A222,I222", "title": "Diskrete Mathematik 2", "start": "02.10.2026 08:30", "registered": true}}
+	w.srv.cachedTool("cis_list_klausuren", tools.Args{})
+	rec := httptest.NewRecorder()
+	w.srv.pendingAPI(rec, httptest.NewRequest("GET", "/api/grades/pending", nil))
+	var out struct {
+		Pending []pendingGrade `json:"pending"`
+	}
+	json.Unmarshal(rec.Body.Bytes(), &out)
+	if len(out.Pending) != 1 || out.Pending[0].Due != "22.11.2026" || !out.Pending[0].DueKnown {
+		t.Fatalf("pending = %+v (%s)", out.Pending, rec.Body.String())
+	}
+	// the grade arrives (PDF, under the module number, not the exam number)
+	w.f.transcript = []map[string]any{{"module_nr": "I168", "title": "Diskrete Mathematik 2", "grade": "2,7"}}
+	*w.now = w.now.Add(time.Hour)
+	w.srv.cachedTool("cis_transcript_grades", tools.Args{})
+	if n := len(w.srv.pendingExams(*w.now)); n != 0 {
+		t.Fatalf("graded exam still pending (%d)", n)
 	}
 }
