@@ -2327,7 +2327,16 @@ function switchTheme(e) {
 }
 
 function header() {
-  const links = [["Übersicht", "#/"], ["Woche", "#/woche"], ["Kurse", "#/kurse"], ["Neuigkeiten", "#/neu"], ["Nachrichten", "#/nachrichten"], ["Noten", "#/noten"], ["Studium", "#/studium"]];
+  // [label, short label for the phone tab bar, route, icon]
+  const links = [
+    ["Übersicht", "Start", "#/", ["M3 11l9-7 9 7", "M5 10v10h14V10", "M10 20v-6h4v6"]],
+    ["Woche", "Woche", "#/woche", ["M4 6h16v14H4z", "M4 10h16", "M9 3v4", "M15 3v4"]],
+    ["Kurse", "Kurse", "#/kurse", ["M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z", "M4 19V5", "M8 7h7"]],
+    ["Neuigkeiten", "Neu", "#/neu", ["M12 3l1.8 4.6L18 9.4l-4.2 1.8L12 16l-1.8-4.8L6 9.4l4.2-1.8z", "M19 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"]],
+    ["Nachrichten", "Chat", "#/nachrichten", ["M4 5h16v11H8l-4 4z"]],
+    ["Noten", "Noten", "#/noten", ["M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.4 6.8 19.1l1-5.8L3.5 9.2l5.9-.9z"]],
+    ["Studium", "Studium", "#/studium", ["M2 9l10-5 10 5-10 5z", "M6 11v5c3 2 9 2 12 0v-5", "M22 9v6"]],
+  ];
   const refresh = h("button", { class: "icon-btn hide-sm", type: "button", title: "Neu laden (frisch aus CIS und Moodle)", "aria-label": "Neu laden" }, svg(icons.refresh));
   refresh.addEventListener("click", async () => {
     refresh.classList.add("spin");
@@ -2336,7 +2345,7 @@ function header() {
   });
   return h("header", { class: "top" }, h("div", { class: "top-in" },
     h("a", { class: "mark", href: "#/", "aria-label": "naknak – Übersicht" }, h("img", { src: "/assets/naknak.svg", alt: "", width: 26, height: 26 }), "naknak"),
-    h("nav", { "aria-label": "Bereiche" }, links.map(([t, href]) => h("a", { href, text: t }))),
+    h("nav", { "aria-label": "Bereiche" }, links.map(([t, short, href, icon]) => h("a", { href, title: t }, svg(icon), h("span", { class: "full", text: t }), h("span", { class: "short", text: short })))),
     h("div", { class: "tools" },
       h("span", { class: "stamp", "aria-live": "polite" }),
       refresh,

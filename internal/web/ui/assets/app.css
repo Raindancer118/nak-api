@@ -1296,3 +1296,38 @@ html.private .eye-btn { border-color: color-mix(in oklab, var(--cis) 55%, transp
 /* the bell's toast would show a new grade in clear text */
 html.private .toast { filter: blur(6px); }
 @media print { html.private .sens { filter: blur(7px); } }
+
+/* nav: text on wide screens, icon tab bar on phones */
+.top nav a svg { display: none; }
+.top nav a .short { display: none; }
+@media (max-width: 680px) {
+  .top nav {
+    overflow-x: visible;
+    justify-content: space-between;
+    padding: .3rem .25rem;
+  }
+  .top nav a {
+    flex: 1 1 0;
+    min-width: 0;
+    flex-direction: column;
+    gap: .15rem;
+    padding: .4rem 0 .3rem;
+    min-height: 52px;
+    font-size: .66rem;
+    letter-spacing: .01em;
+    border-radius: 12px;
+  }
+  .top nav a svg { display: block; width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  .top nav a .full { display: none; }
+  .top nav a .short { display: block; }
+  .top nav a[aria-current="page"] { color: var(--ink); background: color-mix(in oklab, var(--ink) 9%, transparent); }
+  .top nav a[aria-current="page"]::after { display: none; }
+  .top nav a:active svg { transform: scale(.88); transition: transform .2s var(--spring); }
+}
+@media (max-width: 680px) {
+  /* long status chips go below the title instead of squeezing it */
+  .row:has(> .chips) { grid-template-columns: auto 1fr; }
+  .row > .chips { grid-column: 2; justify-content: flex-start; max-width: none; }
+  .row .chip { white-space: normal; }
+  .lazy, .seminar .action, .exam-row .action { margin-left: 1.2rem; }
+}
