@@ -452,6 +452,8 @@ async function overview(root) {
     },
     moodle: (i) => { const t = tile("Moodle · aktuelle Kurse", { cls: "w12", i, link: ["Alle Kurse", "#/kurse"] }); fill(t, () => Promise.all([dash, api("moodle_courses", { classification: "current" })]), moodleSummary); return t; },
     messages: (i) => { const t = tile("Nachrichten", { cls: "half", i, link: ["Inbox", "#/nachrichten"] }); fill(t, () => api("moodle_conversations", { limit: 4 }), messageRows); return t; },
+    transfer: (i) => { const t = tile("Transferleistungen", { cls: "half", i, link: ["Alle", "#/transferleistungen"] }); fill(t, () => Promise.all([api("cis_list_transfer"), api("nak_transfer_plan").catch(() => null)]), ([list, plan]) => transferOverview(list, plan)); return t; },
+    transfer_grades: (i) => { const t = tile("TL-Noten · rechnerisch", { cls: "half", i, link: ["Details", "#/transferleistungen"] }); fill(t, () => api("nak_transfer_grades"), (g) => transferGradeSummary(g, 4)); return t; },
     pending: (i) => { const t = tile("Noten ausstehend", { cls: "half", i, link: ["Prüfungen", "#/pruefungen"] }); fill(t, loadPending, (p) => pendingRows(p) || emptyRow("Keine Note offen.")); return t; },
   };
   const order = savedHome();
@@ -578,7 +580,7 @@ function thesisView(tr) {
       h("span", { class: "empty", text: tr.fulfilled ? "Voraussetzungen erfüllt" : "noch offen bis zur Zulassung" })),
     !tr.fulfilled && h("ul", { class: "rows meter" }, [
       ...mods.map((m, j) => h("li", {}, h("a", { class: "row", href: `#/modul/${firstNr(label(m))}`, vars: { "--j": j } }, h("span", { class: "dot", "data-src": "cis" }), h("span", { class: "t" }, label(m), h("span", { class: "s", text: "Modulprüfung bis einschließlich 4. Semester" })), h("span", { class: "chip due", text: "fehlt" })))),
-      ...tls.map((t, j) => h("li", {}, h("a", { class: "row", href: "#/studium/transfer", vars: { "--j": j + mods.length } }, h("span", { class: "dot", "data-src": "cis" }), h("span", { class: "t" }, `Transferleistung ${label(t)}`, h("span", { class: "s", text: "Transferleistungen 1–5" })), h("span", { class: "chip due", text: "fehlt" })))),
+      ...tls.map((t, j) => h("li", {}, h("a", { class: "row", href: "#/transferleistungen", vars: { "--j": j + mods.length } }, h("span", { class: "dot", "data-src": "cis" }), h("span", { class: "t" }, `Transferleistung ${label(t)}`, h("span", { class: "s", text: "Transferleistungen 1–5" })), h("span", { class: "chip due", text: "fehlt" })))),
     ]),
     tr.rule && h("p", { class: "empty fine-note", text: tr.rule }),
   ];
@@ -1400,6 +1402,14 @@ async function unitPage(root, nr, tab = "", courseArg = "") {
   const tNews = tile("Neu in Moodle", { cls: "w6", i: 4 });
   const tEv = tile("Altklausuren · EduVault", { cls: "w12", i: 5 });
   grid.append(tGrade, tPlan, tNext, tMoodle, tNews, tEv);
+  // Transferleistungen written on this module's topic (only shown if any)
+  api("cis_list_transfer").then((list) => {
+    const mine = [u?.nr, ...(u?.aliases || []), nr].filter(Boolean);
+    const here = (list || []).filter((x) => mine.includes(tlModuleNr(x)));
+    if (!here.length) return;
+    tEv.before(tile("Transferleistungen zu diesem Modul", { cls: "w12", i: 5, link: ["Alle", "#/transferleistungen"] },
+      h("ul", { class: "rows" }, here.map((x, j) => tlRow({ no: Number(x.no), tl: x }, j)))));
+  }).catch(() => {});
   fill(tEv, () => api("eduvault_module_exams", { title: u?.title || nr }), evRows).then(() => {
     const err = tEv.querySelector(".err");
     if (err && /eingerichtet|Einstellungen/.test(err.textContent)) err.replaceWith(h("p", { class: "empty" }, "Hinterlege in den ", h("a", { href: "#/einstellungen", text: "Einstellungen" }), " deinen EduVault-Zugang, dann stehen hier die Altklausuren zu diesem Modul."));
@@ -2106,7 +2116,7 @@ function paletteCommands() {
     { group: "Seiten", title: "Prüfungen & Anmeldungen", run: go("#/pruefungen") },
     { group: "Seiten", title: "Seminare", run: go("#/studium/seminare") },
     { group: "Seiten", title: "Wahlpflicht", run: go("#/studium/wahlpflicht") },
-    { group: "Seiten", title: "Transferleistungen", run: go("#/studium/transfer") },
+    { group: "Seiten", title: "Transferleistungen", run: go("#/transferleistungen") },
     { group: "Seiten", title: "Studienbescheinigung & Notenspiegel", run: go("#/studium/bescheinigungen") },
     { group: "Seiten", title: "Profil", run: go("#/studium/profil") },
     { group: "Seiten", title: "Einstellungen", run: go("#/einstellungen") },
@@ -2365,13 +2375,13 @@ function lazyDetails(summary, load) {
 
 async function studiesPage(root, tab = "seminare") {
   root.append(h("div", { class: "page-head" }, h("h1", {}, "Studium", h("small", { text: "Seminare, Wahlpflicht, Transferleistungen, Bescheinigungen" }))));
-  const tabs = [["seminare", "Seminare"], ["wahlpflicht", "Wahlpflicht"], ["transfer", "Transferleistungen"], ["bescheinigungen", "Bescheinigungen"], ["profil", "Profil"]];
+  const tabs = [["seminare", "Seminare"], ["wahlpflicht", "Wahlpflicht"], ["bescheinigungen", "Bescheinigungen"], ["profil", "Profil"]];
   root.append(h("nav", { class: "tabs", "aria-label": "Bereiche" }, tabs.map(([k, label]) => h("a", { href: `#/studium/${k}`, text: label, ...(k === tab ? { "aria-current": "page" } : {}) }))));
   const grid = h("div", { class: "grid" });
   root.append(grid);
   if (tab === "seminare") return seminarsTab(grid);
   if (tab === "wahlpflicht") return electivesTab(grid);
-  if (tab === "transfer") return transferTab(grid);
+  if (tab === "transfer") { location.replace("#/transferleistungen"); return; }
   if (tab === "bescheinigungen") return certsTab(grid);
   return profileTab(grid);
 }
@@ -2437,24 +2447,132 @@ function electivesTab(grid) {
   });
 }
 
-function transferTab(grid) {
-  const t = tile("Transferleistungen", { cls: "w12", i: 0 });
-  grid.append(t);
-  fill(t, () => api("cis_list_transfer"), (list) => {
-    if (!list?.length) return emptyRow("Keine Transferleistungen.");
-    return h("ul", { class: "rows" }, list.map((x, j) => h("li", { class: "seminar", vars: { "--j": j } },
-      h("div", { class: "row" },
-        h("span", { class: "ext tl", text: `T${x.no}` }),
-        h("span", { class: "t" }, x.topic || "Thema offen", h("span", { class: "s", text: [x.module, x.abgabedatum && `Abgabe ${x.abgabedatum}`, x.korrekturfrist && `Korrektur bis ${x.korrekturfrist}`, x.versuch && `${x.versuch}. Versuch`].filter(Boolean).join(" · ") })),
-        h("span", { class: `chip sens ${/bestanden|bewertet/i.test(`${x.status} ${x.wertung}`) && !/nicht/i.test(`${x.status} ${x.wertung}`) ? "ok" : /nicht/i.test(`${x.status} ${x.wertung}`) ? "bad" : ""}`, text: x.wertung || x.status || "–" })),
-      lazyDetails("Bewertung & Dokumente", async () => {
-        const b = await api("cis_transfer_bewertung", { transfer_id: x.id });
-        const docs = b.documents || b.dokumente || [];
-        return [genericView({ ...b, documents: undefined, dokumente: undefined }),
-          docs.length > 0 && h("ul", { class: "rows files" }, docs.map((d, k) => h("li", {}, h("button", { class: "row file", type: "button", vars: { "--j": k }, onclick: (e) => openLocal("cis_download_transfer_document", { download_url: d.url || d.download_url }, e.currentTarget) },
-            h("span", { class: "ext", text: "PDF" }), h("span", { class: "t", text: d.name || d.title || "Dokument" }), h("span", { class: "chip", text: "öffnen" })))))];
-      }))));
-  });
+// Transferleistungen (PO § 5 Abs. 3, PVO § 18): six Transfermodule
+// Theorie/Praxis, 5 ECTS each, each written on a topic of a module of the
+// required curriculum; only "bestanden"/"nicht bestanden", two retries, never
+// part of the overall grade. T1–T5 (25 ECTS) are needed for the thesis.
+const TL_SLOTS = 6, TL_ECTS = 5, TL_FOR_THESIS = 5;
+
+const tlPassed = (x) => /bestanden/i.test(x?.wertung || "") && !/nicht/i.test(x?.wertung || "");
+const tlModuleNr = (x) => (String(x?.module || "").match(/\(([A-Z]{1,3}\d{3})\)\s*$/) || [])[1];
+
+function tlSlots(list, plan) {
+  const byNo = new Map((list || []).map((x) => [Number(x.no), x]));
+  const planNo = new Map((plan?.known ? plan.slots : []).map((p) => [p.no, p]));
+  return Array.from({ length: TL_SLOTS }, (_, k) => ({ no: k + 1, tl: byNo.get(k + 1), plan: planNo.get(k + 1) }));
+}
+
+// credits and the thesis requirement, from the list itself
+function tlState(list) {
+  const passed = (list || []).filter(tlPassed);
+  const forThesis = passed.filter((x) => Number(x.no) <= TL_FOR_THESIS).length;
+  return { ects: passed.length * TL_ECTS, of: TL_SLOTS * TL_ECTS, forThesis, thesisOK: forThesis >= TL_FOR_THESIS };
+}
+
+// plan states (nak_transfer_plan) as the owner reads them
+const tlStateLabel = {
+  done: ["im Plan", "ok"], late: ["", "ok"], progress: ["in Arbeit", ""], behind: ["im Verzug", "bad"], now: ["jetzt dran", "due"], upcoming: ["geplant", ""],
+};
+
+function tlPhase(ps) {
+  if (!ps) return "";
+  return `Praxisphase ${ps.phase} (${ps.phase_from.slice(0, 6)}–${ps.phase_to})`;
+}
+
+function tlRow(slot, j, { details = false } = {}) {
+  const x = slot.tl, ps = slot.plan;
+  const nr = tlModuleNr(x);
+  let chip;
+  if (ps && (!x || !tlPassed(x) || ps.state === "late")) {
+    const [label, cls] = tlStateLabel[ps.state] || [ps.state, ""];
+    chip = h("span", { class: `chip ${cls}`, text: ps.state === "late" ? `bestanden · ${ps.weeks_off} Wo. später` : label });
+  } else {
+    chip = h("span", { class: `chip ${x ? (tlPassed(x) ? "ok" : /nicht/i.test(x.wertung) ? "bad" : "") : ""}`, text: x ? (x.wertung || x.status || "–") : `${TL_ECTS} ECTS` });
+  }
+  const when = ps && (ps.state === "now" || ps.state === "upcoming") ? ` · anmelden bis ${ps.register_by}` : "";
+  const head = h("div", { class: "row" },
+    h("span", { class: "ext tl", text: `T${slot.no}` }),
+    x ? h("span", { class: "t" }, x.topic || "Thema offen", h("span", { class: "s" },
+      nr ? h("a", { href: `#/modul/${nr}`, text: x.module }) : (x.module || ""),
+      [x.abgabedatum && ` · Abgabe bis ${x.abgabedatum}`, x.versuch && ` · ${x.versuch}. Versuch (max. 3)`, ps && ` · ${tlPhase(ps)}`].filter(Boolean).join("")))
+      : h("span", { class: "t" }, `Transfermodul Theorie/Praxis ${slot.no}`, h("span", { class: "s", text: [ps ? tlPhase(ps) : "noch offen", slot.no === TL_SLOTS && "kann die Vorstudie zur Bachelorthesis sein"].filter(Boolean).join(" · ") + when })),
+    chip);
+  if (!x || !details) return h("li", { vars: { "--j": j } }, head);
+  return h("li", { class: "seminar", vars: { "--j": j } }, head,
+    lazyDetails("Bewertung & Dokumente", async () => {
+      const b = await api("cis_transfer_bewertung", { transfer_id: x.id });
+      const docs = b.documents || b.dokumente || [];
+      return [b.has_gesamtnote && h("p", { class: "empty" }, "Kriterienwert: ", h("b", { class: "sens", text: String(b.gesamtnote.toFixed(2)).replace(".", ",") }), " (kein offizieller Notenwert)"),
+        (b.kriterien || []).length > 0 && h("ul", { class: "rows" }, b.kriterien.map((k, n) => h("li", {}, h("div", { class: "row", vars: { "--j": n } },
+          h("span", { class: "t" }, k.kriterium, h("span", { class: "s", text: [k.gewichtung, k.feedback].filter(Boolean).join(" · ") })),
+          h("span", { class: "chip sens", text: String(k.note).replace(".", ",") }))))),
+        docs.length > 0 && h("ul", { class: "rows files" }, docs.map((d, k) => h("li", {}, h("button", { class: "row file", type: "button", vars: { "--j": k }, onclick: (e) => openLocal("cis_download_transfer_document", { download_url: d.url || d.download_url }, e.currentTarget) },
+          h("span", { class: "ext", text: "PDF" }), h("span", { class: "t", text: d.label || d.name || d.title || "Dokument" }), h("span", { class: "chip", text: "öffnen" })))))];
+    }));
+}
+
+// what to do next, from the plan: behind or on track, the latest start of
+// the next one, and what the bachelor thesis needs
+function tlAdvice(plan, st, list) {
+  if (!plan?.known) return null;
+  const out = [];
+  if (plan.behind > 0) out.push(h("p", { class: "tl-alert bad" }, h("b", { text: plan.behind === 1 ? "1 Transferleistung im Verzug" : `${plan.behind} Transferleistungen im Verzug` }), " gegenüber dem Studienverlaufsplan."));
+  else out.push(h("p", { class: "tl-alert ok" }, h("b", { text: "Im Plan." }), " Keine Transferleistung im Verzug."));
+  // running ones first, then the first one not started yet
+  const started = new Set((list || []).map((x) => Number(x.no)));
+  for (const p of plan.slots.filter((p) => p.state === "progress" || (started.has(p.no) && p.state === "behind" && !/bestanden/i.test(p.wertung || "")))) {
+    const tl = (list || []).find((x) => Number(x.no) === p.no);
+    out.push(h("p", { class: "empty" }, h("b", { text: `T${p.no} läuft` }), tl?.abgabedatum ? `: Abgabe bis ${tl.abgabedatum}.` : "."));
+  }
+  const n = plan.slots.find((p) => !started.has(p.no));
+  if (n) {
+    const asap = n.state === "behind" || n.tight;
+    out.push(h("p", { class: "empty" }, h("b", { text: `Als Nächstes T${n.no}: ` }),
+      asap ? `so bald wie möglich anmelden (die Praxisphase ${n.phase} ${n.state === "behind" ? "ist vorbei" : "reicht für die 9 Wochen nicht mehr ganz"}).` : `spätestens bis ${n.register_by} anmelden, um in der Praxisphase ${n.phase} fertig zu werden.`));
+  }
+  if (!st.thesisOK && plan.thesis_from) {
+    out.push(h("p", { class: "empty" }, `Für die Bachelorthesis ab ${plan.thesis_from} brauchst du T1–T5 bestanden (${st.forThesis} von 5): die letzte davon spätestens am ${plan.thesis_register_by} beginnen.`));
+  }
+  return out;
+}
+
+// dashboard tile and page head: credits, plan advice, the six slots
+function transferOverview(list, plan, { details = false } = {}) {
+  const st = tlState(list);
+  return [h("div", { class: "band-num" }, h("div", { class: "avg" }, count(st.ects), h("span", { class: "empty", text: `von ${st.of} ECTS` }))),
+    ...(tlAdvice(plan, st, list) || [h("p", { class: "empty" }, st.thesisOK ? "T1–T5 bestanden: Voraussetzung für die Bachelorthesis erfüllt." : `Für die Bachelorthesis: T1–T5, davon ${st.forThesis} bestanden.`)]),
+    h("ul", { class: "rows" }, tlSlots(list, plan).map((slot, j) => tlRow(slot, j, { details })))];
+}
+
+// the criteria values: orientation only, never an official grade
+function transferGradeSummary(g, limit = Infinity) {
+  const items = (g?.items || []).slice(0, limit);
+  if (!items.length) return emptyRow("Noch keine bewertete Transferleistung.");
+  return [h("div", { class: "band-num" }, h("div", { class: "avg" }, h("span", { class: "big sens", text: g.final || g.average || "–" }), h("span", { class: "empty sens", text: `Schnitt aus ${g.count} · Kriterienmittel ${g.average}` }))),
+    h("ul", { class: "rows" }, items.map((x, j) => h("li", {}, h("div", { class: "row", vars: { "--j": j } },
+      h("span", { class: "ext tl", text: `T${x.no}` }),
+      h("span", { class: "t" }, x.topic, h("span", { class: "s" }, x.module_nr ? h("a", { href: `#/modul/${x.module_nr}`, text: x.module }) : x.module, h("span", { class: "sens", text: ` · Kriterienwert ${x.grade}` }))),
+      h("span", { class: `chip sens ${x.must_pass_ok ? "" : "bad"}`, text: x.final || x.grade }))))),
+    h("p", { class: "empty meter", text: "Rechnerisch, nicht vom CIS; geht nicht in die Gesamtnote ein." })];
+}
+
+async function transferPage(root) {
+  root.append(h("div", { class: "page-head" }, h("h1", {}, "Transferleistungen", h("small", { text: "Transfermodule Theorie/Praxis 1–6" }))));
+  const grid = h("div", { class: "grid" });
+  root.append(grid);
+  const tSlots = tile("Transfermodule", { cls: "w8", i: 0 });
+  const tValues = tile("Noten · rechnerisch", { i: 1 });
+  const tRules = tile("Was gilt", { cls: "w12", i: 2 });
+  grid.append(tSlots, tValues, tRules);
+  fill(tSlots, () => Promise.all([api("cis_list_transfer"), api("nak_transfer_plan").catch(() => null)]), ([list, plan]) => transferOverview(list, plan, { details: true }));
+  fill(tValues, () => api("nak_transfer_grades"), (g) => [...[transferGradeSummary(g)].flat(),
+    ...(g.items || []).filter((x) => !x.must_pass_ok).map((x) => h("p", { class: "err", text: `T${x.no}: ein Kriterium, das bestanden werden muss, ist schlechter als 4,0.` }))]);
+  tRules.append(h("ul", { class: "rules" },
+    h("li", { text: "Sechs Transferleistungen zwischen dem 2. und 7. Semester, je 5 ECTS. Das Thema muss einem Modul des Pflichtcurriculums zugeordnet sein (PO § 5 Abs. 3)." }),
+    h("li", { text: "Studienleistung: nur „bestanden“ oder „nicht bestanden“, keine Note, nicht in der Gesamtnote; zweimal wiederholbar (PVO § 18)." }),
+    h("li", { text: "Das Thema der Bachelorthesis gibt es erst mit den 25 ECTS aus T1–T5 (PO § 7 Abs. 1). T6 kann eine Vorstudie zur Thesis sein." }),
+    h("li", { text: "Je Transferleistung eine Praxisphase, etwa 9 Wochen von der Auftragsklärung bis zur Bewertung (Studienverlaufsplan der NORDAKADEMIE im Moodle-Kurs Transferleistungen)." }),
+    h("li", { text: "Die Note hier ist rechnerisch: gewichteter Mittelwert der Bewertungskriterien, wie eine zusammengesetzte Note auf eine Nachkommastelle abgerundet (PVO § 17 Abs. 4). Offiziell gibt es keine." })));
 }
 
 function certsTab(grid) {
@@ -2605,6 +2723,7 @@ const routes = [
   [/^#\/nachrichten(?:\/(\d+))?$/, messagesPage, "#/nachrichten"],
   [/^#\/noten$/, gradesPage, "#/noten"],
   [/^#\/pruefungen$/, examsPage, "#/noten"],
+  [/^#\/(?:transferleistungen|transfernoten)$/, transferPage, "#/transferleistungen"],
   [/^#\/studium(?:\/(seminare|wahlpflicht|transfer|bescheinigungen|profil))?$/, studiesPage, "#/studium"],
   [/^#\/einstellungen$/, settingsPage, "#/einstellungen"],
   [/^#\/module$/, unitsPage, "#/kurse"],
@@ -2693,6 +2812,7 @@ const navDefs = {
   studium: ["Studium", "Studium", "#/studium", ["M2 9l10-5 10 5-10 5z", "M6 11v5c3 2 9 2 12 0v-5", "M22 9v6"]],
   pruefungen: ["Prüfungen", "Prüfung", "#/pruefungen", ["M6 3h9l4 4v14H6z", "M14 3v5h5", "M9 13l2 2 4-4"]],
   abgaben: ["Abgaben", "Abgaben", "#/abgaben", ["M12 4v11", "M7 10l5 5 5-5", "M5 20h14"]],
+  transfer: ["Transferleistungen", "Transfer", "#/transferleistungen", ["M4 19h16", "M7 15l3-4 3 2 4-6"]],
 };
 const defaultNav = ["start", "woche", "kurse", "inbox", "noten", "studium"];
 
@@ -2706,6 +2826,8 @@ const homeDefs = {
   moodle: ["Moodle · aktuelle Kurse", "", "", navDefs.kurse[3]],
   messages: ["Nachrichten", "", "", navDefs.inbox[3]],
   pending: ["Noten ausstehend", "", "", ["M12 7v5l3 2", "M5 20h14"]],
+  transfer: ["Transferleistungen", "", "", ["M5 4h14v16H5z", "M9 9h6", "M9 13h6"]],
+  transfer_grades: ["TL-Noten (rechnerisch)", "", "", ["M4 19h16", "M7 15l3-4 3 2 4-6"]],
 };
 const defaultHome = ["next", "deadlines", "week", "grades", "exams", "moodle"];
 

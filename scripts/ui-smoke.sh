@@ -43,7 +43,7 @@ check "#/einstellungen"       "EduVault" "Kalender-Abo" "Benachrichtigungen" "De
 check "#/abgabe/801"          "Übungsblatt 4" "Abgeben"
 check "#/studium/seminare"    "Moderation und Präsentation" "Agiles Projektmanagement" "zum Seminar anmelden"
 check "#/studium/wahlpflicht" "WP Data Engineering"
-check "#/studium/transfer"    "Datenqualität im Betrieb" "T5"
+check "#/transferleistungen"   "Transfermodule" "von 30 ECTS" "Bachelorthesis" "1,9" "Kriterienmittel 1,98" "Praxisphase" "PVO § 18"
 check "#/studium/bescheinigungen" "Studienbescheinigung WS 2026" "Deutsch"
 check "#/studium/profil"      "Mustermann" "Kopierguthaben" "Kontakt ändern" "Adresse ändern" "Freigaben ändern"
 exit $fail

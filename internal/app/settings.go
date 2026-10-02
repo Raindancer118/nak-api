@@ -24,12 +24,12 @@ type Settings struct {
 
 // NavItems are the pages the navigation bar can hold; the web UI knows
 // their labels and icons.
-var NavItems = []string{"start", "woche", "kurse", "inbox", "noten", "studium", "pruefungen", "abgaben"}
+var NavItems = []string{"start", "woche", "kurse", "inbox", "noten", "studium", "pruefungen", "abgaben", "transfer"}
 
 var DefaultNav = []string{"start", "woche", "kurse", "inbox", "noten", "studium"}
 
 // HomeItems are the dashboard tiles; the web UI renders them.
-var HomeItems = []string{"next", "deadlines", "week", "grades", "exams", "moodle", "messages", "pending"}
+var HomeItems = []string{"next", "deadlines", "week", "grades", "exams", "moodle", "messages", "pending", "transfer", "transfer_grades"}
 
 var DefaultHome = []string{"next", "deadlines", "week", "grades", "exams", "moodle"}
 

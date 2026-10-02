@@ -202,6 +202,52 @@ func nakTools() []*Tool {
 		{Name: "nak_agenda", Kind: Read, Desc: "Kombinierter Kalender für einen Zeitraum: Vorlesungen (Stundenplan, nur eigene WPF), Moodle-Termine/Fristen und eigene Klausuren — nach Tagen gruppiert.",
 			Params: []Param{{Name: "from", Desc: "YYYY-MM-DD (Standard heute)"}, {Name: "days", Type: "integer", Desc: "Anzahl Tage (Standard 7)"}, {Name: "to", Desc: "YYYY-MM-DD"}},
 			Run:    func(a *app.App, args Args) (any, error) { return agenda(a, args) }},
+		{Name: "nak_transfer_grades", Kind: Read, Desc: "Inoffizielle Noten der Transferleistungen: aus den Kriterien der Bewertung gewichtet berechnet (PVO § 17 Abs. 4 abgerundet), mit Durchschnitt. Zählen nicht in den Notenschnitt.",
+			Run: func(a *app.App, args Args) (any, error) {
+				c, err := cis(a)
+				if err != nil {
+					return nil, err
+				}
+				list, err := transfer.FetchList(c)
+				if err != nil {
+					return nil, err
+				}
+				bew := map[string]*transfer.Bewertung{}
+				for _, r := range list {
+					// only assessed reports have criteria; one page each
+					if r.ID == "" || !strings.Contains(strings.ToLower(r.Status+" "+r.Action), "bewertet") && r.Action != "performance" {
+						continue
+					}
+					if b, err := transfer.FetchBewertung(c, r.ID); err == nil {
+						bew[r.ID] = b
+					}
+				}
+				return transfer.ComputeGrades(list, bew), nil
+			}},
+		{Name: "nak_transfer_plan", Kind: Read, Desc: "Transferleistungen im Studienverlauf: welche TL in welche Praxisphase gehört (idealtypischer Plan der NORDAKADEMIE), ob du im Verzug bist, bis wann du die nächste spätestens anmelden solltest und bis wann T1–T5 für die Bachelorthesis fertig sein müssen.",
+			Run: func(a *app.App, args Args) (any, error) {
+				c, err := cis(a)
+				if err != nil {
+					return nil, err
+				}
+				p, err := profile.FetchPersonal(c)
+				if err != nil {
+					return nil, err
+				}
+				list, err := transfer.FetchList(c)
+				if err != nil {
+					return nil, err
+				}
+				var qs []transfer.Quarter
+				if raw, err := planning.FetchVorlesungszeiten(c); err == nil {
+					for _, q := range raw {
+						if x, ok := transfer.ParseQuarter(q.Name, q.From, q.To, a.Zone); ok {
+							qs = append(qs, x)
+						}
+					}
+				}
+				return transfer.BuildPlan(p.Studiengang, p.Zenturie, qs, list, a.Now().In(a.Zone)), nil
+			}},
 		{Name: "nak_dashboard", Kind: Read, Desc: "Der Überblick in einem Aufruf: heutige & morgige Vorlesungen, dringende Fristen (CIS + Moodle, 14 Tage), angemeldete Prüfungen, ungelesene Moodle-Nachrichten, aktuelles Quartal, Kopierguthaben. Guter Einstieg.",
 			Run: func(a *app.App, args Args) (any, error) { return dashboard(a) }},
 		{Name: "nak_selfcheck", Kind: Read, Desc: "Prüft (nur lesend) alle CIS-Seiten und -Formulare, auf die nak angewiesen ist, ob sie noch die erwartete Struktur haben. 'drift' = das CIS hat sich geändert (dann nak_report_drift vorschlagen); 'unavailable' = Netz/Login/Wartung.",

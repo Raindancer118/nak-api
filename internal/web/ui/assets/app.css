@@ -1364,3 +1364,9 @@ html.private .toast { filter: blur(6px); }
 .offline-bar { margin: 0; padding: .55rem 1.25rem; text-align: center; font-size: .85rem; font-weight: 500;
   color: var(--ink); background: color-mix(in oklab, var(--due, #ffc857) 22%, var(--bg)); border-bottom: 1px solid color-mix(in oklab, var(--due, #ffc857) 45%, transparent); }
 .offline-bar[hidden] { display: none; }
+
+/* rule lists (Transferleistungen) */
+ul.rules { margin: .25rem 0 0; padding-left: 1.1rem; display: grid; gap: .5rem; color: var(--text); font-size: .92rem; }
+.tl-alert { margin: .4rem 0; padding: .55rem .8rem; border-radius: 12px; font-size: .92rem; }
+.tl-alert.bad { background: color-mix(in oklab, var(--bad, #c0392b) 14%, transparent); }
+.tl-alert.ok { background: color-mix(in oklab, var(--ok, #2e8b57) 14%, transparent); }

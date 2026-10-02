@@ -13,6 +13,7 @@ import (
 
 	"github.com/Raindancer118/nak-api/internal/app"
 	"github.com/Raindancer118/nak-api/internal/tools"
+	"github.com/Raindancer118/nak-api/internal/transfer"
 )
 
 type module struct {
@@ -471,11 +472,13 @@ func Registry() *tools.Registry {
 			return map[string]any{"chosen": []map[string]any{{"id": "8801", "name": "WP Data Engineering", "termin": "Q3/26", "chosen": true}}, "available": nil, "selection_open": false,
 				"notice": "Der nächste Wahlzeitraum beginnt im November."}, nil
 		}),
-		read("cis_list_transfer", "Demo-Transferleistungen", func(*app.App, tools.Args) (any, error) {
-			return []map[string]any{
-				{"id": "6601", "no": "5", "abgabedatum": "15.06.2026", "korrekturfrist": "15.07.2026", "topic": "Automatisierte Tests in einer gewachsenen Codebasis", "module": "Softwaretechnik (I151)", "wertung": "bestanden", "versuch": "1", "status": "bewertet"},
-				{"id": "6602", "no": "6", "abgabedatum": "22.10.2026", "korrekturfrist": "22.11.2026", "topic": "Datenqualität im Betrieb", "module": "Datenbanksysteme (I160)", "wertung": "", "versuch": "1", "status": "angemeldet"},
-			}, nil
+		read("cis_list_transfer", "Demo-Transferleistungen", func(*app.App, tools.Args) (any, error) { return demoTransfers(), nil }),
+		read("nak_transfer_plan", "Demo-Zeitplan der Transferleistungen", func(a *app.App, _ tools.Args) (any, error) {
+			var list []transfer.Report
+			for _, x := range demoTransfers() {
+				list = append(list, transfer.Report{No: fmt.Sprint(x["no"]), Abgabedatum: fmt.Sprint(x["abgabedatum"]), Wertung: fmt.Sprint(x["wertung"])})
+			}
+			return transfer.BuildPlan("Angewandte Informatik (B.Sc.)", "I24a", nil, list, a.Now().In(a.Zone)), nil
 		}),
 		read("cis_transfer_bewertung", "Demo-Bewertung", func(*app.App, tools.Args) (any, error) {
 			return map[string]any{"kriterien": []map[string]any{{"kriterium": "Problemstellung", "note": "1,7", "gewichtung": "20 %"}, {"kriterium": "Methodik", "note": "2,0", "gewichtung": "40 %"}, {"kriterium": "Form", "note": "1,3", "gewichtung": "40 %"}}, "gesamt": "1,7"}, nil
@@ -525,6 +528,16 @@ func Registry() *tools.Registry {
 				}
 			}
 			return out
+		}),
+		read("nak_transfer_grades", "Demo-Transfernoten", func(*app.App, tools.Args) (any, error) {
+			item := func(id, no, topic, module, nr string, v float64) map[string]any {
+				return map[string]any{"id": id, "no": no, "topic": topic, "module": module, "module_nr": nr, "wertung": "bestanden", "versuch": "1",
+					"exact": v, "grade": transfer.CriteriaValue(v), "final": transfer.FinalGrade(v), "criteria": 12, "must_pass_ok": true}
+			}
+			return map[string]any{"items": []map[string]any{
+				item("6597", "1", "Kennzahlen für den Service Desk", "Allgemeine Betriebswirtschaftslehre (I169)", "I169", 2.2),
+				item("6598", "2", "Auswahl einer CI/CD-Plattform", "Praxis der Softwareentwicklung (I143)", "I143", 1.75),
+			}, "average": "1,98", "final": "1,9", "count": 2, "note": transfer.GradesNote}, nil
 		}),
 		read("cis_status", "Demo-Status", func(*app.App, tools.Args) (any, error) {
 			return map[string]any{"name": "Max Mustermann", "zenturie": "I24a", "studiengang": "Angewandte Informatik (B.Sc.)"}, nil
@@ -591,4 +604,14 @@ func timetable(a *app.App, args tools.Args) map[string]any {
 // so the demo shows a pending grade with its deadline.
 func WrittenExam(now time.Time) []map[string]any {
 	return []map[string]any{{"exam_id": "8800", "module_nr": "I190", "title": "Theoretische Informatik", "start": now.AddDate(0, 0, -6).Format("02.01.2006") + " 09:00", "registered": true, "dozenten": []string{"Okafor, Mira"}}}
+}
+
+// demoTransfers fit the AINF plan of cohort 2024: T1 in its phase, T2 late,
+// T3 under way in the current one.
+func demoTransfers() []map[string]any {
+	return []map[string]any{
+		{"id": "6597", "no": "1", "abgabedatum": "30.09.2025", "topic": "Kennzahlen für den Service Desk", "module": "Allgemeine Betriebswirtschaftslehre (I169)", "wertung": "bestanden", "versuch": "1", "status": "bewertet"},
+		{"id": "6598", "no": "2", "abgabedatum": "10.05.2026", "topic": "Auswahl einer CI/CD-Plattform", "module": "Praxis der Softwareentwicklung (I143)", "wertung": "bestanden", "versuch": "1", "status": "bewertet"},
+		{"id": "6602", "no": "3", "abgabedatum": "09.10.2026", "korrekturfrist": "06.11.2026", "topic": "Datenqualität im Betrieb", "module": "Datenbanksysteme (I160)", "wertung": "", "versuch": "1", "status": "angemeldet"},
+	}
 }
