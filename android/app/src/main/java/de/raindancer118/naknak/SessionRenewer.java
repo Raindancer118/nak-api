@@ -26,6 +26,9 @@ final class SessionRenewer {
     // a password prompt does not go away within minutes
     private static final long RETRY_AFTER_MS = 5 * 60000;
     private static long failedAt;
+    // touched on the main thread only
+    private static CountDownLatch running;
+    private static boolean aborted;
 
     private SessionRenewer() {
     }
@@ -40,6 +43,13 @@ final class SessionRenewer {
         WebView[] holder = new WebView[1];
         Handler main = new Handler(Looper.getMainLooper());
         main.post(() -> {
+            if (App.visible()) { // checked on the main thread, where it changes
+                aborted = true;
+                done.countDown();
+                return;
+            }
+            aborted = false;
+            running = done;
             try {
                 holder[0] = start(app, server, ok, done);
             } catch (RuntimeException e) { // no WebView provider (updating)
@@ -51,15 +61,32 @@ final class SessionRenewer {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
+        CountDownLatch cleaned = new CountDownLatch(1);
+        boolean[] wasAborted = new boolean[1];
         main.post(() -> {
+            wasAborted[0] = aborted;
+            running = null;
             if (holder[0] != null) {
                 holder[0].stopLoading();
                 holder[0].destroy();
             }
             CookieManager.getInstance().flush();
+            cleaned.countDown();
         });
-        failedAt = ok.get() ? 0 : System.currentTimeMillis();
-        return ok.get();
+        try {
+            cleaned.await(5, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        boolean success = ok.get() && !wasAborted[0];
+        if (!wasAborted[0]) failedAt = success ? 0 : System.currentTimeMillis();
+        return success;
+    }
+
+    /** Main thread: the app came to the front, stop any renewal right away. */
+    static void abort() {
+        aborted = true;
+        if (running != null) running.countDown();
     }
 
     @SuppressLint("SetJavaScriptEnabled")

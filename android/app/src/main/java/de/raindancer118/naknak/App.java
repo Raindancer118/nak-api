@@ -1,9 +1,12 @@
 package de.raindancer118.naknak;
 
+import android.app.Activity;
 import android.app.Application;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.content.Context;
+import android.os.Bundle;
+import androidx.annotation.NonNull;
 import androidx.work.Constraints;
 import androidx.work.ExistingPeriodicWorkPolicy;
 import androidx.work.NetworkType;
@@ -12,6 +15,7 @@ import androidx.work.WorkManager;
 import java.util.concurrent.TimeUnit;
 
 public class App extends Application {
+    private static volatile int started;
     static final String CH_GRADES = "grades";
     static final String CH_MESSAGES = "messages";
     static final String CH_NEWS = "news";
@@ -26,6 +30,45 @@ public class App extends Application {
         nm.createNotificationChannel(new NotificationChannel(CH_DEADLINES, getString(R.string.ch_deadlines), NotificationManager.IMPORTANCE_DEFAULT));
         nm.createNotificationChannel(new NotificationChannel(CH_NEWS, getString(R.string.ch_news), NotificationManager.IMPORTANCE_LOW));
         schedule(this);
+        registerActivityLifecycleCallbacks(new ActivityLifecycleCallbacks() {
+            @Override
+            public void onActivityStarted(@NonNull Activity a) {
+                started++;
+                // the visible app logs in itself; a background renewal would
+                // overwrite the outpost's state cookie and break that login
+                SessionRenewer.abort();
+            }
+
+            @Override
+            public void onActivityStopped(@NonNull Activity a) {
+                started--;
+            }
+
+            @Override
+            public void onActivityCreated(@NonNull Activity a, Bundle b) {
+            }
+
+            @Override
+            public void onActivityResumed(@NonNull Activity a) {
+            }
+
+            @Override
+            public void onActivityPaused(@NonNull Activity a) {
+            }
+
+            @Override
+            public void onActivitySaveInstanceState(@NonNull Activity a, @NonNull Bundle b) {
+            }
+
+            @Override
+            public void onActivityDestroyed(@NonNull Activity a) {
+            }
+        });
+    }
+
+    /** True while one of naknak's screens is visible. */
+    static boolean visible() {
+        return started > 0;
     }
 
     /**

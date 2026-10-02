@@ -513,3 +513,37 @@ func TestOrderedOutput(t *testing.T) {
 		t.Error("false pointer kept")
 	}
 }
+
+func TestMarkMessagesReadOnlyUnreadConversations(t *testing.T) {
+	f, s := svc(t)
+	f.on("core_message_get_conversations", `{"conversations":[
+		{"id":7,"name":"","membercount":2,"unreadcount":2,"members":[{"id":4711,"fullname":"Ich"},{"id":5,"fullname":"Prof. Muster"}],"messages":[{"text":"Hallo","timecreated":1790000000}]},
+		{"id":8,"name":"Gruppe I24a","membercount":30,"unreadcount":0,"members":[],"messages":[{"text":"x","timecreated":1790000000}]}]}`)
+	f.on("core_message_mark_all_conversation_messages_as_read", "null")
+	prev, err := s.MarkMessagesRead(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	eq(t, v(t, prev, "conversations"), "1", "preview count")
+	for _, c := range f.called() {
+		if c == "core_message_mark_all_conversation_messages_as_read" {
+			t.Fatal("preview must not write")
+		}
+	}
+	if _, err := s.MarkMessagesRead(true); err != nil {
+		t.Fatal(err)
+	}
+	eq(t, f.last().Get("conversationid"), "7", "only the unread conversation")
+	eq(t, f.last().Get("userid"), "4711", "userid")
+	n := 0
+	for _, c := range f.called() {
+		if c == "core_message_mark_all_conversation_messages_as_read" {
+			n++
+		}
+	}
+	eq(t, fmt.Sprint(n), "1", "mark calls")
+	s.C.ReadOnly = true
+	if _, err := s.MarkMessagesRead(true); !errors.Is(err, ErrReadOnly) {
+		t.Errorf("read-only: %v", err)
+	}
+}

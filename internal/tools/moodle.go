@@ -269,6 +269,10 @@ func moodleTools() []*Tool {
 				}
 				return s.MarkNotificationsRead()
 			}),
+		mwrite("moodle_mark_messages_read", "Markiert alle ungelesenen Moodle-Unterhaltungen als gelesen (Vorschau nennt sie).", nil,
+			func(s *moodle.Service, a *app.App, args Args, confirm bool) (any, error) {
+				return s.MarkMessagesRead(confirm)
+			}),
 		mwrite("moodle_forum_reply", "Antwortet auf einen Forenbeitrag.",
 			[]Param{{Name: "postid", Type: "integer", Required: true, Desc: "postid aus moodle_forum_posts"}, {Name: "message", Required: true, Desc: "Text (Zeilenumbrüche werden übernommen)"},
 				{Name: "subject", Desc: "Betreff, Standard 'Re: …'"}},

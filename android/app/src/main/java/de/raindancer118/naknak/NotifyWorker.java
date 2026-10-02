@@ -103,7 +103,8 @@ public class NotifyWorker extends Worker {
     // once per expiry: the Authentik/naknak session ran out, background
     // checks need the app opened once
     private static void loginHint(Context c) {
-        if (Prefs.of(c).getBoolean("login_hint", false) || !allowed(c)) return;
+        // the app is open: the user sees the login page anyway
+        if (Prefs.of(c).getBoolean("login_hint", false) || !allowed(c) || App.visible()) return;
         Prefs.of(c).edit().putBoolean("login_hint", true).apply();
         try {
             NotificationManagerCompat.from(c).notify(1, new NotificationCompat.Builder(c, App.CH_NEWS)

@@ -365,7 +365,11 @@ function moodleSummary([dash, courses]) {
     h("div", { class: "band-num" },
       h("div", { class: "avg" }, count((u.notifications || 0) + (u.conversations || 0)), h("span", { class: "empty", text: "ungelesen" })),
       h("p", { class: "empty", text: `${u.notifications || 0} Benachrichtigungen · ${u.conversations || 0} Nachrichten` }),
-      h("div", { class: "go-links" }, h("a", { class: "go", href: "#/neu", text: "Neuigkeiten" }), h("a", { class: "go", href: "#/nachrichten", text: "Nachrichten" }))),
+      h("div", { class: "go-links" }, h("a", { class: "go", href: "#/neu", text: "Neuigkeiten" }), h("a", { class: "go", href: "#/nachrichten", text: "Nachrichten" })),
+      (u.notifications || u.conversations) ? confirmFlow({
+        steps: [u.notifications && ["moodle_mark_notifications_read", {}], u.conversations && ["moodle_mark_messages_read", {}]].filter(Boolean),
+        label: "Alle als gelesen markieren", confirm: "Ja, markieren", done: refreshPage,
+      }) : null),
     h("ul", { class: "courses", "aria-label": `${list.length} aktuelle Kurse` }, list.map((c, j) => h("li", { vars: { "--j": j } },
       h("a", { href: `#/kurs/${c.id}`, title: c.name },
         h("span", { class: "nr", text: firstNr(c.name) || firstNr(c.shortname) }), courseTitle(c),
@@ -1015,8 +1019,15 @@ async function discussionPage(root, id) {
 
 // ── news & messages ─────────────────────────────────────────────────────────
 
+// messages and Moodle news share one place: the "Inbox" in the navigation
+function inboxHead(root, current) {
+  root.append(h("div", { class: "page-head" }, h("h1", {}, "Inbox", h("small", { text: "Moodle-Nachrichten und was sich in deinen Kursen getan hat" }))),
+    h("nav", { class: "tabs", "aria-label": "Inbox" }, [["#/nachrichten", "Nachrichten"], ["#/neu", "Neuigkeiten"]].map(([href, label]) =>
+      h("a", { href, text: label, ...(href === current ? { "aria-current": "page" } : {}) }))));
+}
+
 async function newsPage(root) {
-  root.append(h("div", { class: "page-head" }, h("h1", {}, "Neuigkeiten", h("small", { text: "Was sich in deinen Kursen getan hat" }))));
+  inboxHead(root, "#/neu");
   const grid = h("div", { class: "grid" });
   root.append(grid);
   const tNew = tile("Geändert in den letzten 14 Tagen", { cls: "w8" });
@@ -1050,7 +1061,7 @@ async function newsPage(root) {
 }
 
 async function messagesPage(root, id) {
-  root.append(h("div", { class: "page-head" }, h("h1", {}, "Nachrichten", h("small", { text: "Moodle-Nachrichten" }))));
+  inboxHead(root, "#/nachrichten");
   const layout = h("div", { class: "chat" });
   root.append(layout);
   const side = tile("Unterhaltungen", { cls: "chat-list" });
@@ -2000,22 +2011,25 @@ function previewView(pre) {
 
 // confirmFlow renders a button; the first click asks the server for a preview
 // (nothing is sent to CIS/Moodle), only the second, labelled click executes.
-function confirmFlow({ tool, args, label, confirm, done, cls = "ghost" }) {
+// steps: several write tools behind one preview and one confirmation
+function confirmFlow({ tool, args, steps, label, confirm, done, cls = "ghost" }) {
   const box = h("div", { class: "preview-box", hidden: true });
   const btn = h("button", { class: cls, type: "button", text: label });
   btn.addEventListener("click", async () => {
     const a = typeof args === "function" ? await args() : args;
-    if (!a) return;
+    if (!steps && !a) return;
+    const todo = steps || [[tool, a]];
     box.hidden = false;
     box.replaceChildren(h("p", { class: "empty", text: "Vorschau wird erstellt …" }));
     try {
-      const pre = await post(tool, a);
+      const pres = await Promise.all(todo.map(([t, x]) => post(t, x)));
       const go = h("button", { class: "primary", type: "button", text: confirm });
       go.addEventListener("click", async () => {
         go.disabled = true;
         go.classList.add("busy");
         try {
-          const r = await post(tool, { ...a, confirm: true }, "", { "X-Nak-Confirm": "JA" });
+          let r;
+          for (const [t, x] of todo) r = await post(t, { ...x, confirm: true }, "", { "X-Nak-Confirm": "JA" });
           box.replaceChildren(h("p", { class: "ok-note", text: "Erledigt." }));
           unitsP = null;
           historyP = null;
@@ -2026,7 +2040,7 @@ function confirmFlow({ tool, args, label, confirm, done, cls = "ghost" }) {
       });
       box.replaceChildren(
         h("p", { class: "empty", text: "Noch nichts gesendet. Das würde passieren:" }),
-        previewView(pre.result),
+        ...pres.map((pre) => previewView(pre.result)),
         h("div", { class: "row-actions" }, go, h("button", { class: "ghost", type: "button", text: "Abbrechen", onclick: () => { box.hidden = true; } })));
     } catch (err) {
       box.replaceChildren(errorBox(err));
@@ -2259,7 +2273,7 @@ const routes = [
   [/^#\/abgaben$/, allAssignmentsPage, "#/kurse"],
   [/^#\/abgabe\/(\d+)$/, assignmentPage, "#/kurse"],
   [/^#\/diskussion\/(\d+)$/, discussionPage, "#/kurse"],
-  [/^#\/neu$/, newsPage, "#/neu"],
+  [/^#\/neu$/, newsPage, "#/nachrichten"],
   [/^#\/nachrichten(?:\/(\d+))?$/, messagesPage, "#/nachrichten"],
   [/^#\/noten$/, gradesPage, "#/noten"],
   [/^#\/pruefungen$/, examsPage, "#/noten"],
@@ -2344,8 +2358,7 @@ function header() {
     ["Übersicht", "Start", "#/", ["M3 11l9-7 9 7", "M5 10v10h14V10", "M10 20v-6h4v6"]],
     ["Woche", "Woche", "#/woche", ["M4 6h16v14H4z", "M4 10h16", "M9 3v4", "M15 3v4"]],
     ["Kurse", "Kurse", "#/kurse", ["M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z", "M4 19V5", "M8 7h7"]],
-    ["Neuigkeiten", "Neu", "#/neu", ["M12 3l1.8 4.6L18 9.4l-4.2 1.8L12 16l-1.8-4.8L6 9.4l4.2-1.8z", "M19 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"]],
-    ["Nachrichten", "Chat", "#/nachrichten", ["M4 5h16v11H8l-4 4z"]],
+    ["Inbox", "Inbox", "#/nachrichten", ["M4 5h16v11H8l-4 4z"]],
     ["Noten", "Noten", "#/noten", ["M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.4 6.8 19.1l1-5.8L3.5 9.2l5.9-.9z"]],
     ["Studium", "Studium", "#/studium", ["M2 9l10-5 10 5-10 5z", "M6 11v5c3 2 9 2 12 0v-5", "M22 9v6"]],
   ];

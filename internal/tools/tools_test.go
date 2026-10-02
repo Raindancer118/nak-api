@@ -283,7 +283,7 @@ func TestStartupListsAllToolsWithSafeSchemas(t *testing.T) {
 			t.Errorf("%s: description must warn", tool.Name)
 		}
 	}
-	if prefixes["cis"] < 40 || prefixes["moodle"] != 30 || prefixes["nak"] != 6 || prefixes["eduvault"] != 3 {
+	if prefixes["cis"] < 40 || prefixes["moodle"] != 31 || prefixes["nak"] != 6 || prefixes["eduvault"] != 3 {
 		t.Errorf("prefixes = %v", prefixes)
 	}
 }
@@ -375,6 +375,7 @@ func TestNoWriteWithoutConfirm(t *testing.T) {
 		"cis_set_sharing":                {"noten_betrieb": false, "kommilitonen": map[string]any{"Adresse": "1"}},
 		"cis_set_vertiefung":             {"value": "8"},
 		"moodle_mark_notifications_read": {},
+		"moodle_mark_messages_read":      {},
 		"moodle_send_message":            {"conversationid": 1, "text": "hi"},
 		"moodle_forum_reply":             {"postid": 1, "message": "x"},
 		"moodle_forum_post":              {"forumid": 1, "subject": "s", "message": "m"},

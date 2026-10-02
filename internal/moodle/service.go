@@ -1123,6 +1123,38 @@ func (s *Service) MarkNotificationsRead() (*M, error) {
 	return m("marked_read", true), nil
 }
 
+// MarkMessagesRead marks every unread conversation (of the newest 50) as
+// read; without confirm it only says which ones that would be.
+func (s *Service) MarkMessagesRead(confirm bool) (*M, error) {
+	uid, err := s.userID()
+	if err != nil {
+		return nil, err
+	}
+	convs, err := s.Conversations(50)
+	if err != nil {
+		return nil, err
+	}
+	var ids []int64
+	var names []string
+	for _, c := range convs {
+		if c.Get("unread") == nil {
+			continue
+		}
+		id, _ := c.Get("conversationid").(int64)
+		name, _ := c.Get("name").(string)
+		ids, names = append(ids, id), append(names, name)
+	}
+	if !confirm {
+		return m("action", "Alle Moodle-Nachrichten als gelesen markieren", "conversations", len(ids), "names", names), nil
+	}
+	for _, id := range ids {
+		if _, err := s.C.CallWrite("core_message_mark_all_conversation_messages_as_read", map[string]any{"userid": uid, "conversationid": id}); err != nil {
+			return nil, err
+		}
+	}
+	return m("marked_read", len(ids)), nil
+}
+
 func (s *Service) ForumReply(postID int64, subject, message string, confirm bool) (*M, error) {
 	if err := requireText(message, "message"); err != nil {
 		return nil, err

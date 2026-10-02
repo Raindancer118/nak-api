@@ -501,6 +501,7 @@ func Registry() *tools.Registry {
 			return map[string]any{"would": "Abgabe hochladen", "files": args.Strs("files"), "submit_for_grading": args.Bool("submit_for_grading", false)}
 		}),
 		write("moodle_mark_notifications_read", "Demo: gelesen", func(tools.Args) any { return map[string]any{"would": "Alle Benachrichtigungen als gelesen markieren"} }),
+		write("moodle_mark_messages_read", "Demo: gelesen", func(tools.Args) any { return map[string]any{"would": "Alle Moodle-Nachrichten als gelesen markieren"} }),
 	)
 	return r
 }

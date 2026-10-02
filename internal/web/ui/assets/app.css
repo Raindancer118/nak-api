@@ -1100,6 +1100,13 @@ a.icon-btn { color: inherit; }
   box-shadow: 0 24px 60px -24px #0009; padding: .75rem;
   animation: drop .35s var(--spring) both;
 }
+/* phones: the bell is not the rightmost button, so a panel hanging off it
+   runs out of the screen on the left; span the header row instead */
+@media (max-width: 680px) {
+  .top-in { position: relative; }
+  .bell-wrap { position: static; }
+  .bell-panel { left: .75rem; right: .75rem; width: auto; top: calc(100% + .35rem); }
+}
 .bell-head { display: flex; justify-content: space-between; align-items: center; padding: .2rem .35rem .5rem; }
 .bell-list .row { grid-template-columns: auto 1fr auto; }
 .dot.new { background: var(--moodle); }
