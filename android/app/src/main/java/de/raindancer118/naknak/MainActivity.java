@@ -111,7 +111,7 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public boolean shouldOverrideUrlLoading(WebView v, WebResourceRequest r) {
                 String url = r.getUrl().toString();
-                if (policy.inApp(url, r.isRedirect())) return false;
+                if (policy.inApp(url, r.isRedirect(), v.getUrl())) return false;
                 openOutside(url);
                 return true;
             }

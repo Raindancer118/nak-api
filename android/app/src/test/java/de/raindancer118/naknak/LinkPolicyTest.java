@@ -32,4 +32,23 @@ public class LinkPolicyTest {
         assertFalse(p.inApp("https://naknak.tstieh.de.evil.com/", false));
         assertFalse(p.inApp("https://evil.com/?https://naknak.tstieh.de", false));
     }
+
+    @Test public void theLoginFlowKeepsItsOwnNavigationsInTheApp() {
+        // after the password Authentik moves on with JavaScript, not with a
+        // redirect; in another browser the outpost callback lacks its state
+        // cookie and answers 400
+        String flow = "https://portal.tstieh.de/if/flow/default-authentication-flow/?next=x";
+        assertTrue(p.inApp("https://portal.tstieh.de/application/o/authorize/?client_id=x", false, flow));
+        assertTrue(p.inApp("https://github.com/login/oauth/authorize?x=1", false, flow));
+        assertTrue(p.inApp("https://naknak.tstieh.de/outpost.goauthentik.io/callback?code=x", false, flow));
+        assertFalse(p.inApp("http://portal.tstieh.de/x", false, flow));
+        assertFalse(p.inApp("intent://x#Intent;end", false, flow));
+    }
+
+    @Test public void linksTappedInNaknakStillLeave() {
+        String page = "https://naknak.tstieh.de/#/kurs/1";
+        assertFalse(p.inApp("https://moodle.nordakademie.de/course/view.php?id=1", false, page));
+        assertFalse(p.inApp("https://portal.tstieh.de/if/user/", false, page));
+        assertFalse(p.inApp("https://x.de/", false, null));
+    }
 }
