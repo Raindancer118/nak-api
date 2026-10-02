@@ -1268,3 +1268,18 @@ a.wg-ev:hover { translate: 0 -1px; box-shadow: 0 6px 18px -8px #0007; z-index: 2
 .calc-row select { font: inherit; min-height: 40px; padding: 0 .6rem; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); }
 .big.bump { animation: bump .45s var(--spring); }
 @keyframes bump { 40% { scale: 1.08; } }
+
+/* ── privacy mode (blur) ────────────────────────────────── */
+
+html.private .sens:not(.peek) {
+  filter: blur(7px);
+  cursor: pointer;
+  user-select: none;
+  transition: filter .35s var(--ease);
+}
+html.private .sens.peek { filter: none; transition: filter .35s var(--ease); }
+html.private .eye-btn { border-color: color-mix(in oklab, var(--cis) 55%, transparent); background: color-mix(in oklab, var(--cis) 12%, var(--tile)); }
+.eye-btn .label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+/* the bell's toast would show a new grade in clear text */
+html.private .toast { filter: blur(6px); }
+@media print { html.private .sens { filter: blur(7px); } }

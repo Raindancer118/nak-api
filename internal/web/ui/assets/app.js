@@ -53,6 +53,8 @@ const icons = {
   light: ["M12 4V2", "M12 22v-2", "M4.9 4.9 3.5 3.5", "M20.5 20.5l-1.4-1.4", "M4 12H2", "M22 12h-2", "M4.9 19.1l-1.4 1.4", "M20.5 3.5l-1.4 1.4", "M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"],
   dark: ["M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"],
   back: ["M15 18l-6-6 6-6"],
+  eye: ["M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z", "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"],
+  eyeOff: ["M3 3l18 18", "M10.6 5.1A10 10 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.2 4.1", "M6.6 6.6A17 17 0 0 0 2 12s3.5 7 10 7a9.7 9.7 0 0 0 5.4-1.6", "M9.9 9.9a3 3 0 0 0 4.2 4.2"],
   gear: ["M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z", "M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"],
 };
 
@@ -186,7 +188,7 @@ function count(n, unit) {
 
 // decimal numbers (grade averages) count up in JS; integers use the CSS counter
 function decimal(n, digits = 1) {
-  const el = h("span", { class: "big", text: (0).toFixed(digits).replace(".", ",") });
+  const el = h("span", { class: "big sens", text: (0).toFixed(digits).replace(".", ",") });
   const target = Number(n) || 0;
   if (reduced.matches) {
     el.textContent = target.toFixed(digits).replace(".", ",");
@@ -321,7 +323,7 @@ function credits(progress, g) {
 function creditMeter(progress, g) {
   const { earned, total, parts, cis } = credits(progress, g);
   if (!total) return h("div", { class: "meter" }, h("div", { class: "meter-label" }, h("span", { text: `${fmtNum(earned)} Credits` })));
-  return h("div", { class: "meter" },
+  return h("div", { class: "meter sens" },
     h("div", { class: "meter-label" }, h("span", { text: `${fmtNum(earned)} von ${total} Credits` }), h("span", { text: `${Math.round((earned / total) * 100)} %` })),
     h("div", { class: "progress stacked", role: "img", "aria-label": parts.map((p) => `${p.label} ${fmtNum(p.v)}`).join(", ") },
       parts.map((p, j) => h("i", { vars: { "--w": `${(p.v / total) * 100}%`, "--c": p.color, "--j": j }, title: `${p.label}: ${fmtNum(p.v)}${p.of ? ` von ${p.of}` : ""}` }))),
@@ -341,7 +343,7 @@ function gradeSummary([g, progress]) {
     h("ul", { class: "rows" }, recent.map((m, j) => h("li", {}, h("a", { class: "row", href: `#/modul/${firstNr(m.module_nr)}`, vars: { "--j": j } },
       h("span", { class: "dot", "data-src": "cis" }),
       h("span", { class: "t" }, m.title, h("span", { class: "s", text: m.entry_date || m.exam_date })),
-      h("span", { class: `chip ${gradeClass(m)}`, text: m.grade }))))),
+      h("span", { class: `chip sens ${gradeClass(m)}`, text: m.grade }))))),
   ];
 }
 
@@ -558,7 +560,7 @@ function gradeCalculator(g, p) {
   }
   if (!open.length) return emptyRow("Keine offenen benoteten Module.");
   const grades = ["–", "1,0", "1,3", "1,7", "2,0", "2,3", "2,7", "3,0", "3,3", "3,7", "4,0"];
-  const result = h("span", { class: "big", text: weight ? (sum / weight).toFixed(2).replace(".", ",") : "–" });
+  const result = h("span", { class: "big sens", text: weight ? (sum / weight).toFixed(2).replace(".", ",") : "–" });
   const delta = h("span", { class: "empty" });
   const pick = new Map();
   const update = () => {
@@ -633,7 +635,7 @@ async function gradesPage(root) {
         h("td", { class: "nr", text: m.exam_date || "" }),
         h("td", { class: "nr r", text: m.attempt ? `${m.attempt}.` : "" }),
         h("td", { class: "nr r", text: m.credits || "" }),
-        h("td", { class: "grade" }, h("span", { class: `chip ${gradeClass(m)}`, text: m.grade || m.status || "–" })))));
+        h("td", { class: "grade" }, h("span", { class: `chip sens ${gradeClass(m)}`, text: m.grade || m.status || "–" })))));
       if (!rows.length) body.append(h("tr", {}, h("td", { colspan: 6, class: "empty", text: "Keine Module in dieser Ansicht." })));
     };
     const filters = h("div", { class: "filters", role: "group", "aria-label": "Filter" },
@@ -1059,7 +1061,7 @@ async function messagesPage(root, id) {
     if (!list.length) return emptyRow("Keine Unterhaltungen.");
     return h("ul", { class: "rows" }, list.map((c, j) => h("li", {}, h("a", { class: "row", href: `#/nachrichten/${c.conversationid}`, vars: { "--j": j }, ...(String(c.conversationid) === String(id) ? { "aria-current": "true" } : {}) },
       h("span", { class: "dot", "data-src": "moodle" }),
-      h("span", { class: "t" }, c.name || "Unterhaltung", h("span", { class: "s preview", text: c.last_message })),
+      h("span", { class: "t" }, c.name || "Unterhaltung", h("span", { class: "s preview sens", text: c.last_message })),
       h("span", { class: "s", text: (c.last_time || "").slice(5, 10).split("-").reverse().join(".") })))));
   });
   if (!id) {
@@ -1072,7 +1074,7 @@ async function messagesPage(root, id) {
     const msgs = Array.isArray(r) ? r : r?.messages || [];
     const thread = h("div", { class: "msgs" }, msgs.map((m, j) => h("div", { class: `msg ${m.mine || m.from === "ich" || m.from === "me" ? "mine" : ""}`, vars: { "--j": Math.min(j, 12) } },
       h("span", { class: "s", text: [m.from, m.time].filter(Boolean).join(" · ") }),
-      h("p", { text: m.text }))));
+      h("p", { class: "sens", text: m.text }))));
     pane.replaceChildren(thread, composer({ tool: "moodle_send_message", field: "text", base: { conversationid: Number(id) }, placeholder: "Antworten …" }));
     thread.scrollTop = thread.scrollHeight;
   } catch (err) {
@@ -1268,7 +1270,7 @@ function unitCard(u, i) {
       h("span", { class: "name", text: u.title || u.nr }),
       h("span", { class: "tags" },
         u.courses.some((c) => c.state === "current") && h("span", { class: "chip moodle", text: "läuft" }),
-        u.grade?.grade ? h("span", { class: `chip ${gradeClass(u.grade)}`, text: u.grade.grade }) : u.grade?.status && h("span", { class: `chip ${gradeClass(u.grade)}`, text: u.grade.status }),
+        u.grade?.grade ? h("span", { class: `chip sens ${gradeClass(u.grade)}`, text: u.grade.grade }) : u.grade?.status && h("span", { class: `chip sens ${gradeClass(u.grade)}`, text: u.grade.status }),
         u.courses.length > 0 && h("span", { class: "chip", text: `${u.courses.length} Moodle-Kurs${u.courses.length > 1 ? "e" : ""}` }))));
   t.querySelector(".tile-head").remove();
   return t;
@@ -1370,14 +1372,14 @@ function gradeTile(m, u) {
   const g = m.grade || u?.grade;
   const d = m.distribution;
   if (!g) return emptyRow("Noch keine Leistung eingetragen.");
-  const out = [h("div", { class: "avg" }, g.grade_value ? decimal(g.grade_value, 1) : h("span", { class: "big", text: "–" }), h("span", { class: `chip ${gradeClass(g)}`, text: g.status || "" }))];
+  const out = [h("div", { class: "avg" }, g.grade_value ? decimal(g.grade_value, 1) : h("span", { class: "big", text: "–" }), h("span", { class: `chip sens ${gradeClass(g)}`, text: g.status || "" }))];
   out.push(h("dl", { class: "kv meter" },
     h("dt", { text: "Prüfung" }), h("dd", { text: g.exam_date || "–" }),
     h("dt", { text: "Versuch" }), h("dd", { text: g.attempt || "–" }),
     d?.count > 0 && [h("dt", { text: "Jahrgang" }), h("dd", { text: `Schnitt ${String(d.average).replace(".", ",")} · ${d.count} Ergebnisse${d.percentile ? ` · besser als ${Math.round(d.percentile)} %` : ""}` })]));
   if (d?.buckets?.length) {
     const max = Math.max(...d.buckets.map((b) => b.count), 1);
-    out.push(h("div", { class: "dist", role: "img", "aria-label": "Notenverteilung" }, d.buckets.map((b, j) =>
+    out.push(h("div", { class: "dist sens", role: "img", "aria-label": "Notenverteilung" }, d.buckets.map((b, j) =>
       h("span", { class: `col ${b.grade === g.grade ? "mine" : ""}`, title: `${b.grade}: ${b.count}`, vars: { "--h": b.count / max, "--j": j } }, h("i"), h("small", { text: b.grade })))));
   }
   return out;
@@ -1772,7 +1774,7 @@ function drawBell() {
       bell.unread > 0 && h("button", { class: "ghost small", type: "button", text: "Alle gelesen", onclick: markAllRead })),
     bell.items.length ? h("ul", { class: "rows bell-list" }, bell.items.slice(0, 30).map((n, j) => h("li", {}, h("a", { class: `row ${n.read ? "" : "unread"}`, href: n.url || "#/", vars: { "--j": Math.min(j, 10) }, onclick: () => { bell.panel.hidden = true; } },
       h("span", { class: `chip kind-${n.kind}`, text: kindIcon[n.kind] || "Neu" }),
-      h("span", { class: "t" }, n.title, h("span", { class: "s", text: [n.body, relTime(n.at)].filter(Boolean).join(" · ") })),
+      h("span", { class: `t ${n.kind === "grade" || n.kind === "message" ? "sens" : ""}` }, n.title, h("span", { class: "s", text: [n.body, relTime(n.at)].filter(Boolean).join(" · ") })),
       !n.read && h("span", { class: "dot new" })))))
       : h("p", { class: "empty", text: "Noch nichts. naknak meldet sich bei neuen Noten, Moodle-Inhalten, Nachrichten und dringenden Fristen." }),
     h("a", { class: "bell-foot", href: "#/einstellungen", onclick: () => { bell.panel.hidden = true; }, text: "Einstellungen" }));
@@ -1895,6 +1897,7 @@ function paletteCommands() {
     { group: "Seiten", title: "Einstellungen", run: go("#/einstellungen") },
     { group: "Aktionen", title: "Neu laden (frisch aus CIS und Moodle)", run: refreshPage },
     { group: "Aktionen", title: "Design wechseln (System → Hell → Dunkel)", run: () => { const cur = localStorage.getItem("nak-theme") || "system"; const next = themes[(themes.indexOf(cur) + 1) % themes.length]; localStorage.setItem("nak-theme", next); applyTheme(next); } },
+    { group: "Aktionen", title: "Sensible Daten aus-/einblenden (Blur)", run: togglePrivate },
     { group: "Aktionen", title: "Alle Benachrichtigungen als gelesen markieren", run: markAllRead },
     { group: "Aktionen", title: "Kalender-Abo einrichten", run: go("#/einstellungen") },
     { group: "Aktionen", title: "Abmelden", run: () => $(".top form[action='/logout']")?.requestSubmit() },
@@ -2196,7 +2199,7 @@ function transferTab(grid) {
       h("div", { class: "row" },
         h("span", { class: "ext tl", text: `T${x.no}` }),
         h("span", { class: "t" }, x.topic || "Thema offen", h("span", { class: "s", text: [x.module, x.abgabedatum && `Abgabe ${x.abgabedatum}`, x.korrekturfrist && `Korrektur bis ${x.korrekturfrist}`, x.versuch && `${x.versuch}. Versuch`].filter(Boolean).join(" · ") })),
-        h("span", { class: `chip ${/bestanden|bewertet/i.test(`${x.status} ${x.wertung}`) && !/nicht/i.test(`${x.status} ${x.wertung}`) ? "ok" : /nicht/i.test(`${x.status} ${x.wertung}`) ? "bad" : ""}`, text: x.wertung || x.status || "–" })),
+        h("span", { class: `chip sens ${/bestanden|bewertet/i.test(`${x.status} ${x.wertung}`) && !/nicht/i.test(`${x.status} ${x.wertung}`) ? "ok" : /nicht/i.test(`${x.status} ${x.wertung}`) ? "bad" : ""}`, text: x.wertung || x.status || "–" })),
       lazyDetails("Bewertung & Dokumente", async () => {
         const b = await api("cis_transfer_bewertung", { transfer_id: x.id });
         const docs = b.documents || b.dokumente || [];
@@ -2228,7 +2231,7 @@ function profileTab(grid) {
   const t = tile("Meine Daten", { cls: "w8", i: 0 });
   const tSide = tile("Freigaben & Konto", { i: 1 });
   grid.append(t, tSide);
-  fill(t, () => api("cis_profile"), (p) => genericView(p.all || p));
+  fill(t, () => api("cis_profile"), (p) => h("div", { class: "sens" }, genericView(p.all || p)));
   fill(tSide, () => Promise.allSettled([api("cis_sharing"), api("cis_balance")]), ([sh, bal]) => [
     sh.status === "fulfilled" && genericView(sh.value), bal.status === "fulfilled" && genericView(bal.value),
     h("p", { class: "empty meter", text: "Ändern geht hier noch nicht; das CIS-Profil bleibt dafür zuständig." })]);
@@ -2265,6 +2268,35 @@ function stamp() {
   el.textContent = mins < 1 ? "Stand: gerade eben" : `Stand: vor ${mins} min`;
 }
 setInterval(stamp, 30_000);
+
+// Privacy mode (like banking apps): blurs grades, averages, credits and
+// messages; a click on one value shows just that one.
+function applyPrivate(on) {
+  document.documentElement.classList.toggle("private", on);
+  const b = $(".eye-btn");
+  if (b) {
+    b.replaceChildren(svg(on ? icons.eyeOff : icons.eye), h("span", { class: "label", text: on ? "Daten einblenden" : "Daten ausblenden" }));
+    b.title = on ? "Sensible Daten einblenden" : "Sensible Daten ausblenden (Noten, Nachrichten …)";
+    b.setAttribute("aria-pressed", on ? "true" : "false");
+  }
+}
+
+function togglePrivate() {
+  const on = !document.documentElement.classList.contains("private");
+  localStorage.setItem("nak-private", on ? "1" : "");
+  document.querySelectorAll(".sens.peek").forEach((el) => el.classList.remove("peek"));
+  applyPrivate(on);
+}
+
+document.addEventListener("click", (e) => {
+  if (!document.documentElement.classList.contains("private")) return;
+  const el = e.target.closest?.(".sens");
+  if (!el || el.classList.contains("peek")) return;
+  // first click reveals, it does not follow the link around it
+  e.preventDefault();
+  e.stopPropagation();
+  el.classList.add("peek");
+}, true);
 
 const themes = ["system", "light", "dark"];
 const themeLabel = { system: "Design: wie System", light: "Design: hell", dark: "Design: dunkel" };
@@ -2308,6 +2340,7 @@ function header() {
     h("div", { class: "tools" },
       h("span", { class: "stamp", "aria-live": "polite" }),
       refresh,
+      h("button", { class: "icon-btn eye-btn", type: "button", onclick: togglePrivate }),
       bellButton(),
       h("a", { class: "icon-btn", href: "#/einstellungen", title: "Einstellungen", "aria-label": "Einstellungen" }, svg(icons.gear)),
       h("button", { class: "icon-btn theme-btn", type: "button", onclick: switchTheme }),
@@ -2371,6 +2404,7 @@ function boot() {
   const app = $("#app");
   app.replaceWith(header(), h("main", { id: "main" }));
   applyTheme(new URLSearchParams(location.search).get("theme") || localStorage.getItem("nak-theme") || "system");
+  applyPrivate(localStorage.getItem("nak-private") === "1");
   addEventListener("hashchange", render);
   render();
 }
