@@ -235,6 +235,22 @@ Signing out also clears the data the browser kept for offline use.
 
 </details>
 
+<details>
+<summary><b>Android app</b></summary>
+
+`android/` holds a small Java app around your instance: the portal in a WebView plus what a browser tab cannot do.
+
+- notifications for new grades, messages, Moodle news and deadlines (every 15 min from naknak's watcher, never a CIS call of its own; the lock screen only ever shows "Neues in naknak")
+- home screen widget with the next appointment and the three nearest deadlines
+- optional app lock (fingerprint or device PIN) that also blocks screenshots
+- downloads with your session, app shortcuts for week, courses, messages and grades
+
+Get the APK from the [latest release](https://github.com/Raindancer118/nak-api/releases/latest) (or the `naknak-apk` artifact of any CI run on `main`), install it and enter your server's address. It must be `https://`; the app talks only to that host. Behind Authentik or another SSO proxy, the login happens inside the app just like in the browser.
+
+Build it yourself with JDK 21 and the Android SDK: `cd android && ./gradlew assembleDebug`.
+
+</details>
+
 <br>
 
 <a id="safety"></a>

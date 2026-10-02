@@ -98,9 +98,56 @@ jobs:
             org.opencontainers.image.licenses=WTFPL
           tags: ${{ steps.tags.outputs.list }}
 
+  android:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+      # run_number only grows, so every CI APK installs over the previous one
+      - name: Version
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then name="$GITHUB_REF_NAME"; else name="edge-${GITHUB_SHA::7}"; fi
+          echo "NAKNAK_VERSION_NAME=$name" >> "$GITHUB_ENV"
+          echo "NAKNAK_VERSION_CODE=$GITHUB_RUN_NUMBER" >> "$GITHUB_ENV"
+      - name: Release signing key
+        if: github.event_name == 'push'
+        env:
+          KEYSTORE_B64: ${{ secrets.NAKNAK_KEYSTORE_B64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.NAKNAK_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.NAKNAK_KEY_ALIAS }}
+        run: |
+          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/naknak.jks"
+          {
+            echo "NAKNAK_KEYSTORE=$RUNNER_TEMP/naknak.jks"
+            echo "NAKNAK_KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD"
+            echo "NAKNAK_KEY_ALIAS=$KEY_ALIAS"
+          } >> "$GITHUB_ENV"
+      - run: ./gradlew --no-daemon testDebugUnitTest lintDebug assembleRelease
+      - name: Name the APK
+        run: |
+          mkdir -p dist
+          cp app/build/outputs/apk/release/app-release.apk "dist/naknak-$NAKNAK_VERSION_NAME.apk"
+          (cd dist && sha256sum *.apk > naknak-apk-SHA256SUMS)
+      - name: Check signature
+        if: github.event_name == 'push'
+        run: |
+          "$ANDROID_HOME"/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)/apksigner verify --print-certs dist/*.apk \
+            | grep -q '4b886ba0e1a5e3859f857712bd40ec9bfe7fafd2660e4cb09f5db06cde50656e'
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: naknak-apk
+          path: android/dist/
+
   release:
     if: startsWith(github.ref, 'refs/tags/')
-    needs: [test, image]
+    needs: [test, image, android]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -112,6 +159,10 @@ jobs:
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
           go-version-file: go.mod
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: naknak-apk
+          path: dist
       - name: Build binaries
         run: |
           mkdir -p dist

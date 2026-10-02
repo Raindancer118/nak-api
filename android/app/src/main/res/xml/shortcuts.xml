@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut android:shortcutId="week" android:enabled="true" android:icon="@mipmap/ic_launcher" android:shortcutShortLabel="@string/shortcut_week">
+        <intent android:action="android.intent.action.VIEW" android:targetPackage="de.raindancer118.naknak" android:targetClass="de.raindancer118.naknak.MainActivity">
+            <extra android:name="path" android:value="#/woche" />
+        </intent>
+    </shortcut>
+    <shortcut android:shortcutId="courses" android:enabled="true" android:icon="@mipmap/ic_launcher" android:shortcutShortLabel="@string/shortcut_courses">
+        <intent android:action="android.intent.action.VIEW" android:targetPackage="de.raindancer118.naknak" android:targetClass="de.raindancer118.naknak.MainActivity">
+            <extra android:name="path" android:value="#/kurse" />
+        </intent>
+    </shortcut>
+    <shortcut android:shortcutId="messages" android:enabled="true" android:icon="@mipmap/ic_launcher" android:shortcutShortLabel="@string/shortcut_messages">
+        <intent android:action="android.intent.action.VIEW" android:targetPackage="de.raindancer118.naknak" android:targetClass="de.raindancer118.naknak.MainActivity">
+            <extra android:name="path" android:value="#/nachrichten" />
+        </intent>
+    </shortcut>
+    <shortcut android:shortcutId="grades" android:enabled="true" android:icon="@mipmap/ic_launcher" android:shortcutShortLabel="@string/shortcut_grades">
+        <intent android:action="android.intent.action.VIEW" android:targetPackage="de.raindancer118.naknak" android:targetClass="de.raindancer118.naknak.MainActivity">
+            <extra android:name="path" android:value="#/noten" />
+        </intent>
+    </shortcut>
+</shortcuts>

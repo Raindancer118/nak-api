@@ -102,6 +102,10 @@ func (s *Server) StartWatcher(ctx context.Context) {
 		t := time.NewTicker(time.Minute)
 		defer t.Stop()
 		time.Sleep(20 * time.Second) // let the server come up first
+		if s.cfg.Demo {
+			s.watch.demoLoop(ctx)
+			return
+		}
 		for {
 			s.watch.runDue()
 			select {
@@ -149,6 +153,36 @@ func (w *watcher) runDue() {
 		w.add(n)
 	}
 	w.save()
+}
+
+// The demo has nothing to watch, but the bell, live events and the app's push
+// path deserve a showcase: one invented event shortly after start, then one
+// every 20 minutes.
+var demoEvents = []Notification{
+	{Kind: "moodle", Title: "Neue Bewertung in Übungsblatt 3", Body: "I160_I24 · Datenbanksysteme", URL: "#/neu"},
+	{Kind: "message", Title: "Neue Nachricht: Prof. Jonas Brandt", Body: "Die Übung am Freitag fällt aus.", URL: "#/nachrichten"},
+	{Kind: "news", Title: "Neu in I151_I24: Ankündigungen", Body: "2 neue Beiträge", URL: "#/kurs/2101"},
+	{Kind: "deadline", Title: "Frist morgen: Übungsblatt 4", Body: "Datenbanksysteme · 23:59", URL: "#/abgaben"},
+}
+
+func (w *watcher) demoLoop(ctx context.Context) {
+	t := time.NewTicker(20 * time.Minute)
+	defer t.Stop()
+	for {
+		w.demoTick()
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+		}
+	}
+}
+
+func (w *watcher) demoTick() {
+	w.mu.Lock()
+	n := demoEvents[len(w.state.Events)%len(demoEvents)]
+	w.mu.Unlock()
+	w.add(n)
 }
 
 func (w *watcher) add(n Notification) {

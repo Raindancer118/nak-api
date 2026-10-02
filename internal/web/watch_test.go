@@ -225,3 +225,18 @@ func TestEventStreamDeliversNotifications(t *testing.T) {
 		t.Fatalf("stream: %q", s)
 	}
 }
+
+func TestDemoTickRotatesInventedEvents(t *testing.T) {
+	w := newWatchHarness(t, app.NotifySettings{})
+	w.srv.watch.demoTick()
+	w.srv.watch.demoTick()
+	got := w.events(t)
+	if len(got) != 2 || got[0].Title == got[1].Title {
+		t.Fatalf("want two different demo events, got %+v", got)
+	}
+	for _, e := range got {
+		if !strings.HasPrefix(e.URL, "#/") || e.Kind == "" {
+			t.Errorf("demo event must link into the portal: %+v", e)
+		}
+	}
+}

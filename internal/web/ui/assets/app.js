@@ -1546,6 +1546,13 @@ async function settingsPage(root) {
     return;
   }
 
+  // only inside the Android app: lock, notifications and server live there
+  if (window.NaknakApp) {
+    grid.append(tile("naknak-App", { cls: "w12", i: 0 },
+      h("p", { class: "empty", text: `Version ${window.NaknakApp.version()}. App-Sperre, Benachrichtigungen und Server stellst du in der App selbst ein.` }),
+      h("div", { class: "row-actions" }, h("button", { class: "primary", type: "button", text: "App-Einstellungen", onclick: () => window.NaknakApp.openSettings() }))));
+  }
+
   // EduVault
   const ev = st.eduvault || {};
   const tEv = tile("EduVault · Altklausuren", { cls: "w8", i: 0 });
@@ -1899,6 +1906,7 @@ function paletteCommands() {
     { group: "Seiten", title: "Studienbescheinigung & Notenspiegel", run: go("#/studium/bescheinigungen") },
     { group: "Seiten", title: "Profil", run: go("#/studium/profil") },
     { group: "Seiten", title: "Einstellungen", run: go("#/einstellungen") },
+    ...(window.NaknakApp ? [{ group: "Aktionen", title: "App-Einstellungen öffnen", run: () => window.NaknakApp.openSettings() }] : []),
     { group: "Aktionen", title: "Neu laden (frisch aus CIS und Moodle)", run: refreshPage },
     { group: "Aktionen", title: "Design wechseln (System → Hell → Dunkel)", run: () => { const cur = localStorage.getItem("nak-theme") || "system"; const next = themes[(themes.indexOf(cur) + 1) % themes.length]; localStorage.setItem("nak-theme", next); applyTheme(next); } },
     { group: "Aktionen", title: "Sensible Daten aus-/einblenden (Blur)", run: togglePrivate },

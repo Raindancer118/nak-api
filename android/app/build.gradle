@@ -1,0 +1,73 @@
+plugins {
+    id "com.android.application"
+}
+
+// Release signing comes from the environment (CI secrets); local builds
+// without it produce a debug-signed APK.
+def ks = System.getenv("NAKNAK_KEYSTORE")
+
+android {
+    namespace "de.raindancer118.naknak"
+    compileSdk 36
+
+    defaultConfig {
+        applicationId "de.raindancer118.naknak"
+        minSdk 26
+        targetSdk 36
+        versionCode Integer.parseInt(System.getenv("NAKNAK_VERSION_CODE") ?: "1")
+        versionName System.getenv("NAKNAK_VERSION_NAME") ?: "0.5.0-dev"
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    signingConfigs {
+        if (ks) {
+            release {
+                storeFile file(ks)
+                storePassword System.getenv("NAKNAK_KEYSTORE_PASSWORD")
+                keyAlias System.getenv("NAKNAK_KEY_ALIAS") ?: "naknak"
+                keyPassword System.getenv("NAKNAK_KEY_PASSWORD") ?: System.getenv("NAKNAK_KEYSTORE_PASSWORD")
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
+            signingConfig ks ? signingConfigs.release : signingConfigs.debug
+        }
+    }
+
+    buildFeatures {
+        buildConfig true
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    lint {
+        abortOnError true
+        warningsAsErrors false
+        disable "MissingTranslation"
+    }
+
+    testOptions {
+        unitTests.returnDefaultValues = true
+    }
+}
+
+dependencies {
+    implementation "androidx.appcompat:appcompat:1.8.0"
+    implementation "androidx.webkit:webkit:1.17.1"
+    implementation "androidx.swiperefreshlayout:swiperefreshlayout:1.2.0"
+    implementation "androidx.work:work-runtime:2.12.0"
+    implementation "androidx.biometric:biometric:1.1.0"
+    implementation "androidx.preference:preference:1.2.1"
+    implementation "androidx.browser:browser:1.10.0"
+    implementation "androidx.core:core-splashscreen:1.2.0"
+    testImplementation "junit:junit:4.13.2"
+    testImplementation "org.json:json:20260814"
+}

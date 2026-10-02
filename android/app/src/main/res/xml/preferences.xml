@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <PreferenceCategory app:title="@string/pref_server" app:iconSpaceReserved="false">
+        <Preference app:key="server_change" app:title="@string/pref_server_summary" app:iconSpaceReserved="false" />
+    </PreferenceCategory>
+    <PreferenceCategory app:title="@string/pref_security" app:iconSpaceReserved="false">
+        <SwitchPreferenceCompat app:key="lock" app:defaultValue="false" app:title="@string/pref_lock" app:summary="@string/pref_lock_summary" app:iconSpaceReserved="false" />
+    </PreferenceCategory>
+    <PreferenceCategory app:title="@string/pref_notify_cat" app:iconSpaceReserved="false">
+        <SwitchPreferenceCompat app:key="notify" app:defaultValue="true" app:title="@string/pref_notify" app:summary="@string/pref_notify_summary" app:iconSpaceReserved="false" />
+        <SwitchPreferenceCompat app:key="notify_details" app:defaultValue="true" app:dependency="notify" app:title="@string/pref_details" app:summary="@string/pref_details_summary" app:iconSpaceReserved="false" />
+        <Preference app:key="check_now" app:title="@string/pref_check" app:iconSpaceReserved="false" />
+    </PreferenceCategory>
+    <PreferenceCategory app:key="home_cat" app:title="@string/pref_home" app:iconSpaceReserved="false">
+        <Preference app:key="widget_pin" app:title="@string/pref_widget" app:summary="@string/pref_widget_summary" app:iconSpaceReserved="false" />
+    </PreferenceCategory>
+    <PreferenceCategory app:title="@string/pref_about" app:iconSpaceReserved="false">
+        <Preference app:key="version" app:title="@string/pref_version" app:iconSpaceReserved="false" />
+    </PreferenceCategory>
+</PreferenceScreen>

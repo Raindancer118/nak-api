@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="bg">#F6F4EE</color>
+    <color name="ink">#0D1B33</color>
+    <color name="text">#36445F</color>
+    <color name="dim">#7B8499</color>
+    <color name="cis">#1F63C4</color>
+    <color name="moodle">#C8601A</color>
+    <color name="due">#B87A00</color>
+    <color name="widget_bg">#F2FFFFFF</color>
+    <color name="widget_text">#36445F</color>
+    <color name="icon_bg">#07101F</color>
+</resources>
