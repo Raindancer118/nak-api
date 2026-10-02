@@ -1462,6 +1462,25 @@ async function settingsPage(root) {
       alertBox("Zwischenspeicher geleert.");
       e.currentTarget.disabled = false;
     } })));
+  const statBox = h("div", { class: "stat-box" });
+  tCache.append(statBox);
+  fetch("/api/stats", { credentials: "same-origin" }).then((r) => r.json()).then((st) => {
+    const total = st.fetches + st.cache_hits;
+    const share = total ? Math.round((st.cache_hits / total) * 100) : 0;
+    const rows = Object.entries(st.tools || {}).sort((a, b) => (b[1].fetches + b[1].hits) - (a[1].fetches + a[1].hits)).slice(0, 12);
+    statBox.replaceChildren(
+      h("div", { class: "stat-line" },
+        h("span", {}, h("b", { text: String(st.fetches) }), " Abrufe bei CIS, Moodle & EduVault"),
+        h("span", {}, h("b", { text: String(st.cache_hits) }), " aus dem Zwischenspeicher"),
+        h("span", {}, h("b", { text: `${share} %` }), " gespart"),
+        h("span", { class: "s", text: `seit dem Start (${relTime(st.since)})` })),
+      total > 0 && bar(st.cache_hits / total, "var(--ok)"),
+      rows.length > 0 && h("details", { class: "lazy" }, h("summary", { text: "Pro Datenquelle" }),
+        h("div", { class: "table-wrap" }, h("table", {},
+          h("thead", {}, h("tr", {}, ["Quelle", "Abrufe", "Cache", "Fehler"].map((x, i) => h("th", { class: i ? "r" : "", text: x })))),
+          h("tbody", {}, rows.map(([k, v]) => h("tr", {}, h("td", { class: "nr", text: k }), h("td", { class: "r", text: v.fetches }), h("td", { class: "r", text: v.hits }), h("td", { class: "r", text: v.errors }))))))),
+      h("p", { class: "empty fine-note", text: "Für Monitoring: /metrics (Prometheus-Format, gleicher Login oder Zugangsschlüssel)." }));
+  }).catch(() => {});
   // calendar subscription
   const tCal = tile("Kalender-Abo", { cls: "w12", i: 4 });
   const calBox = h("div", { class: "cal-box" }, skeleton());

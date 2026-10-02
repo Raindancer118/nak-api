@@ -203,9 +203,11 @@ func (s *Server) cachedTool(name string, args tools.Args) (json.RawMessage, erro
 	if e, ok := s.store.get(key); ok && usable(e) {
 		age := s.cfg.Now().Sub(e.At)
 		if age < s.freshFor(name) {
+			s.stats.hit(name)
 			return e.Res, nil
 		}
 		if age < maxStale {
+			s.stats.hit(name)
 			go s.refresh(t, key, args)
 			return e.Res, nil
 		}

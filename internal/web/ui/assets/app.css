@@ -1188,3 +1188,6 @@ html.still *, html.still *::before, html.still *::after { animation: none !impor
 h2.sub { margin: 1rem 0 .4rem; }
 .kv.generic dd { overflow-wrap: anywhere; }
 .row.file .ext.tl { background: color-mix(in oklab, var(--cis) 14%, transparent); color: var(--cis); }
+.stat-box { display: grid; gap: .6rem; margin-top: 1rem; }
+.stat-line { display: flex; flex-wrap: wrap; gap: .4rem 1.5rem; align-items: baseline; color: var(--text); }
+.stat-line b { color: var(--ink); font-size: 1.25rem; font-weight: 600; }

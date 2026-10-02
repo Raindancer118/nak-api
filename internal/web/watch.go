@@ -255,6 +255,7 @@ func (s *Server) toolAtMost(name string, args tools.Args, maxAge time.Duration) 
 	k, _ := json.Marshal(args)
 	key := t.Name + " " + string(k)
 	if e, ok := s.store.get(key); ok && usable(e) && s.cfg.Now().Sub(e.At) < maxAge {
+		s.stats.hit(name)
 		return e.Res, nil
 	}
 	res, _, err := s.refresh(t, key, args)

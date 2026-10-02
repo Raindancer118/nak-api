@@ -70,6 +70,7 @@ type Server struct {
 	store   *store
 	watch   *watcher
 	history *history
+	stats   *stats
 
 	loginMu sync.Mutex
 	logins  map[string]*attempts
@@ -105,6 +106,7 @@ func New(a *app.App, reg *tools.Registry, cfg Config) *Server {
 		histFile = filepath.Join(a.ConfigDir, "history.json")
 	}
 	s.history = newHistory(histFile, cfg.Now)
+	s.stats = newStats(cfg.Now())
 	s.watch = newWatcher(s)
 	return s
 }
@@ -129,6 +131,8 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("GET /api/settings", s.authed(http.HandlerFunc(s.getSettings)))
 	mux.Handle("GET /api/calendar", s.authed(http.HandlerFunc(s.calendarInfo)))
 	mux.Handle("GET /api/history", s.authed(http.HandlerFunc(s.historyAPI)))
+	mux.Handle("GET /api/stats", s.authed(http.HandlerFunc(s.statsAPI)))
+	mux.Handle("GET /metrics", s.authed(http.HandlerFunc(s.metrics)))
 	mux.Handle("POST /api/upload", s.authed(s.sameOriginOnly(s.upload)))
 	mux.Handle("GET /api/notifications", s.authed(http.HandlerFunc(s.notifications)))
 	mux.Handle("POST /api/notifications/read", s.authed(s.jsonOnly(s.notificationsRead)))
@@ -529,7 +533,14 @@ func usable(e entry) bool {
 
 // refresh fetches a tool result (one flight per key) and stores it.
 func (s *Server) refresh(t *tools.Tool, key string, args tools.Args) (json.RawMessage, time.Time, error) {
-	res, at, err := s.store.fetch(key, s.cfg.Now, func() (any, error) { return s.reg.Call(s.app, t.Name, args) })
+	res, at, err := s.store.fetch(key, s.cfg.Now, func() (any, error) {
+		s.stats.fetch(t.Name)
+		out, err := s.reg.Call(s.app, t.Name, args)
+		if err != nil {
+			s.stats.fail(t.Name)
+		}
+		return out, err
+	})
 	if err != nil {
 		return nil, at, err
 	}
@@ -551,6 +562,9 @@ func resultPath(res json.RawMessage) string {
 }
 
 func (s *Server) respond(w http.ResponseWriter, t *tools.Tool, res json.RawMessage, at time.Time, hit, stale bool, refreshErr string) {
+	if hit {
+		s.stats.hit(t.Name)
+	}
 	out := map[string]any{"tool": t.Name, "result": res, "cached": hit, "fetched_at": at.Format(time.RFC3339)}
 	if stale {
 		out["stale"] = true
