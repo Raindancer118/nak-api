@@ -606,7 +606,7 @@ func fakeCISLogin(t *testing.T) (*httptest.Server, *atomic.Int32) {
 		if r.Method == http.MethodPost {
 			posts.Add(1)
 			r.ParseForm()
-			if r.PostForm.Get("user") == "12345" && r.PostForm.Get("pass") == "right" {
+			if r.PostForm.Get("user") == "12345@nordakademie.de" && r.PostForm.Get("pass") == "right" {
 				http.SetCookie(w, &http.Cookie{Name: "fe_typo_user_cae070b", Value: "sess", Path: "/"})
 				io.WriteString(w, `<main>Willkommen</main><a href="/login/?logintype=logout">Abmelden</a>`)
 				return

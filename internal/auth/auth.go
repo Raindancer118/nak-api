@@ -4,12 +4,27 @@ package auth
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/Raindancer118/nak-api/internal/client"
 	"github.com/Raindancer118/nak-api/internal/drift"
 	"github.com/Raindancer118/nak-api/internal/forms"
 	"github.com/Raindancer118/nak-api/internal/htmlx"
 )
+
+// LoginDomain is appended to bare login numbers: the CIS only accepts
+// "<nummer>@nordakademie.de" as username.
+const LoginDomain = "@nordakademie.de"
+
+// CISUsername adds LoginDomain to a bare login number; usernames that
+// already contain an "@" are passed through unchanged.
+func CISUsername(username string) string {
+	u := strings.TrimSpace(username)
+	if u == "" || strings.Contains(u, "@") {
+		return u
+	}
+	return u + LoginDomain
+}
 
 // Login fetches the login form (hidden TYPO3 fields included), posts the
 // credentials and stores the session cookie.
@@ -23,7 +38,7 @@ func Login(c *client.Client, username, password string) error {
 	if f == nil {
 		return drift.New("/", "felogin form with a pass field", p.Body)
 	}
-	set := map[string]string{"user": username, "pass": password}
+	set := map[string]string{"user": CISUsername(username), "pass": password}
 	if f.Field("logintype") != nil {
 		set["logintype"] = "login"
 	}

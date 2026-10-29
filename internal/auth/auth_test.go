@@ -43,7 +43,7 @@ func TestLoginAndRelogin(t *testing.T) {
 	if err := Login(c, "10000", "ok"); err != nil {
 		t.Fatal(err)
 	}
-	if got["user"] != "10000" || got["pid"] != "7" || got["submit"] != "Anmelden" {
+	if got["user"] != "10000@nordakademie.de" || got["pid"] != "7" || got["submit"] != "Anmelden" {
 		t.Errorf("posted = %v", got)
 	}
 	if p, err := c.Page("/mein-profil"); err != nil || p.Status != 200 {
@@ -55,5 +55,19 @@ func TestLoginAndRelogin(t *testing.T) {
 	c.Relogin = func(c *client.Client) error { return Login(c, "10000", "ok") }
 	if _, err := c.Page("/mein-profil"); err != nil {
 		t.Fatalf("relogin: %v", err)
+	}
+}
+
+func TestCISUsername(t *testing.T) {
+	for in, want := range map[string]string{
+		"10000":                 "10000@nordakademie.de",
+		" 10000 ":               "10000@nordakademie.de",
+		"10000@nordakademie.de": "10000@nordakademie.de",
+		"someone@example.org":   "someone@example.org",
+		"":                      "",
+	} {
+		if got := CISUsername(in); got != want {
+			t.Errorf("CISUsername(%q) = %q, want %q", in, got, want)
+		}
 	}
 }
