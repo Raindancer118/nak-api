@@ -2,6 +2,7 @@ package mensa
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -143,5 +144,25 @@ func TestClientMenu(t *testing.T) {
 	ds, err := New(srv.URL, "", "").Menu(1)
 	if err != nil || len(ds) != 9 {
 		t.Fatalf("%d %v", len(ds), err)
+	}
+}
+
+func TestClientUnavailable(t *testing.T) {
+	var hits int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&hits, 1)
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	defer srv.Close()
+	c := New(srv.URL, "u", "p")
+	c.retryWait = time.Millisecond
+	if _, err := c.Menu(1); !errors.Is(err, ErrUnavailable) {
+		t.Fatalf("want ErrUnavailable, got %v", err)
+	}
+	if hits != 2 {
+		t.Fatalf("want one retry (2 hits), got %d", hits)
+	}
+	if _, err := c.Account(time.Now().AddDate(0, 0, -1), time.Now()); !errors.Is(err, ErrUnavailable) {
+		t.Fatalf("account: want ErrUnavailable, got %v", err)
 	}
 }

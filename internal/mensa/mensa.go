@@ -26,6 +26,20 @@ const DefaultURL = "https://mensa.nordakademie.de"
 
 var ErrAuth = errors.New("Mensa-Anmeldung fehlgeschlagen (NAK-Login)")
 
+// ErrUnavailable: the canteen server itself answers 502/503/504 (outage or
+// maintenance on the NORDAKADEMIE side, not a problem of this API).
+var ErrUnavailable = errors.New("Mensa-Server derzeit nicht erreichbar (HTTP 502/503/504) – Störung oder Wartung bei der NAK, bitte später erneut versuchen")
+
+func statusErr(code int) error {
+	switch code {
+	case http.StatusOK:
+		return nil
+	case http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout:
+		return fmt.Errorf("%w (zuletzt HTTP %d)", ErrUnavailable, code)
+	}
+	return fmt.Errorf("Mensa: HTTP %d", code)
+}
+
 type Dish struct {
 	Date      string   `json:"date"` // YYYY-MM-DD
 	Line      string   `json:"line"` // "Menü 1", "Menü 2 Veg."
@@ -262,6 +276,7 @@ type Client struct {
 	Base, User, Pass string
 	Zone             *time.Location
 	http             *http.Client
+	retryWait        time.Duration
 
 	mu  sync.Mutex
 	kid string // set while logged in
@@ -269,7 +284,7 @@ type Client struct {
 
 func New(base, user, pass string) *Client {
 	jar, _ := cookiejar.New(nil)
-	return &Client{Base: strings.TrimRight(base, "/"), User: user, Pass: pass, Zone: time.Local,
+	return &Client{Base: strings.TrimRight(base, "/"), User: user, Pass: pass, Zone: time.Local, retryWait: 2 * time.Second,
 		http: &http.Client{Jar: jar, Timeout: 30 * time.Second}}
 }
 
@@ -285,10 +300,19 @@ func (c *Client) do(req *http.Request) (string, int, error) {
 }
 
 func (c *Client) get(path string) (string, error) {
-	req, _ := http.NewRequest(http.MethodGet, c.Base+path, nil)
-	s, code, err := c.do(req)
-	if err == nil && code != http.StatusOK {
-		err = fmt.Errorf("Mensa: HTTP %d", code)
+	var s string
+	var err error
+	for try := 0; try < 2; try++ { // one retry for a short blip; GET is idempotent
+		req, _ := http.NewRequest(http.MethodGet, c.Base+path, nil)
+		var code int
+		s, code, err = c.do(req)
+		if err == nil {
+			err = statusErr(code)
+		}
+		if !errors.Is(err, ErrUnavailable) {
+			break
+		}
+		time.Sleep(c.retryWait)
 	}
 	return s, err
 }
@@ -297,8 +321,8 @@ func (c *Client) postForm(path string, v url.Values) (string, error) {
 	req, _ := http.NewRequest(http.MethodPost, c.Base+path, strings.NewReader(v.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	s, code, err := c.do(req)
-	if err == nil && code != http.StatusOK {
-		err = fmt.Errorf("Mensa: HTTP %d", code)
+	if err == nil {
+		err = statusErr(code)
 	}
 	return s, err
 }
@@ -348,6 +372,9 @@ func (c *Client) login() error {
 	s, code, err := c.do(req)
 	if err != nil {
 		return err
+	}
+	if serr := statusErr(code); errors.Is(serr, ErrUnavailable) {
+		return serr
 	}
 	if code != http.StatusOK || strings.TrimSpace(s) != "true" {
 		return ErrAuth
