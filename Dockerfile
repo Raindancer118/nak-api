@@ -11,7 +11,7 @@ RUN --mount=type=secret,id=uninow,required=false \
     CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath \
       -ldflags "-s -w -X github.com/Raindancer118/nak-api/cmd.Version=$VERSION -X github.com/Raindancer118/nak-api/internal/mensa.UniNowSecret=$(cat /run/secrets/uninow 2>/dev/null)" -o /out/nak .
 
-FROM alpine:3.22
+FROM alpine:3.24
 # poppler-utils: pdftotext gives better text from Moodle PDFs than the Go fallback
 RUN apk add --no-cache ca-certificates tzdata poppler-utils \
  && adduser -S -D -H -u 10001 -h /data -s /sbin/nologin nak \
