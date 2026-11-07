@@ -2,6 +2,7 @@ package mensa
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -143,5 +144,24 @@ func TestClientMenu(t *testing.T) {
 	ds, err := New(srv.URL, "", "").Menu(1)
 	if err != nil || len(ds) != 9 {
 		t.Fatalf("%d %v", len(ds), err)
+	}
+}
+
+func TestServerOutageIsErrUnavailable(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		w.Write([]byte("<html><body><b>Http/1.1 Service Unavailable</b></body> </html>"))
+	}))
+	defer srv.Close()
+	_, err := New(srv.URL, "", "").Menu(1)
+	if !errors.Is(err, ErrUnavailable) {
+		t.Fatalf("err = %v, want ErrUnavailable", err)
+	}
+	if !strings.Contains(err.Error(), "HTTP 503") || !strings.Contains(err.Error(), "NORDAKADEMIE-App") {
+		t.Fatalf("message = %q", err)
+	}
+	_, err = New(srv.URL, "12345", "pw").Account(time.Now().AddDate(0, 0, -7), time.Now())
+	if !errors.Is(err, ErrUnavailable) {
+		t.Fatalf("account err = %v", err)
 	}
 }

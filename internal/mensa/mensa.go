@@ -26,6 +26,10 @@ const DefaultURL = "https://mensa.nordakademie.de"
 
 var ErrAuth = errors.New("Mensa-Anmeldung fehlgeschlagen (NAK-Login)")
 
+// ErrUnavailable: the OPC server itself is down (5xx, no connection) — an
+// outage at the canteen's side, not a changed page.
+var ErrUnavailable = errors.New("Mensa-System (mensa.nordakademie.de) ist gerade nicht erreichbar; Speiseplan solange in der NORDAKADEMIE-App")
+
 type Dish struct {
 	Date      string   `json:"date"` // YYYY-MM-DD
 	Line      string   `json:"line"` // "Menü 1", "Menü 2 Veg."
@@ -277,18 +281,25 @@ func (c *Client) do(req *http.Request) (string, int, error) {
 	req.Header.Set("User-Agent", "naknak (+https://github.com/Raindancer118/nak-api)")
 	res, err := c.http.Do(req)
 	if err != nil {
-		return "", 0, err
+		return "", 0, fmt.Errorf("%w (%v)", ErrUnavailable, err)
 	}
 	defer res.Body.Close()
 	b, err := io.ReadAll(io.LimitReader(res.Body, 8<<20))
 	return string(b), res.StatusCode, err
 }
 
+func statusErr(code int) error {
+	if code >= 500 {
+		return fmt.Errorf("%w (HTTP %d)", ErrUnavailable, code)
+	}
+	return fmt.Errorf("Mensa: HTTP %d", code)
+}
+
 func (c *Client) get(path string) (string, error) {
 	req, _ := http.NewRequest(http.MethodGet, c.Base+path, nil)
 	s, code, err := c.do(req)
 	if err == nil && code != http.StatusOK {
-		err = fmt.Errorf("Mensa: HTTP %d", code)
+		err = statusErr(code)
 	}
 	return s, err
 }
@@ -298,7 +309,7 @@ func (c *Client) postForm(path string, v url.Values) (string, error) {
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	s, code, err := c.do(req)
 	if err == nil && code != http.StatusOK {
-		err = fmt.Errorf("Mensa: HTTP %d", code)
+		err = statusErr(code)
 	}
 	return s, err
 }
