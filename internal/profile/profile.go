@@ -628,6 +628,7 @@ func FetchBalance(c *client.Client) (map[string]string, error) {
 type Vertiefung struct {
 	Current string            `json:"current"`
 	Options map[string]string `json:"options"` // value -> label
+	Notice  string            `json:"notice,omitempty"`
 }
 
 const vertiefungAction = "action]=handleForm"
@@ -635,6 +636,12 @@ const vertiefungAction = "action]=handleForm"
 func ParseVertiefung(body, base string) (*Vertiefung, error) {
 	f := formFrom(body, base, vertiefungAction)
 	if f == nil {
+		// since 11/2026 the page keeps only its contact box once no cohort may choose anymore
+		if doc, err := htmlx.Parse(body); err == nil {
+			if m := htmlx.First(doc, htmlx.Tag("main")); m != nil && htmlx.First(m, htmlx.Tag("form")) == nil && htmlx.First(m, htmlx.Tag("h1")) != nil {
+				return &Vertiefung{Options: map[string]string{}, Notice: "Das CIS bietet derzeit keine Vertiefungswahl an (nur bis Jahrgang 2023)."}, nil
+			}
+		}
 		return nil, drift.New(VertiefungPath, "form action=handleForm", body)
 	}
 	fl := f.Field("vertiefungsrichtung")

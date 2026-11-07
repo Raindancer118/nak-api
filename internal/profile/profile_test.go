@@ -211,3 +211,14 @@ func TestPrepareOthers(t *testing.T) {
 		t.Errorf("vertiefung: %v", err)
 	}
 }
+
+func TestVertiefungNoLongerOffered(t *testing.T) {
+	v, err := ParseVertiefung(fx(t, "vertiefung-keine.html"), base)
+	if err != nil || v.Notice == "" || len(v.Options) != 0 {
+		t.Fatalf("vertiefung = %+v %v", v, err)
+	}
+	// a page that lost its main content entirely is still drift
+	if _, err := ParseVertiefung("<html><body><p>x</p></body></html>", base); err == nil {
+		t.Fatal("page without main must be drift")
+	}
+}
