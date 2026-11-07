@@ -18,6 +18,9 @@ import (
 // PagePath is the timetable overview page.
 const PagePath = "/studium/bachelor/stundenplaene"
 
+// MinePath is the personal timetable page ("Mein Stundenplan", since 11/2026).
+const MinePath = "/mein-profil/meine-planung/mein-stundenplan"
+
 // Plan is a single downloadable timetable file for one Zenturie.
 type Plan struct {
 	Zenturie string `json:"zenturie"` // file name without extension, e.g. "A24a_4"
@@ -35,6 +38,38 @@ func FetchList(c *client.Client) ([]Plan, error) {
 		return nil, fmt.Errorf("fetch stundenplaene: %w", err)
 	}
 	return parsePlans(p.Body, c.Base), nil
+}
+
+// Mine is what "Mein Stundenplan" says about the own plan.
+type Mine struct {
+	Notice string `json:"notice,omitempty"` // e.g. "Für Sie ist aktuell kein Stundenplan hinterlegt."
+}
+
+// FetchMine reads the personal timetable page. ok is false when the page lacks
+// the stupla block (page changed or gone).
+func FetchMine(c *client.Client) (Mine, bool, error) {
+	p, err := c.Page(MinePath)
+	if err != nil {
+		return Mine{}, false, fmt.Errorf("fetch mein stundenplan: %w", err)
+	}
+	m, ok := ParseMine(p.Body)
+	return m, ok, nil
+}
+
+func ParseMine(body string) (Mine, bool) {
+	doc, err := htmlx.Parse(body)
+	if err != nil {
+		return Mine{}, false
+	}
+	box := htmlx.First(doc, htmlx.Class("stupla"))
+	if box == nil {
+		return Mine{}, false
+	}
+	var m Mine
+	if a := htmlx.First(box, htmlx.Class("alert")); a != nil {
+		m.Notice = htmlx.Text(a)
+	}
+	return m, true
 }
 
 // Download fetches a plan file and returns its raw bytes plus content type.

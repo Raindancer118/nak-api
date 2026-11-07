@@ -501,9 +501,12 @@ async function week(root) {
     } })));
     if (!data) return;
     const days = data.days || [];
-    if (!days.length) return box.replaceChildren(emptyRow("In den nächsten 14 Tagen steht nichts an."));
+    // e.g. thesis semester: the CIS has no timetable for the Zenturie
+    const noPlan = (data.notes || []).find((n) => /kein Stundenplan/i.test(n));
+    if (!days.length) return box.replaceChildren(...[emptyRow("In den nächsten 14 Tagen steht nichts an."), noPlan && emptyRow(noPlan)].filter(Boolean));
     box.className = view === "raster" ? "week-grid-wrap" : "days";
     box.replaceChildren(...(view === "raster" ? [weekGrid(days)] : weekList(days)));
+    if (noPlan) box.prepend(emptyRow(noPlan));
     if (data.unavailable_sources) box.prepend(errorBox(new Error(`Nicht erreichbar: ${Object.keys(data.unavailable_sources).join(", ")}`)));
   };
   draw();

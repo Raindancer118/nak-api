@@ -37,8 +37,9 @@ type hit struct{ Method, Path, Action string }
 
 // fakeCIS routes paths (+ TYPO3 action) to the anonymised fixtures.
 type fakeCIS struct {
-	mu   sync.Mutex
-	hits []hit
+	mu     sync.Mutex
+	hits   []hit
+	noPlan bool // own Zenturie missing from the timetable list (thesis semester)
 }
 
 func (f *fakeCIS) handler(t *testing.T) http.HandlerFunc {
@@ -99,7 +100,13 @@ func (f *fakeCIS) handler(t *testing.T) http.HandlerFunc {
 		case strings.HasSuffix(p, "/vorlesungszeiten"):
 			page("planning/testdata/vorlesungszeiten.html")
 		case p == "/studium/bachelor/stundenplaene":
+			if f.noPlan {
+				io.WriteString(w, strings.ReplaceAll(stundenplaene, "I23a_6", "I24a_5"))
+				return
+			}
 			io.WriteString(w, stundenplaene)
+		case p == "/mein-profil/meine-planung/mein-stundenplan":
+			page("stundenplan/testdata/mein_stundenplan_keiner.html")
 		case strings.HasSuffix(p, ".ics"):
 			w.Header().Set("Content-Type", "text/calendar")
 			page("timetable/testdata/zenturie.ics")
@@ -472,6 +479,28 @@ func TestArgCoercionAndValidation(t *testing.T) {
 	}
 	if out, isErr := call(t, c, "cis_page", map[string]any{"path": "/x?tx_naexams_naexams%5Baction%5D=register"}); !isErr {
 		t.Errorf("action link readable: %s", out)
+	}
+}
+
+func TestNoOwnTimetableIsEmptyNotAnError(t *testing.T) {
+	e := newEnv(t)
+	e.cis.noPlan = true
+	c := startMCP(t, e.app)
+	for _, tc := range []struct {
+		tool string
+		args map[string]any
+	}{
+		{"cis_timetable", map[string]any{"from": "2026-11-09", "days": 7}},
+		{"nak_agenda", map[string]any{"from": "2026-09-20", "days": 14}},
+	} {
+		out, isErr := call(t, c, tc.tool, tc.args)
+		if isErr || !strings.Contains(out, "kein Stundenplan hinterlegt") || strings.Contains(out, "cis_stundenplan") {
+			t.Errorf("%s: err=%v\n%.800s", tc.tool, isErr, out)
+		}
+	}
+	out, isErr := call(t, c, "nak_selfcheck", nil)
+	if isErr || strings.Contains(out, `"unavailable"`) || strings.Contains(out, `"drift"`) {
+		t.Errorf("selfcheck without own plan:\n%s", out)
 	}
 }
 

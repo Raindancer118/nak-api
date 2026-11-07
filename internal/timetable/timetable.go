@@ -3,6 +3,7 @@
 package timetable
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 	"sort"
@@ -218,6 +219,10 @@ func normalize(s string) string {
 	return strings.Join(strings.Fields(s), " ")
 }
 
+// ErrNoPlan: the CIS publishes no .ics for the Zenturie — normal e.g. in the
+// thesis semester, when the overview only lists the cohorts still in lectures.
+var ErrNoPlan = errors.New("no .ics timetable published")
+
 // Fetch downloads and merges every .ics of the Zenturie (e.g. "I23a" matches
 // "I23a_6.ics" and "I23a_7.ics"); events are deduplicated by UID.
 func Fetch(c *client.Client, zenturie string) ([]Event, []string, error) {
@@ -251,7 +256,7 @@ func Fetch(c *client.Client, zenturie string) ([]Event, []string, error) {
 		}
 	}
 	if len(files) == 0 {
-		return nil, nil, fmt.Errorf("no .ics timetable found for Zenturie %q", zenturie)
+		return nil, nil, fmt.Errorf("%w for Zenturie %q", ErrNoPlan, zenturie)
 	}
 	return all, files, nil
 }

@@ -111,3 +111,23 @@ func toLower(s string) string {
 	}
 	return string(b)
 }
+
+func TestParseMineWithoutPlan(t *testing.T) {
+	b, err := os.ReadFile("testdata/mein_stundenplan_keiner.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	m, ok := ParseMine(string(b))
+	if !ok {
+		t.Fatal("stupla block not recognised")
+	}
+	if m.Notice != "Für Sie ist aktuell kein Stundenplan hinterlegt." {
+		t.Fatalf("notice = %q", m.Notice)
+	}
+}
+
+func TestParseMineUnknownPage(t *testing.T) {
+	if _, ok := ParseMine("<html><body><p>anders</p></body></html>"); ok {
+		t.Fatal("page without stupla block must not count as recognised")
+	}
+}

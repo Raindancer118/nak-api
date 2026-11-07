@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"os"
@@ -943,6 +944,9 @@ func lectures(a *app.App, c *client.Client, args Args, from, to time.Time) ([]ag
 		zen = p.Zenturie
 	}
 	evs, files, err := timetable.Fetch(c, zen)
+	if errors.Is(err, timetable.ErrNoPlan) {
+		return []agendaEvent{}, []string{noPlanNote(c, zen)}, nil
+	}
 	if err != nil {
 		return nil, nil, err
 	}
@@ -980,6 +984,13 @@ func lectures(a *app.App, c *client.Client, args Args, from, to time.Time) ([]ag
 			Source: "stundenplan", sortKey: s})
 	}
 	return out, append(notes, "Quellen: "+strings.Join(files, ", ")), nil
+}
+
+func noPlanNote(c *client.Client, zen string) string {
+	if m, ok, err := stundenplan.FetchMine(c); err == nil && ok && m.Notice != "" {
+		return m.Notice + " (Zenturie " + zen + ", CIS „Mein Stundenplan“)"
+	}
+	return "Für Zenturie " + zen + " ist im CIS aktuell kein Stundenplan veröffentlicht."
 }
 
 func timetableTool(a *app.App, c *client.Client, args Args) (any, error) {

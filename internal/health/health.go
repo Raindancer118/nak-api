@@ -150,6 +150,15 @@ var checks = []check{
 			return err
 		}
 		evs, _, err := timetable.Fetch(c, p.Zenturie)
+		if errors.Is(err, timetable.ErrNoPlan) {
+			// fine if "Mein Stundenplan" says so itself (e.g. thesis semester)
+			body, perr := page(c, stundenplan.MinePath)
+			if perr != nil {
+				return perr
+			}
+			m, ok := stundenplan.ParseMine(body)
+			return need(ok && m.Notice != "", stundenplan.MinePath, "div.stupla with the plan or an alert", body)
+		}
 		if err != nil {
 			return err
 		}
@@ -192,6 +201,7 @@ var checks = []check{
 		return err
 	}},
 	{"payment form", func(c *client.Client) error { _, err := profile.FetchPayment(c); return err }},
+	{"specialisation", func(c *client.Client) error { _, err := profile.FetchVertiefung(c); return err }},
 	{"classmates", func(c *client.Client) error {
 		body, err := page(c, profile.KommilitonenPath)
 		if err != nil {
