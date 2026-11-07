@@ -6,8 +6,10 @@ WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath \
-      -ldflags "-s -w -X github.com/Raindancer118/nak-api/cmd.Version=$VERSION" -o /out/nak .
+# UniNow app secret (Mensa menu) as a build secret, so it stays out of the image metadata; optional
+RUN --mount=type=secret,id=uninow,required=false \
+    CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath \
+      -ldflags "-s -w -X github.com/Raindancer118/nak-api/cmd.Version=$VERSION -X github.com/Raindancer118/nak-api/internal/mensa.UniNowSecret=$(cat /run/secrets/uninow 2>/dev/null)" -o /out/nak .
 
 FROM alpine:3.22
 # poppler-utils: pdftotext gives better text from Moodle PDFs than the Go fallback

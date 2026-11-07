@@ -94,6 +94,7 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           build-args: VERSION=${{ steps.tags.outputs.version }}
+          secrets: uninow=${{ secrets.UNINOW_APP_SECRET }}
           labels: |
             org.opencontainers.image.source=https://github.com/Raindancer118/nak-api
             org.opencontainers.image.version=${{ steps.tags.outputs.version }}
@@ -168,12 +169,14 @@ jobs:
           name: naknak-apk
           path: dist
       - name: Build binaries
+        env:
+          UNINOW_SECRET: ${{ secrets.UNINOW_APP_SECRET }}
         run: |
           mkdir -p dist
           for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64; do
             os=${target%/*}; arch=${target#*/}; ext=""; [ "$os" = windows ] && ext=".exe"
             CGO_ENABLED=0 GOOS=$os GOARCH=$arch go build -trimpath \
-              -ldflags "-s -w -X github.com/Raindancer118/nak-api/cmd.Version=$VERSION" \
+              -ldflags "-s -w -X github.com/Raindancer118/nak-api/cmd.Version=$VERSION -X github.com/Raindancer118/nak-api/internal/mensa.UniNowSecret=$UNINOW_SECRET" \
               -o "dist/nak-api-$VERSION-$os-$arch$ext" .
           done
           (cd dist && sha256sum nak-api-* > SHA256SUMS)

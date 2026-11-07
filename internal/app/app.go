@@ -250,6 +250,11 @@ func (a *App) Mensa() *mensa.Client {
 	if a.mensa == nil {
 		a.mensa = mensa.New(envOr("MENSA_URL", mensa.DefaultURL), a.cisUser, a.cisPass)
 		a.mensa.Zone = a.Zone
+		if u := mensa.NewUniNow(envOr("NAK_UNINOW_SECRET", mensa.UniNowSecret)); u != nil {
+			u.AppVersion = envOr("NAK_UNINOW_APP_VERSION", u.AppVersion)
+			u.Zone = a.Zone
+			a.mensa.UniNow = u
+		}
 	}
 	return a.mensa
 }

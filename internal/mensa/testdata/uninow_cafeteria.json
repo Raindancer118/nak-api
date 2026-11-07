@@ -1,0 +1,8 @@
+{"data":{"cafeteria":[{"additions":[{"key":"a","value":"Glutenhaltiges Getreide"},{"key":"c","value":"Eier und daraus gewonnene Erzeugnisse"},{"key":"g","value":"Milch und daraus gewonnene Erzeugnisse"},{"key":"2","value":"mit Konservierungsstoff"}],
+"address":{"city":"Elmshorn","country":"Deutschland","postalCode":"25337","street":"Köllner Chaussee 11"},"closedUntil":false,
+"meals":[
+{"date":"2026/11/09","title":"Spaghetti Bolognese","category":"Menü 1","priceStudents":4.2,"priceEmployees":5.5,"priceGuests":6.9,"additions":["a","c","2"],"vegetarian":false,"vegan":false},
+{"date":"2026/11/09","title":"Gemüsecurry mit Reis","category":"Menü 2 Veg.","priceStudents":3.9,"priceEmployees":5.2,"priceGuests":6.5,"additions":["g"],"vegetarian":true,"vegan":false},
+{"date":"2026/11/10","title":"Linsen-Dal","category":"Menü 2 Veg.","priceStudents":null,"priceEmployees":null,"priceGuests":null,"additions":[],"vegetarian":true,"vegan":true},
+{"date":"2026/12/01","title":"zu weit weg","category":"Menü 1","priceStudents":4.2,"priceEmployees":5.5,"priceGuests":6.9,"additions":[],"vegetarian":false,"vegan":false}],
+"name":"Mensa Nordakademie","openings":[{"weekdays":[1,2,3,4],"start":"08:00","end":"15:00"}],"pluginId":"de_ne_mensa","shortName":"Mensa Nordakademie","uuid":"x"}]}}

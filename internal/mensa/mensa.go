@@ -265,6 +265,8 @@ func Spend(bs []Booking) Spending {
 type Client struct {
 	Base, User, Pass string
 	Zone             *time.Location
+	UniNow           *UniNow // menu source first; OPC is the fallback
+	Now              func() time.Time
 	http             *http.Client
 
 	mu  sync.Mutex
@@ -314,8 +316,33 @@ func (c *Client) postForm(path string, v url.Values) (string, error) {
 	return s, err
 }
 
-// Menu: the current week and up to two more (what OPC publishes).
+// Menu asks UniNow first and OPC when UniNow fails or has nothing. An empty
+// UniNow plan with OPC down is an empty menu (weekend), not an error.
 func (c *Client) Menu(weeks int) ([]Dish, error) {
+	if c.UniNow == nil {
+		return c.opcMenu(weeks)
+	}
+	now := time.Now
+	if c.Now != nil {
+		now = c.Now
+	}
+	ds, uerr := c.UniNow.Menu(now(), weeks)
+	if uerr == nil && len(ds) > 0 {
+		return ds, nil
+	}
+	ods, oerr := c.opcMenu(weeks)
+	switch {
+	case oerr == nil:
+		return ods, nil
+	case uerr == nil:
+		return ds, nil
+	default:
+		return nil, fmt.Errorf("%w; %v", oerr, uerr)
+	}
+}
+
+// opcMenu: the current week and up to two more (what OPC publishes).
+func (c *Client) opcMenu(weeks int) ([]Dish, error) {
 	weeks = max(1, min(weeks, 3))
 	page, err := c.get("/menuplan.php?VMP")
 	if err != nil {
