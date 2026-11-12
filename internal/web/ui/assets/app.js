@@ -701,14 +701,16 @@ async function gradesPage(root) {
   });
 
   fill(tList, () => data, (g) => {
-    const mods = g.overview?.modules || [];
+    const mods = [...(g.overview?.modules || []), ...(g.overview?.extra || []).filter((e) => !e.counts_for).map((e) => ({ ...e, extra: true }))];
     let filter = "all";
     const body = h("tbody");
     const draw = () => {
       const rows = mods.filter((m) => filter === "all" || gradeState(m) === filter);
       body.replaceChildren(...rows.map((m, j) => h("tr", { vars: { "--j": Math.min(j, 20) } },
         h("td", { class: "nr", text: m.module_nr }),
-        h("td", { class: "name" }, h("a", { href: `#/modul/${firstNr(m.module_nr)}`, text: m.title })),
+        h("td", { class: "name" }, m.extra ? m.title : h("a", { href: `#/modul/${firstNr(m.module_nr)}`, text: m.title }),
+          m.recorded_as && h("small", { class: "booked", title: `Das Ergebnis steht ${bookedText(m)}.`, text: `als ${m.recorded_as} verbucht` }),
+          m.extra && h("small", { class: "booked", title: "Im CIS unter „weitere Leistungen“, zählt zu keinem Modul des Studienplans", text: "weitere Leistung" })),
         h("td", { class: "nr", text: m.exam_date || "" }),
         h("td", { class: "nr r", text: m.attempt ? `${m.attempt}.` : "" }),
         h("td", { class: "nr r", text: m.credits || "" }),
@@ -1333,6 +1335,7 @@ function loadUnits() {
     // "A222,I222" for the module graded as I168) — match by number, then by
     // title, and keep the extra numbers as aliases of the same unit.
     const alias = new Map();
+    for (const u of units) for (const nr of nrsIn(u.grade?.recorded_as)) if (!map.has(nr)) { alias.set(nr, u); if (!u.aliases.includes(nr)) u.aliases.push(nr); }
     for (const e of x.value || []) {
       const nrs = nrsIn(e.module_nr);
       const u = nrs.map((nr) => map.get(nr)).find(Boolean) || byTitle(e.title);
@@ -1495,6 +1498,13 @@ async function unitPage(root, nr, tab = "", courseArg = "") {
   });
 }
 
+// The CIS books an exam written under another number (I222 for I168) under
+// "weitere Leistungen" and leaves the module's own row at the earlier attempt.
+function bookedText(g) {
+  return [`im CIS als ${g.recorded_as || "andere Nummer"} unter „weitere Leistungen“${g.entry_date ? ` (${g.entry_date})` : ""}`,
+    g.superseded && `beim Modul selbst steht dort noch ${g.superseded.replace(/\s*\(m\)/, "")}`].filter(Boolean).join("; ");
+}
+
 function gradeTile(m, u) {
   const g = m.grade || u?.grade;
   const d = m.distribution;
@@ -1505,6 +1515,7 @@ function gradeTile(m, u) {
     h("dt", { text: "Versuch" }), h("dd", { text: g.attempt || "–" }),
     g.oral_supplement && [h("dt", { text: "Ergänzung" }), h("dd", { class: "sens", text: "Mündliche Ergänzungsprüfung zulässig (laut CIS)" })],
     g.source === "notenuebersicht" && [h("dt", { text: "Quelle" }), h("dd", { text: `Notenübersicht vom ${g.entry_date || "–"}, noch nicht in der Leistungsübersicht` })],
+    g.source === "weitere_leistungen" && [h("dt", { text: "Verbucht" }), h("dd", { text: bookedText(g) })],
     d?.count > 0 && [h("dt", { text: "Jahrgang" }), h("dd", { text: `Schnitt ${String(d.average).replace(".", ",")} · ${d.count} Ergebnisse${d.percentile ? ` · besser als ${Math.round(d.percentile)} %` : ""}` })]));
   if (d?.buckets?.length) {
     const max = Math.max(...d.buckets.map((b) => b.count), 1);
@@ -1594,8 +1605,8 @@ function examTimeline(u, m, hist, current) {
   if (g?.exam_date && !steps.some((x) => x.exam_date === g.exam_date && x.grade === g.grade)) steps.push(g);
   for (const st of steps) put(st);
   const rows = [...byKey.values()].sort((a, b) => b.at - a.at);
-  // a grade from the PDF has no exam date: it belongs to the last exam taken
-  const last = g?.source === "notenuebersicht" && !g.exam_date && rows.find((r) => !r.upcoming);
+  // a grade from the PDF or from "weitere Leistungen" has no exam date: it belongs to the last exam taken
+  const last = (g?.source === "notenuebersicht" || g?.source === "weitere_leistungen") && !g.exam_date && rows.find((r) => !r.upcoming);
   if (last && !last.result) last.result = g;
   if (!rows.length) return emptyRow("Noch keine Prüfungstermine bekannt. naknak merkt sich ab jetzt jeden Termin, den das CIS anzeigt.");
   return h("ol", { class: "timeline" }, rows.map((r, j) => {

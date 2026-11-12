@@ -27,7 +27,7 @@ type module struct {
 var modules = []module{
 	{"I151", "Softwaretechnik", "", "offen", "", "Dr. Ada Lindqvist", 0, 0, 6, 2101},
 	{"I160", "Datenbanksysteme", "", "offen", "", "Prof. Jonas Brandt", 0, 0, 6, 2102},
-	{"I168", "Diskrete Mathematik 2", "4,0 (2.Versuch)", "bestanden", "11.02.2026", "Prof. Mira Okafor", 4.0, 2, 5, 2103},
+	{"I168", "Diskrete Mathematik 2", "4,0", "bestanden", "11.02.2026", "Prof. Mira Okafor", 4.0, 2, 5, 2103},
 	{"I145", "Diskrete Mathematik 1", "2,3", "bestanden", "14.07.2025", "Prof. Mira Okafor", 2.3, 1, 5, 2004},
 	{"I201", "Einführung in die objektorientierte Programmierung", "1,3", "bestanden", "03.02.2025", "Felix Sorensen", 1.3, 1, 6, 2005},
 	{"I154", "Rechnernetze", "1,7", "bestanden", "22.07.2025", "Dr. Ilse Varga", 1.7, 1, 5, 2006},
@@ -148,12 +148,21 @@ func courses(classification string) []map[string]any {
 	return out
 }
 
+// booked: the retake ran under the new regulations' number, so the CIS lists
+// the result under "weitere Leistungen" instead of on the module.
+func booked(nr string, row map[string]any) {
+	if nr == "I168" {
+		row["source"], row["recorded_as"], row["superseded"] = "weitere_leistungen", "I222", "5,0"
+	}
+}
+
 func grades() map[string]any {
 	var mods []map[string]any
 	passed, open, earned := 0, 0, 0
 	sum, weight := 0.0, 0.0
 	for _, m := range modules {
 		row := map[string]any{"module_nr": m.nr, "title": m.title, "grade": m.grade, "status": m.status, "exam_date": m.examDate, "entry_date": m.examDate, "credits": fmt.Sprint(m.credits), "attempt": m.attempt, "oral_supplement": strings.Contains(m.grade, "(m)")}
+		booked(m.nr, row)
 		if m.value > 0 {
 			row["grade_value"] = m.value
 			sum += m.value * float64(m.credits)
@@ -338,7 +347,9 @@ func Registry() *tools.Registry {
 				if m.nr == nr {
 					out["title"] = m.title
 					if m.grade != "" {
-						out["grade"] = map[string]any{"module_nr": m.nr, "title": m.title, "grade": m.grade, "grade_value": m.value, "status": m.status, "exam_date": m.examDate, "attempt": m.attempt, "oral_supplement": strings.Contains(m.grade, "(m)")}
+						g := map[string]any{"module_nr": m.nr, "title": m.title, "grade": m.grade, "grade_value": m.value, "status": m.status, "exam_date": m.examDate, "entry_date": m.examDate, "attempt": m.attempt, "oral_supplement": strings.Contains(m.grade, "(m)")}
+						booked(m.nr, g)
+						out["grade"] = g
 						out["distribution"] = map[string]any{"average": 2.6, "count": 84, "lecturers": []string{m.lecturer}, "buckets": []map[string]any{{"grade": "1,0", "count": 6}, {"grade": "1,3", "count": 9}, {"grade": "1,7", "count": 12}, {"grade": "2,0", "count": 14}, {"grade": "2,3", "count": 11}, {"grade": "2,7", "count": 10}, {"grade": "3,0", "count": 8}, {"grade": "3,3", "count": 5}, {"grade": "3,7", "count": 4}, {"grade": "4,0", "count": 3}, {"grade": "5,0", "count": 2}}, "percentile": 22}
 					}
 					out["studienplan"] = map[string]any{"credits": m.credits, "exam_form_name": "Klausur (90 Minuten)", "exam_semester": 3}
