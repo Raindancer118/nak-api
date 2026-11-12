@@ -40,6 +40,9 @@ type entry struct {
 	At  time.Time       `json:"at"`
 	// Path is set for downloads; the entry is only valid while the file exists.
 	Path string `json:"path,omitempty"`
+	// Old: cached by another version, which may have read the CIS differently.
+	// Asked again before it is shown; kept as the fallback if that fails.
+	Old bool `json:"old,omitempty"`
 }
 
 type flight struct {
@@ -54,25 +57,43 @@ type store struct {
 	entries map[string]entry
 	flights map[string]*flight
 	file    string
+	version string
 	dirty   bool
 	timer   *time.Timer
 }
 
-func newStore(file string) *store {
-	s := &store{entries: map[string]entry{}, flights: map[string]*flight{}, file: file}
+func newStore(file, version string) *store {
+	s := &store{entries: map[string]entry{}, flights: map[string]*flight{}, file: file, version: version}
 	if file == "" {
 		return s
 	}
 	if b, err := os.ReadFile(file); err == nil {
 		var saved struct {
 			V       int              `json:"v"`
+			App     string           `json:"app"`
 			Entries map[string]entry `json:"entries"`
 		}
 		if json.Unmarshal(b, &saved) == nil && saved.V == 1 && saved.Entries != nil {
 			s.entries = saved.Entries
+			if saved.App != version {
+				s.outdate()
+			}
 		}
 	}
 	return s
+}
+
+// outdate marks every answer as one of another version; downloads are files, not readings.
+func (s *store) outdate() {
+	s.mu.Lock()
+	for k, e := range s.entries {
+		if e.Path == "" {
+			e.Old = true
+			s.entries[k] = e
+		}
+	}
+	s.markDirtyLocked()
+	s.mu.Unlock()
 }
 
 func (s *store) get(key string) (entry, bool) {
@@ -132,7 +153,7 @@ func (s *store) save() error {
 		s.mu.Unlock()
 		return nil
 	}
-	b, err := json.Marshal(map[string]any{"v": 1, "entries": s.entries})
+	b, err := json.Marshal(map[string]any{"v": 1, "app": s.version, "entries": s.entries})
 	s.dirty = false
 	s.mu.Unlock()
 	if err != nil {

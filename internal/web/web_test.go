@@ -24,7 +24,10 @@ import (
 
 const token = "test-token-0123456789"
 
-type counters struct{ reads, previews, dos, downloads atomic.Int32 }
+type counters struct {
+	reads, previews, dos, downloads atomic.Int32
+	failReads                       atomic.Bool
+}
 
 func fakeRegistry(c *counters) *tools.Registry {
 	r := tools.NewRegistry()
@@ -33,6 +36,9 @@ func fakeRegistry(c *counters) *tools.Registry {
 			Params: []tools.Param{{Name: "q", Desc: "Suchwort"}},
 			Run: func(a *app.App, args tools.Args) (any, error) {
 				n := c.reads.Add(1)
+				if c.failReads.Load() {
+					return nil, errors.New("CIS down")
+				}
 				return map[string]any{"q": args.Str("q"), "call": n}, nil
 			}},
 		&tools.Tool{Name: "fake_write", Kind: tools.Write, Desc: "Ändert etwas.",
@@ -80,13 +86,17 @@ type harness struct {
 func newHarness(t *testing.T) *harness { return newHarnessWith(t, "") }
 
 func newHarnessWith(t *testing.T, cacheFile string) *harness {
+	return newHarnessVersion(t, cacheFile, "9.9.9")
+}
+
+func newHarnessVersion(t *testing.T, cacheFile, version string) *harness {
 	t.Helper()
 	c := &counters{}
 	a := app.FromEnv()
 	a.DownloadDir = t.TempDir()
 	now := time.Date(2026, 10, 2, 12, 0, 0, 0, time.UTC)
 	h := &harness{c: c, app: a, now: &now}
-	s := New(a, fakeRegistry(c), Config{Token: token, CacheTTL: 5 * time.Minute, Version: "9.9.9", Now: func() time.Time { return *h.now }, CacheFile: cacheFile})
+	s := New(a, fakeRegistry(c), Config{Token: token, CacheTTL: 5 * time.Minute, Version: version, Now: func() time.Time { return *h.now }, CacheFile: cacheFile})
 	h.web = s
 	h.srv = httptest.NewServer(s.Handler())
 	t.Cleanup(h.srv.Close)
@@ -108,6 +118,49 @@ func TestCacheSurvivesRestart(t *testing.T) {
 	m := decode(t, h2.do(t, "POST", "/api/tools/fake_read", `{"q":"x"}`, bearer))
 	if m["cached"] != true || h2.c.reads.Load() != 0 {
 		t.Fatalf("after restart: %v reads=%d", m, h2.c.reads.Load())
+	}
+}
+
+// A new version may read the CIS differently (a grade found in another place):
+// what an older version cached is asked again first and only shown if that fails.
+func TestCacheOfAnotherVersionIsAskedAgain(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "web-cache.json")
+	h1 := newHarnessWith(t, file)
+	h1.do(t, "POST", "/api/tools/fake_read", `{"q":"x"}`, bearer)
+	h1.do(t, "POST", "/api/tools/fake_read", `{"q":"y"}`, bearer)
+	if err := h1.web.SaveCache(); err != nil {
+		t.Fatal(err)
+	}
+	h2 := newHarnessVersion(t, file, "9.9.10")
+	m := decode(t, h2.do(t, "POST", "/api/tools/fake_read", `{"q":"x"}`, bearer))
+	if m["cached"] != false || m["stale"] == true || h2.c.reads.Load() != 1 {
+		t.Fatalf("after an update: %v reads=%d", m, h2.c.reads.Load())
+	}
+	if m := decode(t, h2.do(t, "POST", "/api/tools/fake_read", `{"q":"x"}`, bearer)); m["cached"] != true || h2.c.reads.Load() != 1 {
+		t.Fatalf("the new answer is cached as usual: %v reads=%d", m, h2.c.reads.Load())
+	}
+	if _, err := h2.web.cachedTool("fake_read", tools.Args{"q": "y"}); err != nil || h2.c.reads.Load() != 2 {
+		t.Fatalf("internal readers ask again too: %v reads=%d", err, h2.c.reads.Load())
+	}
+	if err := h2.web.SaveCache(); err != nil {
+		t.Fatal(err)
+	}
+	// same version again: the cache is trusted
+	h3 := newHarnessVersion(t, file, "9.9.10")
+	if m := decode(t, h3.do(t, "POST", "/api/tools/fake_read", `{"q":"y"}`, bearer)); m["cached"] != true || h3.c.reads.Load() != 0 {
+		t.Fatalf("same version: %v reads=%d", m, h3.c.reads.Load())
+	}
+	// CIS down right after an update: the old answer is better than none, and it is asked again next time
+	h3.web.store.outdate()
+	h3.c.failReads.Store(true)
+	res := h3.do(t, "POST", "/api/tools/fake_read", `{"q":"x"}`, bearer)
+	m = decode(t, res)
+	if res.StatusCode != 200 || m["stale"] != true || m["refresh_error"] == nil || m["result"].(map[string]any)["q"] != "x" {
+		t.Fatalf("fallback to the old answer: %d %v", res.StatusCode, m)
+	}
+	h3.c.failReads.Store(false)
+	if m := decode(t, h3.do(t, "POST", "/api/tools/fake_read", `{"q":"x"}`, bearer)); m["cached"] != false || h3.c.reads.Load() != 2 {
+		t.Fatalf("not confirmed yet: %v reads=%d", m, h3.c.reads.Load())
 	}
 }
 

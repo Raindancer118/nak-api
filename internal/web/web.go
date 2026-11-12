@@ -103,7 +103,7 @@ func New(a *app.App, reg *tools.Registry, cfg Config) *Server {
 	}
 	s := &Server{
 		app: a, reg: reg, cfg: cfg, ui: ui,
-		store:  newStore(cfg.CacheFile),
+		store:  newStore(cfg.CacheFile, cfg.Version),
 		logins: map[string]*attempts{},
 	}
 	if cfg.UIDir == "" {
@@ -523,10 +523,10 @@ func (s *Server) callTool(w http.ResponseWriter, r *http.Request) {
 		if e, ok := s.store.get(key); ok && usable(e) {
 			age := s.cfg.Now().Sub(e.At)
 			switch {
-			case t.Kind == tools.Local || age < s.freshFor(t.Name):
+			case t.Kind == tools.Local || (!e.Old && age < s.freshFor(t.Name)):
 				s.respond(w, t, args, e.Res, e.At, true, false, "")
 				return
-			case age < maxStale && !wait:
+			case age < maxStale && !wait && !e.Old:
 				// stale-while-revalidate: answer now, refresh behind it
 				go s.refresh(t, key, args)
 				s.respond(w, t, args, e.Res, e.At, true, true, "")
