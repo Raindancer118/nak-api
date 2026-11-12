@@ -63,3 +63,16 @@ func TestHistoryEndpoint(t *testing.T) {
 		t.Fatalf("no auth: %d", res.StatusCode)
 	}
 }
+
+// The module page is often opened before the grades list: its grade counts too,
+// or the module stays "ausstehend" until the list is loaded.
+func TestHistoryRecordsTheGradeOfAModulePage(t *testing.T) {
+	now := time.Date(2026, 11, 12, 9, 0, 0, 0, time.UTC)
+	hs := newHistory("", func() time.Time { return now })
+	hs.observe("nak_module", json.RawMessage(`{"module_nr":"I168","title":"Diskrete Mathematik 2","grade":{"module_nr":"I168","title":"Diskrete Mathematik 2","grade":"2,3","status":"bestanden","attempt":3},"exams":[]}`))
+	hs.observe("nak_module", json.RawMessage(`{"module_nr":"I151","title":"Softwaretechnik"}`))
+	s := hs.snapshot()
+	if g := s.Grades["I168"]; len(g) != 1 || g[0].Grade != "2,3" || g[0].Attempt != 3 || len(s.Grades) != 1 {
+		t.Fatalf("grade steps: %+v", s.Grades)
+	}
+}

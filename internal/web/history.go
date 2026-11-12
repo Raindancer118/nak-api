@@ -90,9 +90,13 @@ func (h *history) observe(tool string, raw json.RawMessage) {
 	case "nak_module":
 		var m struct {
 			Exams []map[string]any `json:"exams"`
+			Grade map[string]any   `json:"grade"`
 		}
 		json.Unmarshal(raw, &m)
 		exams = m.Exams
+		if m.Grade != nil {
+			modules = []map[string]any{m.Grade}
+		}
 	case "cis_transcript_grades":
 		var t struct {
 			Modules []map[string]any `json:"modules"`
