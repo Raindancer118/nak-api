@@ -209,7 +209,7 @@ func cisTools() []*Tool {
 			}},
 
 		// ── grades ──
-		{Name: "cis_grades", Kind: Read, Desc: "Leistungsübersicht: alle Module mit Note, Versuch, Status, Credits, dazu Seminare, Transferleistungen, Durchschnitt, Credits gesamt und eine Auswertung.",
+		{Name: "cis_grades", Kind: Read, Desc: "Leistungsübersicht: alle Module mit Note, Versuch, Status, Credits, dazu Seminare, Transferleistungen, Durchschnitt, Credits gesamt und eine Auswertung. Ein Ergebnis, das das CIS unter „weitere Leistungen“ verbucht (Klausur unter anderer Modulnummer), steht beim zugehörigen Modul (source=weitere_leistungen, recorded_as, superseded).",
 			Params: []Param{{Name: "status", Desc: "Filter Module: bestanden | nicht bestanden | offen", Enum: []string{grades.StatusPassed, grades.StatusFailed, grades.StatusOpen}}},
 			Run: func(a *app.App, args Args) (any, error) {
 				c, err := cis(a)

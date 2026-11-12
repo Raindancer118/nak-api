@@ -43,8 +43,12 @@ type ModuleGrade struct {
 	StatisticURL  string   `json:"statistic_url,omitempty"`
 	AttendanceURL string   `json:"attendance_url,omitempty"`
 	// Source is SourceTranscript when the grade comes from the Notenübersicht
-	// PDF and the page does not show it yet.
-	Source string `json:"source,omitempty"`
+	// PDF and the page does not show it yet, SourceExtra when the CIS booked
+	// it under "weitere Leistungen" (see applyExtra).
+	Source     string `json:"source,omitempty"`
+	RecordedAs string `json:"recorded_as,omitempty"` // number the CIS booked the result under
+	Superseded string `json:"superseded,omitempty"`  // what the module's own row still shows
+	CountsFor  string `json:"counts_for,omitempty"`  // on an extra row: the module it was laid over
 }
 
 type SeminarGrade struct {
@@ -111,6 +115,7 @@ func ParseOverview(body, base string) *Overview {
 	if pane := htmlx.First(doc, htmlx.ID("extra")); pane != nil {
 		o.Extra, _, _ = parseModuleTable(pane, base)
 	}
+	o.applyExtra()
 	if pane := htmlx.First(doc, htmlx.ID("seminar")); pane != nil {
 		for _, tr := range htmlx.Rows(pane) {
 			cells := labelled(tr)
@@ -155,7 +160,8 @@ func parseModuleTable(pane *html.Node, base string) (mods []ModuleGrade, avg, cr
 		if cells["Modulnummer"] == "" && cells["Bezeichnung"] == "" {
 			continue
 		}
-		raw := cells["Note"]
+		// "weitere Leistungen" writes 3.7 where every other place writes 3,7
+		raw := dotGrade.ReplaceAllString(cells["Note"], "$1,$2")
 		v, attempt, status := parseGrade(raw)
 		m := ModuleGrade{ModuleNr: cells["Modulnummer"], Title: cells["Bezeichnung"], ExamDate: cells["Prüfungsdatum"],
 			EntryDate: cells["Noteneingabedatum"], Grade: raw, GradeValue: v, Attempt: attempt, Status: status,
@@ -207,6 +213,7 @@ func splitLead(s string) (string, string) {
 }
 
 var (
+	dotGrade = regexp.MustCompile(`^(\d)\.(\d)`)
 	gradeNum = regexp.MustCompile(`^(\d)[,.](\d)`)
 	attemptR = regexp.MustCompile(`\((\d+)\.\s*Versuch\)`)
 )

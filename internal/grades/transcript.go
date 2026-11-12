@@ -119,6 +119,10 @@ func (o *Overview) ApplyTranscript(t *TranscriptGrades, pdfNewer bool) []string 
 		if m != nil && (NormalizeGrade(m.Grade) == NormalizeGrade(tg.Grade) || strings.TrimSpace(m.Grade) != "" && !pdfNewer) {
 			continue
 		}
+		// the PDF keeps the attempt a result from "weitere Leistungen" replaced
+		if m != nil && m.Source == SourceExtra && NormalizeGrade(m.Superseded) == NormalizeGrade(tg.Grade) {
+			continue
+		}
 		if m == nil {
 			o.Modules = append(o.Modules, ModuleGrade{ModuleNr: tg.ModuleNr, Title: tg.Title})
 			m = &o.Modules[len(o.Modules)-1]
@@ -135,7 +139,7 @@ func (o *Overview) ApplyTranscript(t *TranscriptGrades, pdfNewer bool) []string 
 		if m.Credits == "" {
 			m.Credits = tg.Credits
 		}
-		m.Source = SourceTranscript
+		m.Source, m.RecordedAs, m.Superseded = SourceTranscript, "", ""
 		changed = append(changed, tg.ModuleNr)
 	}
 	return changed
