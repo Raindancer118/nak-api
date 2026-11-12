@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -163,7 +164,8 @@ func (h *history) observe(tool string, raw json.RawMessage) {
 }
 
 // observeTranscript records grades from the PDF: no exam dates there, so a
-// step only says "this result was there at Seen"; same grade, no new step.
+// step only says "this result was there at Seen". A grade the module already
+// had is no new step — the PDF can lag behind the page ("weitere Leistungen").
 func (h *history) observeTranscript(mods []map[string]any) {
 	now := h.now()
 	h.mu.Lock()
@@ -174,7 +176,7 @@ func (h *history) observeTranscript(mods []map[string]any) {
 			continue
 		}
 		steps := h.data.Grades[nr]
-		if n := len(steps); n > 0 && grades.NormalizeGrade(steps[n-1].Grade) == grades.NormalizeGrade(grade) {
+		if slices.ContainsFunc(steps, func(st gradeRecord) bool { return grades.NormalizeGrade(st.Grade) == grades.NormalizeGrade(grade) }) {
 			continue
 		}
 		h.data.Grades[nr] = append(steps, gradeRecord{ModuleNr: nr, Title: str(m, "title"), Grade: grade, Seen: now})

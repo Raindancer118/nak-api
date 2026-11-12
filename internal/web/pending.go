@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/Raindancer118/nak-api/internal/exams"
+	"github.com/Raindancer118/nak-api/internal/grades"
 	"github.com/Raindancer118/nak-api/internal/tools"
 )
 
@@ -34,9 +35,7 @@ func parseDE(s string, loc *time.Location) (time.Time, bool) {
 }
 
 func titleKey(s string) string {
-	s = strings.ToLower(strings.TrimSpace(s))
-	s = strings.TrimPrefix(s, "wp ")
-	return strings.Join(strings.Fields(s), " ")
+	return strings.TrimPrefix(grades.TitleKey(s), "wp ")
 }
 
 type pendingExam struct {

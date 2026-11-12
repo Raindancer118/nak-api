@@ -351,6 +351,12 @@ func diffGrades(raw json.RawMessage, seen map[string]string) []Notification {
 		if nr == "" || grade == "" {
 			continue
 		}
+		// a result from "weitere Leistungen": the PDF keeps the replaced attempt
+		if sup := str(m, "superseded"); sup != "" {
+			seen["superseded:"+nr] = grades.NormalizeGrade(sup)
+		} else {
+			delete(seen, "superseded:"+nr)
+		}
 		old, had := seen["grade:"+nr]
 		if gradeChange(seen, nr, grade) {
 			title := "Neue Note: " + str(m, "title") + " " + grade
@@ -381,6 +387,9 @@ func diffTranscript(raw json.RawMessage, seen map[string]string) []Notification 
 	for _, m := range t.Modules {
 		nr, grade := str(m, "module_nr"), str(m, "grade")
 		if nr == "" || grade == "" {
+			continue
+		}
+		if sup, ok := seen["superseded:"+nr]; ok && sup == grades.NormalizeGrade(grade) {
 			continue
 		}
 		old, had := seen["grade:"+nr]

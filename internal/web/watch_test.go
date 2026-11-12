@@ -451,3 +451,65 @@ func TestPageAndPDFSpellingDoNotFlipFlop(t *testing.T) {
 		}
 	}
 }
+
+// A result the CIS books under "weitere Leistungen" replaces the module's row;
+// the PDF keeps the superseded attempt for the module. Neither the bell nor the
+// history may swing back and forth between the two.
+func TestSupersededGradeInThePDFIsNoNews(t *testing.T) {
+	seen := map[string]string{}
+	before := json.RawMessage(`{"overview":{"modules":[{"module_nr":"I168","title":"Diskrete Mathematik 2","grade":"5,0 (2.Versuch)"}]}}`)
+	page := json.RawMessage(`{"overview":{"modules":[{"module_nr":"I168","title":"Diskrete Mathematik 2","grade":"2,3","status":"bestanden","source":"weitere_leistungen","recorded_as":"I222","superseded":"5,0 (2.Versuch)"}]}}`)
+	pdf := json.RawMessage(`{"modules":[{"module_nr":"I168","title":"Diskrete Mathematik 2","grade":"5,0 (2. Versuch)"}]}`)
+	diffGrades(before, seen)
+	if n := diffGrades(page, seen); len(n) != 1 || !strings.Contains(n[0].Title, "Diskrete Mathematik 2 2,3") || n[0].URL != "#/modul/I168" {
+		t.Fatalf("the new result is announced once: %+v", n)
+	}
+	for i := 0; i < 3; i++ {
+		if n := diffTranscript(pdf, seen); len(n) != 0 {
+			t.Fatalf("PDF round %d: %+v", i, n)
+		}
+		if n := diffGrades(page, seen); len(n) != 0 {
+			t.Fatalf("page round %d: %+v", i, n)
+		}
+	}
+	// booked on the module itself: page and PDF agree, still nothing new
+	booked := json.RawMessage(`{"overview":{"modules":[{"module_nr":"I168","title":"Diskrete Mathematik 2","grade":"2,3","status":"bestanden"}]}}`)
+	if n := append(diffGrades(booked, seen), diffTranscript(json.RawMessage(`{"modules":[{"module_nr":"I168","title":"Diskrete Mathematik 2","grade":"2,3"}]}`), seen)...); len(n) != 0 {
+		t.Fatalf("same result, other place: %+v", n)
+	}
+	// and a later change of the PDF counts again
+	if n := diffTranscript(pdf, seen); len(n) != 1 {
+		t.Fatalf("without a superseded grade the PDF is compared as usual: %+v", n)
+	}
+}
+
+func TestExtraResultEndsThePendingGrade(t *testing.T) {
+	w := newWatchHarness(t, app.NotifySettings{})
+	w.f.exams = []map[string]any{{"exam_id": "77", "module_nr": "A222,I222", "title": "Diskrete Mathematik 2", "start": "02.10.2026 08:30", "registered": true}}
+	w.f.pageExtra = []map[string]any{{"module_nr": "I168", "title": "Diskrete Mathematik 2", "exam_date": "11.02.2026", "grade": "5,0 (2.Versuch)", "attempt": 2, "status": "nicht bestanden"}}
+	w.srv.cachedTool("cis_list_klausuren", tools.Args{})
+	w.srv.toolAtMost("cis_grades", tools.Args{}, 0)
+	*w.now = w.now.Add(24 * time.Hour)
+	if n := len(w.srv.pendingExams(*w.now)); n != 1 {
+		t.Fatalf("written, not graded: pending = %d", n)
+	}
+	// no exam date on a result from "weitere Leistungen"
+	w.f.mu.Lock()
+	w.f.pageExtra = []map[string]any{{"module_nr": "I168", "title": "Diskrete Mathematik 2", "grade": "2,3", "attempt": 3, "status": "bestanden", "source": "weitere_leistungen", "recorded_as": "I222", "superseded": "5,0 (2.Versuch)"}}
+	w.f.transcript = []map[string]any{{"module_nr": "I168", "title": "Diskrete Mathematik 2", "grade": "5,0 (2. Versuch)"}}
+	w.f.mu.Unlock()
+	*w.now = w.now.Add(40 * 24 * time.Hour)
+	w.srv.toolAtMost("cis_grades", tools.Args{}, 0)
+	if n := len(w.srv.pendingExams(*w.now)); n != 0 {
+		t.Fatalf("graded exam still pending (%d)", n)
+	}
+	for i := 0; i < 3; i++ {
+		*w.now = w.now.Add(4 * time.Hour)
+		w.srv.toolAtMost("cis_transcript_grades", tools.Args{}, 0)
+		w.srv.toolAtMost("cis_grades", tools.Args{}, 0)
+	}
+	steps := w.srv.history.snapshot().Grades["I168"]
+	if len(steps) != 2 || steps[1].Grade != "2,3" {
+		t.Fatalf("the stale PDF must not add steps: %+v", steps)
+	}
+}
